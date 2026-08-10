@@ -2,8 +2,8 @@
 
 ## Requirements
 
-- Node.js <versión acordada>
-- npm
+- Node.js v24.19.0
+- npm 11.17.0
 
 ## Setup
 
