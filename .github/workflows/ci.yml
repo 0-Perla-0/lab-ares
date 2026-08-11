@@ -11,6 +11,9 @@ on:
       - develop
       - main
 
+permissions:
+  contents: read
+
 jobs:
   quality:
     runs-on: ubuntu-latest
@@ -30,6 +33,12 @@ jobs:
 
       - name: Check formatting
         run: npm run format:check
+
+      - name: Validate Prisma schema
+        run: npx prisma validate
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
 
       - name: Type check
         run: npm run check

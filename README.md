@@ -13,8 +13,13 @@ npm run dev
 
 ## Quality checks
 
+### Prisma
+npx prisma validate
+npx prisma generate
+
+### General check
+npm run format
 npm run check
-npm run format:check
 npm run build
 
 ## Branch strategy
