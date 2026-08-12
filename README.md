@@ -14,10 +14,13 @@ npm run dev
 ## Quality checks
 
 ### Prisma
+
 npx prisma validate
 npx prisma generate
 
 ### General check
+
+npm test
 npm run format
 npm run check
 npm run build

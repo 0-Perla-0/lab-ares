@@ -17,6 +17,9 @@ permissions:
 jobs:
   quality:
     runs-on: ubuntu-latest
+    env:
+      ASTRO_TELEMETRY_DISABLED: "1"
+      DATABASE_URL: mysql://ci:ci@127.0.0.1:3306/ares_ci
 
     steps:
       - name: Checkout
@@ -39,6 +42,9 @@ jobs:
 
       - name: Generate Prisma Client
         run: npx prisma generate
+
+      - name: Run tests
+        run: npm test
 
       - name: Type check
         run: npm run check

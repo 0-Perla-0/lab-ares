@@ -1,14 +1,25 @@
 import type { APIRoute } from "astro";
-import { prisma } from "../../server/db/prisma";
+import { getPrisma } from "../../server/db/prisma";
+
+export const prerender = false;
+
+const responseInit = {
+  headers: {
+    "Cache-Control": "no-store",
+  },
+};
 
 export const GET = (async () => {
   try {
-    await prisma.$queryRaw`SELECT 1`;
+    await getPrisma().$queryRaw`SELECT 1`;
 
-    return Response.json({
-      status: "ok",
-      database: "connected",
-    });
+    return Response.json(
+      {
+        status: "ok",
+        database: "connected",
+      },
+      responseInit,
+    );
   } catch (error) {
     console.error("Database health check failed: ", error);
 
@@ -19,6 +30,7 @@ export const GET = (async () => {
       },
       {
         status: 503,
+        ...responseInit,
       },
     );
   }
