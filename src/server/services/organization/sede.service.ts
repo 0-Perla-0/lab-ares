@@ -3,6 +3,7 @@ import type {
   CrearSedeInput,
 } from "../../../schemas/organization";
 import { conflict, notFound } from "../../errors/domain-error";
+import { UniqueConstraintError } from "../../errors/unique-constraint-error";
 import * as sedeRepository from "../../repositories/sede.repository";
 
 export function listarSedes() {
@@ -23,10 +24,12 @@ export async function obtenerSede(id: number) {
 export async function crearSede(input: CrearSedeInput) {
   await verificarNombreDisponible(input.nombre);
 
-  return sedeRepository.create({
-    nombre: input.nombre,
-    direccion: input.direccion ?? null,
-  });
+  return conNombreUnico(() =>
+    sedeRepository.create({
+      nombre: input.nombre,
+      direccion: input.direccion ?? null,
+    }),
+  );
 }
 
 export async function actualizarSede(id: number, input: ActualizarSedeInput) {
@@ -36,7 +39,7 @@ export async function actualizarSede(id: number, input: ActualizarSedeInput) {
     await verificarNombreDisponible(input.nombre, id);
   }
 
-  return sedeRepository.update(id, input);
+  return conNombreUnico(() => sedeRepository.update(id, input));
 }
 
 /** Baja lógica idempotente: desactivar una sede ya inactiva no es un error. */
@@ -55,5 +58,21 @@ async function verificarNombreDisponible(nombre: string, excludeId?: number) {
 
   if (existente) {
     throw conflict("SEDE_ALREADY_EXISTS");
+  }
+}
+
+/**
+ * Red de seguridad para la carrera entre el chequeo de arriba y la escritura:
+ * si el índice único salta primero, el conflicto sigue siendo un 409 y no un 500.
+ */
+async function conNombreUnico<T>(escritura: () => Promise<T>): Promise<T> {
+  try {
+    return await escritura();
+  } catch (error) {
+    if (error instanceof UniqueConstraintError) {
+      throw conflict("SEDE_ALREADY_EXISTS");
+    }
+
+    throw error;
   }
 }

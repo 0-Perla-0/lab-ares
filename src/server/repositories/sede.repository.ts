@@ -4,6 +4,8 @@ import type {
 } from "../../generated/prisma/models";
 import { getPrisma } from "../db/prisma";
 
+import { translateUniqueViolation } from "./prisma-errors";
+
 type CreateData = Pick<SedeCreateInput, "nombre" | "direccion">;
 type UpdateData = Pick<SedeUpdateInput, "nombre" | "direccion">;
 
@@ -32,11 +34,13 @@ export function findByNombre(nombre: string, excludeId?: number) {
 }
 
 export function create(data: CreateData) {
-  return getPrisma().sede.create({ data });
+  return translateUniqueViolation(() => getPrisma().sede.create({ data }));
 }
 
 export function update(id: number, data: UpdateData) {
-  return getPrisma().sede.update({ where: { id }, data });
+  return translateUniqueViolation(() =>
+    getPrisma().sede.update({ where: { id }, data }),
+  );
 }
 
 export function deactivate(id: number) {
