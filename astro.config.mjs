@@ -1,5 +1,5 @@
 // @ts-check
-import { defineConfig, envField } from "astro/config";
+import { defineConfig, envField, sessionDrivers } from "astro/config";
 
 import node from "@astrojs/node";
 
@@ -25,7 +25,14 @@ export default defineConfig({
     },
   },
 
-  // Authentication will configure a persistent session strategy explicitly.
-  // Until then, do not enable the Node adapter's filesystem-backed default.
-  session: false,
+  session: {
+    driver: sessionDrivers.fsLite({
+      base: ".astro/sessions",
+    }),
+    cookie: {
+      name: "ares-session",
+      sameSite: "lax",
+    },
+    ttl: 60 * 60 * 8,
+  },
 });
