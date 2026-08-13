@@ -19,6 +19,10 @@ export function created<T>(data: T): Response {
   return Response.json({ data }, { status: 201, headers: noStoreHeaders });
 }
 
+export function errorResponse(code: string, status: number): Response {
+  return Response.json({ error: code }, { status, headers: noStoreHeaders });
+}
+
 function validationError(details: unknown): Response {
   return Response.json(
     { error: "VALIDATION_ERROR", details },
@@ -47,7 +51,11 @@ export function handleError(error: unknown, context: string): Response {
   );
 }
 
-type Parsed<T> =
+/**
+ * Resultado de una comprobación en el borde HTTP: o sigue el handler con un
+ * valor ya tipado, o se corta devolviendo la Response que corresponda.
+ */
+export type Parsed<T> =
   { success: true; data: T } | { success: false; response: Response };
 
 export function parseValue<T>(schema: z.ZodType<T>, value: unknown): Parsed<T> {
