@@ -72,7 +72,7 @@ export async function desactivarArea(id: number) {
     return area;
   }
 
-  return areaRepository.deactivate(id);
+  return areaRepository.deactivateCascade(id);
 }
 
 /** Un área solo puede colgar de una sede que exista y siga de alta. */

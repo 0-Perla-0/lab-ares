@@ -9,6 +9,7 @@ const noStoreHeaders = {
 const statusByKind: Record<DomainErrorKind, number> = {
   NOT_FOUND: 404,
   CONFLICT: 409,
+  INVALID_INPUT: 400,
 };
 
 export function ok<T>(data: T): Response {

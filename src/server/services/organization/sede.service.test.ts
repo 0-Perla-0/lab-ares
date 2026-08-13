@@ -18,7 +18,7 @@ vi.mock("../../repositories/sede.repository", () => ({
   create: vi.fn(),
   update: vi.fn(),
   reactivate: vi.fn(),
-  deactivateWithAreas: vi.fn(),
+  deactivateCascade: vi.fn(),
 }));
 
 const mocked = vi.mocked(sedeRepository);
@@ -151,12 +151,12 @@ describe("actualizarSede", () => {
 describe("desactivarSede", () => {
   it("da de baja la sede arrastrando sus áreas", async () => {
     mocked.findById.mockResolvedValue(sede);
-    mocked.deactivateWithAreas.mockResolvedValue({ ...sede, activa: false });
+    mocked.deactivateCascade.mockResolvedValue({ ...sede, activa: false });
 
     const resultado = await desactivarSede(1);
 
     expect(resultado.activa).toBe(false);
-    expect(mocked.deactivateWithAreas).toHaveBeenCalledWith(1);
+    expect(mocked.deactivateCascade).toHaveBeenCalledWith(1);
   });
 
   it("es idempotente: no reescribe una sede ya inactiva", async () => {
@@ -166,6 +166,6 @@ describe("desactivarSede", () => {
     const resultado = await desactivarSede(1);
 
     expect(resultado).toEqual(inactiva);
-    expect(mocked.deactivateWithAreas).not.toHaveBeenCalled();
+    expect(mocked.deactivateCascade).not.toHaveBeenCalled();
   });
 });

@@ -18,7 +18,7 @@ vi.mock("../../repositories/area.repository", () => ({
   create: vi.fn(),
   update: vi.fn(),
   reactivate: vi.fn(),
-  deactivate: vi.fn(),
+  deactivateCascade: vi.fn(),
 }));
 
 vi.mock("../../repositories/sede.repository", () => ({
@@ -201,12 +201,12 @@ describe("actualizarArea", () => {
 describe("desactivarArea", () => {
   it("da de baja un área activa", async () => {
     mockedArea.findById.mockResolvedValue(area);
-    mockedArea.deactivate.mockResolvedValue({ ...area, activa: false });
+    mockedArea.deactivateCascade.mockResolvedValue({ ...area, activa: false });
 
     const resultado = await desactivarArea(10);
 
     expect(resultado.activa).toBe(false);
-    expect(mockedArea.deactivate).toHaveBeenCalledWith(10);
+    expect(mockedArea.deactivateCascade).toHaveBeenCalledWith(10);
   });
 
   it("es idempotente con un área ya inactiva", async () => {
@@ -214,6 +214,6 @@ describe("desactivarArea", () => {
 
     await desactivarArea(10);
 
-    expect(mockedArea.deactivate).not.toHaveBeenCalled();
+    expect(mockedArea.deactivateCascade).not.toHaveBeenCalled();
   });
 });

@@ -54,11 +54,16 @@ export function reactivate(id: number, data: CreateData) {
 }
 
 /**
- * Baja lógica en cascada: la sede y todas sus áreas caen juntas o no cae
- * ninguna. Los turnos de esas áreas todavía no entran (llegan en Turnos).
+ * Baja lógica en cascada: la sede, sus áreas y los turnos de esas áreas caen
+ * juntos o no cae ninguno.
  */
-export function deactivateWithAreas(id: number) {
+export function deactivateCascade(id: number) {
   return getPrisma().$transaction(async (tx) => {
+    await tx.turno.updateMany({
+      where: { area: { sedeId: id } },
+      data: { activo: false },
+    });
+
     await tx.area.updateMany({
       where: { sedeId: id },
       data: { activa: false },

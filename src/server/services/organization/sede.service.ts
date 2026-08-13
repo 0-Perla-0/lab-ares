@@ -66,7 +66,7 @@ export async function desactivarSede(id: number) {
     return sede;
   }
 
-  return sedeRepository.deactivateWithAreas(id);
+  return sedeRepository.deactivateCascade(id);
 }
 
 async function verificarNombreDisponible(nombre: string, excludeId?: number) {
