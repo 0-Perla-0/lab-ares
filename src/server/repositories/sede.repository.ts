@@ -43,6 +43,27 @@ export function update(id: number, data: UpdateData) {
   );
 }
 
-export function deactivate(id: number) {
-  return getPrisma().sede.update({ where: { id }, data: { activa: false } });
+/** Vuelve a dar de alta una sede dada de baja, con los datos recibidos. */
+export function reactivate(id: number, data: CreateData) {
+  return translateUniqueViolation(() =>
+    getPrisma().sede.update({
+      where: { id },
+      data: { ...data, activa: true },
+    }),
+  );
+}
+
+/**
+ * Baja lógica en cascada: la sede y todas sus áreas caen juntas o no cae
+ * ninguna. Los turnos de esas áreas todavía no entran (llegan en Turnos).
+ */
+export function deactivateWithAreas(id: number) {
+  return getPrisma().$transaction(async (tx) => {
+    await tx.area.updateMany({
+      where: { sedeId: id },
+      data: { activa: false },
+    });
+
+    return tx.sede.update({ where: { id }, data: { activa: false } });
+  });
 }

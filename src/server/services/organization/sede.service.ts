@@ -21,15 +21,28 @@ export async function obtenerSede(id: number) {
   return sede;
 }
 
+/**
+ * Crear con el nombre de una sede dada de baja la revive con los datos nuevos,
+ * en lugar de chocar contra un registro que el usuario ya no ve. Solo la sede:
+ * sus áreas siguen inactivas hasta que se reactiven una a una.
+ */
 export async function crearSede(input: CrearSedeInput) {
-  await verificarNombreDisponible(input.nombre);
+  const datos = {
+    nombre: input.nombre,
+    direccion: input.direccion ?? null,
+  };
 
-  return conNombreUnico(() =>
-    sedeRepository.create({
-      nombre: input.nombre,
-      direccion: input.direccion ?? null,
-    }),
-  );
+  const existente = await sedeRepository.findByNombre(input.nombre);
+
+  if (existente?.activa) {
+    throw conflict("SEDE_ALREADY_EXISTS");
+  }
+
+  if (existente) {
+    return conNombreUnico(() => sedeRepository.reactivate(existente.id, datos));
+  }
+
+  return conNombreUnico(() => sedeRepository.create(datos));
 }
 
 export async function actualizarSede(id: number, input: ActualizarSedeInput) {
@@ -42,7 +55,10 @@ export async function actualizarSede(id: number, input: ActualizarSedeInput) {
   return conNombreUnico(() => sedeRepository.update(id, input));
 }
 
-/** Baja lógica idempotente: desactivar una sede ya inactiva no es un error. */
+/**
+ * Baja lógica idempotente que arrastra las áreas de la sede: desactivar una
+ * sede ya inactiva no es un error y no vuelve a escribir.
+ */
 export async function desactivarSede(id: number) {
   const sede = await obtenerSede(id);
 
@@ -50,7 +66,7 @@ export async function desactivarSede(id: number) {
     return sede;
   }
 
-  return sedeRepository.deactivate(id);
+  return sedeRepository.deactivateWithAreas(id);
 }
 
 async function verificarNombreDisponible(nombre: string, excludeId?: number) {

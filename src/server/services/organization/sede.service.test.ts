@@ -17,7 +17,8 @@ vi.mock("../../repositories/sede.repository", () => ({
   findByNombre: vi.fn(),
   create: vi.fn(),
   update: vi.fn(),
-  deactivate: vi.fn(),
+  reactivate: vi.fn(),
+  deactivateWithAreas: vi.fn(),
 }));
 
 const mocked = vi.mocked(sedeRepository);
@@ -65,7 +66,7 @@ describe("crearSede", () => {
     });
   });
 
-  it("lanza SEDE_ALREADY_EXISTS si el nombre ya está tomado", async () => {
+  it("lanza SEDE_ALREADY_EXISTS si el nombre lo tiene una sede activa", async () => {
     mocked.findByNombre.mockResolvedValue(sede);
 
     await expect(crearSede({ nombre: "CUCEI Centro" })).rejects.toThrow(
@@ -75,6 +76,24 @@ describe("crearSede", () => {
       }),
     );
     expect(mocked.create).not.toHaveBeenCalled();
+  });
+
+  it("reactiva la sede dada de baja en vez de fallar", async () => {
+    const inactiva = { ...sede, activa: false };
+    mocked.findByNombre.mockResolvedValue(inactiva);
+    mocked.reactivate.mockResolvedValue(sede);
+
+    const resultado = await crearSede({
+      nombre: "CUCEI Centro",
+      direccion: "Nueva dirección",
+    });
+
+    expect(mocked.reactivate).toHaveBeenCalledWith(inactiva.id, {
+      nombre: "CUCEI Centro",
+      direccion: "Nueva dirección",
+    });
+    expect(mocked.create).not.toHaveBeenCalled();
+    expect(resultado.activa).toBe(true);
   });
 
   it("convierte la carrera del índice único en CONFLICT, no en un 500", async () => {
@@ -130,14 +149,14 @@ describe("actualizarSede", () => {
 });
 
 describe("desactivarSede", () => {
-  it("da de baja una sede activa", async () => {
+  it("da de baja la sede arrastrando sus áreas", async () => {
     mocked.findById.mockResolvedValue(sede);
-    mocked.deactivate.mockResolvedValue({ ...sede, activa: false });
+    mocked.deactivateWithAreas.mockResolvedValue({ ...sede, activa: false });
 
     const resultado = await desactivarSede(1);
 
     expect(resultado.activa).toBe(false);
-    expect(mocked.deactivate).toHaveBeenCalledWith(1);
+    expect(mocked.deactivateWithAreas).toHaveBeenCalledWith(1);
   });
 
   it("es idempotente: no reescribe una sede ya inactiva", async () => {
@@ -147,6 +166,6 @@ describe("desactivarSede", () => {
     const resultado = await desactivarSede(1);
 
     expect(resultado).toEqual(inactiva);
-    expect(mocked.deactivate).not.toHaveBeenCalled();
+    expect(mocked.deactivateWithAreas).not.toHaveBeenCalled();
   });
 });

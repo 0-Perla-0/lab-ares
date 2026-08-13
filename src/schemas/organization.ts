@@ -31,3 +31,21 @@ export const actualizarSedeSchema = crearSedeSchema
 
 export type CrearSedeInput = z.infer<typeof crearSedeSchema>;
 export type ActualizarSedeInput = z.infer<typeof actualizarSedeSchema>;
+
+const AREA_NOMBRE_MAX_LENGTH = 150; // Area.nombre @db.VarChar(150)
+
+const areaNombre = z.string().trim().min(1).max(AREA_NOMBRE_MAX_LENGTH);
+
+const referenciaId = z.number().int().positive();
+
+export const crearAreaSchema = z.object({
+  nombre: areaNombre,
+  sedeId: referenciaId,
+});
+
+export const actualizarAreaSchema = crearAreaSchema
+  .partial()
+  .refine((input) => Object.keys(input).length > 0);
+
+export type CrearAreaInput = z.infer<typeof crearAreaSchema>;
+export type ActualizarAreaInput = z.infer<typeof actualizarAreaSchema>;
