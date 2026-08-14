@@ -1,0 +1,108 @@
+---
+interface Props {
+  redirectTo?: string;
+}
+
+const { redirectTo = "/" } = Astro.props;
+---
+
+<form id="login-form" class="space-y-6" data-redirect-to={redirectTo}>
+  <div>
+    <label for="email" class="block text-base font-medium text-gray-700">
+      Correo electrónico
+    </label>
+    <input
+      type="email"
+      name="email"
+      id="email"
+      autocomplete="email"
+      placeholder="inventor@alumnos.udg.mx"
+      required
+      class="mt-1 block h-8 w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+    />
+  </div>
+
+  <div>
+    <div class="flex items-center justify-between">
+      <label for="password" class="block text-base font-medium text-slate-700">
+        Contraseña
+      </label>
+      <a href="#" class="text-sm font-semibold text-sky-600 hover:text-sky-500">
+        ¿Olvidaste tu contraseña?
+      </a>
+    </div>
+
+    <input
+      type="password"
+      name="password"
+      id="password"
+      autocomplete="current-password"
+      placeholder="********"
+      required
+      class="mt-1 block h-8 w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+    />
+  </div>
+
+  <div
+    id="login-error"
+    class="hidden rounded-lg border border-red-200 bg-red-100 px-4 py-3 text-sm text-red-600"
+    role="alert"
+    aria-live="polite"
+  >
+  </div>
+
+  <button
+    id="login-submit"
+    type="submit"
+    class="w-full rounded-lg border border-slate-900 bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:cursor-wait disabled:opacity-70"
+  >
+    Iniciar sesión
+  </button>
+</form>
+
+<script>
+  const form = document.querySelector<HTMLFormElement>("#login-form");
+  const errorMessage = document.querySelector<HTMLElement>("#login-error");
+  const submitButton =
+    document.querySelector<HTMLButtonElement>("#login-submit");
+
+  form?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    if (!errorMessage || !submitButton) return;
+
+    errorMessage.classList.add("hidden");
+    submitButton.disabled = true;
+
+    const formData = new FormData(form);
+
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: formData.get("email"),
+          password: formData.get("password"),
+        }),
+      });
+
+      if (!response.ok) {
+        errorMessage.textContent =
+          response.status === 401
+            ? "Las credenciales no son correctas. Inténtalo de nuevo."
+            : "No fue posible iniciar sesión. Inténtalo nuevamente.";
+        errorMessage.classList.remove("hidden");
+        return;
+      }
+
+      window.location.assign(form.dataset.redirectTo ?? "/");
+    } catch {
+      errorMessage.textContent =
+        "No fue posible conectar con el servidor. Inténtalo nuevamente.";
+      errorMessage.classList.remove("hidden");
+    } finally {
+      submitButton.disabled = false;
+    }
+  });
+</script>

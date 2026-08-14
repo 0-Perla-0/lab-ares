@@ -1,44 +1,33 @@
 {
-  "name": "lunar-limb",
-  "type": "module",
+  "name": "ares",
   "version": "0.0.1",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
   "engines": {
     "node": ">=22.12.0"
   },
   "scripts": {
-    "dev": "astro dev",
-    "check": "astro check",
-    "build": "astro build",
-    "preview": "astro preview",
-    "start": "node ./dist/server/entry.mjs",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "format": "prettier --write .",
-    "format:check": "prettier --check ."
-  },
-  "dependencies": {
-    "@astrojs/node": "^11.1.0",
-    "@astrojs/react": "^6.0.2",
-    "@prisma/adapter-mariadb": "^7.9.1",
-    "@prisma/client": "^7.9.1",
-    "@tailwindcss/vite": "^4.3.3",
-    "@types/react": "^19.2.18",
-    "@types/react-dom": "^19.2.4",
-    "astro": "^7.2.0",
-    "bcryptjs": "^3.0.3",
-    "dotenv": "^17.4.2",
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8",
-    "tailwindcss": "^4.3.3",
-    "zod": "^4.4.3"
+    "dev:frontend": "npm run dev --workspace @ares/frontend",
+    "dev:backend": "npm run start:dev --workspace @ares/backend",
+    "build": "npm run build --workspaces --if-present",
+    "check": "npm run check --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "quality": "npm run format:check && npm run prisma:validate && npm run prisma:generate && npm test && npm run check && npm run build",
+    "format": "npm run format:root && npm run format --workspaces --if-present",
+    "format:root": "prettier --write \"package.json\" \"*.md\" \".github/**/*.yml\"",
+    "format:check": "npm run format:check:root && npm run format:check --workspaces --if-present",
+    "format:check:root": "prettier --check \"package.json\" \"*.md\" \".github/**/*.yml\"",
+    "prisma:validate": "npm run prisma:validate --workspace @ares/backend",
+    "prisma:generate": "npm run prisma:generate --workspace @ares/backend",
+    "prisma:migrate": "npm run prisma:migrate --workspace @ares/backend",
+    "prisma:migrate:dev": "npm run prisma:migrate:dev --workspace @ares/backend --",
+    "prisma:migrate:deploy": "npm run prisma:migrate:deploy --workspace @ares/backend"
   },
   "devDependencies": {
-    "@astrojs/check": "^0.9.10",
-    "prettier": "^3.9.6",
-    "prettier-plugin-astro": "^0.14.1",
-    "prisma": "^7.9.1",
-    "typescript": "^6.0.3",
-    "vitest": "^4.1.10"
+    "prettier": "^3.9.6"
   },
   "allowScripts": {
     "@prisma/engines@7.9.1": true,
