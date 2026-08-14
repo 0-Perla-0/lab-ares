@@ -5,6 +5,8 @@ import node from "@astrojs/node";
 
 import react from "@astrojs/react";
 
+import tailwindcss from "@tailwindcss/vite";
+
 // https://astro.build/config
 export default defineConfig({
   output: "server",
@@ -34,5 +36,9 @@ export default defineConfig({
       sameSite: "lax",
     },
     ttl: 60 * 60 * 8,
+  },
+
+  vite: {
+    plugins: [tailwindcss()],
   },
 });
