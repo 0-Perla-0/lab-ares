@@ -9,7 +9,10 @@ RUN npm ci --workspace @ares/backend --include-workspace-root
 
 FROM dependencies AS build
 COPY backend backend
-RUN npm run prisma:generate --workspace @ares/backend \
+# Prisma loads prisma.config.ts during generation, but this step does not
+# connect to the database. Keep the real DATABASE_URL out of the image build.
+RUN DATABASE_URL=mysql://prisma_generate@127.0.0.1:3306/ares_build \
+    npm run prisma:generate --workspace @ares/backend \
     && npm run build --workspace @ares/backend
 
 FROM build AS migrate
