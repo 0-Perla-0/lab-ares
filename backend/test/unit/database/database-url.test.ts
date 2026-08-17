@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseDatabaseUrl } from "./database-url";
+import { parseDatabaseUrl } from "../../../src/database/database-url";
 
 describe("parseDatabaseUrl", () => {
   it("parses a MySQL connection URL and applies the default port", () => {

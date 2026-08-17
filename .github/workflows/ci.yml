@@ -17,6 +17,21 @@ permissions:
 jobs:
   quality:
     runs-on: ubuntu-latest
+    services:
+      mariadb:
+        image: mariadb:11.8
+        env:
+          MARIADB_DATABASE: ares_ci
+          MARIADB_USER: ci
+          MARIADB_PASSWORD: ci
+          MARIADB_ROOT_PASSWORD: root-ci-password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
     env:
       ASTRO_TELEMETRY_DISABLED: "1"
       DATABASE_URL: mysql://ci:ci@127.0.0.1:3306/ares_ci
@@ -34,5 +49,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Apply database migrations
+        run: npm run prisma:migrate:deploy
+
       - name: Run quality checks (including tests)
         run: npm run quality
+
+      - name: Run MariaDB integration tests
+        run: npm run test:integration
+
+      - name: Build backend container
+        run: docker build --target runtime --file backend/Dockerfile .

@@ -1,0 +1,68 @@
+name: ares
+
+services:
+  database:
+    image: mariadb:11.8
+    environment:
+      MARIADB_DATABASE: ares_dev
+      MARIADB_USER: ares_app
+      MARIADB_PASSWORD: ${MARIADB_PASSWORD:-ares-local-password}
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:-ares-local-root-password}
+    ports:
+      - "3306:3306"
+    volumes:
+      - ares-database:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+
+  migrate:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: migrate
+    environment:
+      DATABASE_URL: mysql://ares_app:${MARIADB_PASSWORD:-ares-local-password}@database:3306/ares_dev
+    depends_on:
+      database:
+        condition: service_healthy
+    restart: "no"
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: runtime
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: mysql://ares_app:${MARIADB_PASSWORD:-ares-local-password}@database:3306/ares_dev
+      BACKEND_HOST: 0.0.0.0
+      BACKEND_PORT: 3000
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:4321}
+      APP_TIME_ZONE: ${APP_TIME_ZONE:-America/Mexico_City}
+      SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET in .env before starting the backend}
+    ports:
+      - "3000:3000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  ares-database:

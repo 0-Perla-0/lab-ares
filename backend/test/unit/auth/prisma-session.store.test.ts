@@ -1,8 +1,8 @@
 import type session from "express-session";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { PrismaService } from "../database/prisma.service";
-import { PrismaSessionStore } from "./prisma-session.store";
+import { PrismaSessionStore } from "../../../src/auth/prisma-session.store";
+import type { PrismaService } from "../../../src/database/prisma.service";
 
 const sessions = {
   findUnique: vi.fn(),
@@ -61,6 +61,16 @@ describe("PrismaSessionStore", () => {
   it("returns null for an unknown session", async () => {
     sessions.findUnique.mockResolvedValue(null);
     await expect(getSession("missing")).resolves.toBeNull();
+  });
+
+  it("deletes all sessions that have expired", async () => {
+    const now = new Date("2026-01-02T00:00:00.000Z");
+    sessions.deleteMany.mockResolvedValue({ count: 3 });
+
+    await expect(store.deleteExpiredSessions(now)).resolves.toBe(3);
+    expect(sessions.deleteMany).toHaveBeenCalledWith({
+      where: { expiresAt: { lte: now } },
+    });
   });
 
   function createSession(): session.SessionData {

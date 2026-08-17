@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { loginSchema } from "./login.schema";
+import { loginSchema } from "../../../src/auth/login.schema";
 
 describe("loginSchema", () => {
   it("trims and normalizes a valid email", () => {

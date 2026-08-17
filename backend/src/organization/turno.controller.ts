@@ -6,8 +6,11 @@ import {
   Param,
   Post,
   Put,
+  Req,
 } from "@nestjs/common";
+import type { Request } from "express";
 
+import { getAuthenticatedUser } from "../auth/authenticated-user";
 import { Permission } from "../auth/permissions";
 import { RequirePermissions } from "../auth/require-permissions.decorator";
 import { PositiveIntPipe } from "../common/validation/positive-int.pipe";
@@ -19,10 +22,14 @@ import {
   type CrearTurnoInput,
 } from "./organization.schemas";
 import { TurnoService } from "./services/turno.service";
+import { OrganizationPolicy } from "./organization.policy";
 
 @Controller("organization/turnos")
 export class TurnoController {
-  constructor(private readonly turnos: TurnoService) {}
+  constructor(
+    private readonly turnos: TurnoService,
+    private readonly policy: OrganizationPolicy,
+  ) {}
 
   @Get()
   @RequirePermissions(Permission.ORGANIZATION_READ)
@@ -34,7 +41,12 @@ export class TurnoController {
   @RequirePermissions(Permission.ORGANIZATION_MANAGE)
   async crear(
     @Body(new ZodValidationPipe(crearTurnoSchema)) input: CrearTurnoInput,
+    @Req() request: Request,
   ) {
+    await this.policy.requireTurnoCreation(
+      getAuthenticatedUser(request),
+      input.areaId,
+    );
     return { data: await this.turnos.crear(input) };
   }
 
@@ -50,13 +62,23 @@ export class TurnoController {
     @Param("id", new PositiveIntPipe()) id: number,
     @Body(new ZodValidationPipe(actualizarTurnoSchema))
     input: ActualizarTurnoInput,
+    @Req() request: Request,
   ) {
+    await this.policy.requireTurnoManagement(
+      getAuthenticatedUser(request),
+      id,
+      input.areaId,
+    );
     return { data: await this.turnos.actualizar(id, input) };
   }
 
   @Delete(":id")
   @RequirePermissions(Permission.ORGANIZATION_MANAGE)
-  async desactivar(@Param("id", new PositiveIntPipe()) id: number) {
+  async desactivar(
+    @Param("id", new PositiveIntPipe()) id: number,
+    @Req() request: Request,
+  ) {
+    await this.policy.requireTurnoManagement(getAuthenticatedUser(request), id);
     return { data: await this.turnos.desactivar(id) };
   }
 }

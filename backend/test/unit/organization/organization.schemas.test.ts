@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { DiaSemana } from "../generated/prisma/enums";
+import { DiaSemana } from "../../../src/generated/prisma/enums";
 import {
   actualizarAreaSchema,
   actualizarSedeSchema,
@@ -9,7 +9,7 @@ import {
   crearSedeSchema,
   crearTurnoSchema,
   idParamSchema,
-} from "./organization.schemas";
+} from "../../../src/organization/organization.schemas";
 
 describe("organization schemas", () => {
   it("normalizes sede text fields", () => {

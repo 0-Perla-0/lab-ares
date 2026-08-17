@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { UniqueConstraintError } from "../../common/errors/unique-constraint-error";
-import type { AreaRepository } from "../repositories/area.repository";
-import type { SedeRepository } from "../repositories/sede.repository";
-import { AreaService } from "./area.service";
+import { UniqueConstraintError } from "../../../src/common/errors/unique-constraint-error";
+import type { AreaRepository } from "../../../src/organization/repositories/area.repository";
+import type { SedeRepository } from "../../../src/organization/repositories/sede.repository";
+import { AreaService } from "../../../src/organization/services/area.service";
 
 const areas = {
   findAllActivas: vi.fn(),

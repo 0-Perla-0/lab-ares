@@ -11,6 +11,7 @@ import { validateEnvironment } from "./config/environment";
 import { DatabaseModule } from "./database/database.module";
 import { HealthModule } from "./health/health.module";
 import { OrganizationModule } from "./organization/organization.module";
+import { OpenApiModule } from "./openapi/openapi.module";
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { OrganizationModule } from "./organization/organization.module";
     AuthModule,
     HealthModule,
     OrganizationModule,
+    OpenApiModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: ApiExceptionFilter },

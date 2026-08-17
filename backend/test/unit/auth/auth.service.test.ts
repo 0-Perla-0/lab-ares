@@ -1,11 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { EstadoUsuario, RolUsuario } from "../generated/prisma/enums";
-import { AuthService, InvalidCredentialsError } from "./auth.service";
-import { verifyPassword } from "./password";
-import type { UserRepository } from "./user.repository";
+import {
+  AuthService,
+  InvalidCredentialsError,
+} from "../../../src/auth/auth.service";
+import { verifyPassword } from "../../../src/auth/password";
+import type { UserRepository } from "../../../src/auth/user.repository";
+import { EstadoUsuario, RolUsuario } from "../../../src/generated/prisma/enums";
 
-vi.mock("./password", () => ({ verifyPassword: vi.fn() }));
+vi.mock("../../../src/auth/password", () => ({ verifyPassword: vi.fn() }));
 
 const findByEmailForAuth = vi.fn();
 const repository = { findByEmailForAuth } as unknown as UserRepository;
@@ -51,6 +54,7 @@ describe("AuthService", () => {
     await expect(
       service.authenticate("missing@ares.local", "Admin123!"),
     ).rejects.toBeInstanceOf(InvalidCredentialsError);
+    expect(mockedVerifyPassword).toHaveBeenCalledOnce();
   });
 
   it("uses the same public error for an incorrect password", async () => {

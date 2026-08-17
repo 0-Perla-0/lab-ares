@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { UniqueConstraintError } from "../../common/errors/unique-constraint-error";
-import type { SedeRepository } from "../repositories/sede.repository";
-import { SedeService } from "./sede.service";
+import { UniqueConstraintError } from "../../../src/common/errors/unique-constraint-error";
+import type { SedeRepository } from "../../../src/organization/repositories/sede.repository";
+import { SedeService } from "../../../src/organization/services/sede.service";
 
 const repository = {
   findAllActivas: vi.fn(),

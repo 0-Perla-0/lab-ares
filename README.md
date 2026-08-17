@@ -18,9 +18,16 @@ npm ci
 cp .env.example .env
 npm run prisma:generate
 npm run prisma:migrate
+npm run admin:bootstrap
 ```
 
 Antes de ejecutar Prisma, edita `.env`: `DATABASE_URL` debe contener un usuario y una contraseña reales de MariaDB; `ares_app` y `CHANGE_ME` son marcadores, no credenciales funcionales. También reemplaza `SESSION_SECRET` por una cadena aleatoria de al menos 32 caracteres antes de desplegar. El valor de desarrollo incluido por defecto nunca es aceptado en producción.
+
+Para crear el primer administrador, define temporalmente
+`BOOTSTRAP_ADMIN_CODE`, `BOOTSTRAP_ADMIN_EMAIL` y
+`BOOTSTRAP_ADMIN_PASSWORD`, y ejecuta `npm run admin:bootstrap`. El comando es
+idempotente: no modifica nada cuando ya existe un administrador activo y no
+imprime la contraseña.
 
 Una configuración local mínima puede crearse desde una sesión administrativa de MariaDB. Sustituye la contraseña del ejemplo y usa el mismo valor, codificado como URL si contiene caracteres especiales, en `DATABASE_URL`:
 
@@ -56,25 +63,52 @@ npm run dev:frontend
 
 Astro escucha normalmente en `http://localhost:4321` y redirige `/api/*` a NestJS en `http://localhost:3000`. Puedes crear `frontend/.env` a partir de `frontend/.env.example` para cambiar `API_PROXY_TARGET` durante desarrollo.
 
+### Docker
+
+Con Docker y una `.env` que contenga un `SESSION_SECRET` real:
+
+```bash
+docker compose up --build
+```
+
+Compose levanta MariaDB, aplica primero las migraciones y después inicia la
+imagen de producción del backend. El contenedor expone `http://localhost:3000`.
+
 ## Rutas migradas
 
 - `GET /api/health`
+- `GET /api/health/live`
+- `GET /api/health/ready`
 - `POST /api/auth/login`
 - `POST /api/auth/logout`
 - `GET /api/auth/me`
+- `GET /api/docs/openapi.json`
 - CRUD lógico de `/api/organization/sedes`
 - CRUD lógico de `/api/organization/areas`
 - CRUD lógico de `/api/organization/turnos`
 
 La autenticación utiliza una cookie HTTP-only y sesiones persistidas en MariaDB. Los permisos se aplican mediante guards de NestJS.
 
+La matriz de autorización está documentada en
+[`backend/docs/rbac.md`](backend/docs/rbac.md), y las decisiones de arquitectura
+de la fase inicial en
+[`backend/docs/phase-0-decisions.md`](backend/docs/phase-0-decisions.md).
+
 ## Comprobaciones
 
 ```bash
 npm run quality
+npm run test:integration
 ```
 
-`quality` comprueba el formato, valida y genera Prisma Client, ejecuta todas las pruebas, revisa los tipos y construye ambos proyectos. Es el mismo comando utilizado por CI.
+`quality` comprueba formato, Prisma, pruebas unitarias/E2E aisladas, tipos y
+build. `test:integration` usa MariaDB real para comprobar el store de sesiones y
+las restricciones de Prisma. CI ejecuta ambos y también construye la imagen del
+backend.
+
+Las pruebas del backend viven bajo `backend/test/`: `unit/`, `e2e/` e
+`integration/`. El código productivo de `backend/src/` no contiene archivos de
+prueba.
 
 ## Despliegue
 

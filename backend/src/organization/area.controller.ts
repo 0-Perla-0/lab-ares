@@ -6,8 +6,11 @@ import {
   Param,
   Post,
   Put,
+  Req,
 } from "@nestjs/common";
+import type { Request } from "express";
 
+import { getAuthenticatedUser } from "../auth/authenticated-user";
 import { Permission } from "../auth/permissions";
 import { RequirePermissions } from "../auth/require-permissions.decorator";
 import { PositiveIntPipe } from "../common/validation/positive-int.pipe";
@@ -19,10 +22,14 @@ import {
   type CrearAreaInput,
 } from "./organization.schemas";
 import { AreaService } from "./services/area.service";
+import { OrganizationPolicy } from "./organization.policy";
 
 @Controller("organization/areas")
 export class AreaController {
-  constructor(private readonly areas: AreaService) {}
+  constructor(
+    private readonly areas: AreaService,
+    private readonly policy: OrganizationPolicy,
+  ) {}
 
   @Get()
   @RequirePermissions(Permission.ORGANIZATION_READ)
@@ -34,7 +41,12 @@ export class AreaController {
   @RequirePermissions(Permission.ORGANIZATION_MANAGE)
   async crear(
     @Body(new ZodValidationPipe(crearAreaSchema)) input: CrearAreaInput,
+    @Req() request: Request,
   ) {
+    this.policy.requireAreaCreation(
+      getAuthenticatedUser(request),
+      input.sedeId,
+    );
     return { data: await this.areas.crear(input) };
   }
 
@@ -50,13 +62,23 @@ export class AreaController {
     @Param("id", new PositiveIntPipe()) id: number,
     @Body(new ZodValidationPipe(actualizarAreaSchema))
     input: ActualizarAreaInput,
+    @Req() request: Request,
   ) {
+    await this.policy.requireAreaManagement(
+      getAuthenticatedUser(request),
+      id,
+      input.sedeId,
+    );
     return { data: await this.areas.actualizar(id, input) };
   }
 
   @Delete(":id")
   @RequirePermissions(Permission.ORGANIZATION_MANAGE)
-  async desactivar(@Param("id", new PositiveIntPipe()) id: number) {
+  async desactivar(
+    @Param("id", new PositiveIntPipe()) id: number,
+    @Req() request: Request,
+  ) {
+    await this.policy.requireAreaManagement(getAuthenticatedUser(request), id);
     return { data: await this.areas.desactivar(id) };
   }
 }

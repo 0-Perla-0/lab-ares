@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 
 import { AreaController } from "./area.controller";
+import { OrganizationPolicy } from "./organization.policy";
 import { AreaRepository } from "./repositories/area.repository";
 import { SedeRepository } from "./repositories/sede.repository";
 import { TurnoRepository } from "./repositories/turno.repository";
@@ -19,6 +20,7 @@ import { TurnoController } from "./turno.controller";
     SedeService,
     AreaService,
     TurnoService,
+    OrganizationPolicy,
   ],
 })
 export class OrganizationModule {}

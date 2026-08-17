@@ -1,19 +1,36 @@
-import { Body, Controller, Get, HttpCode, Post, Req } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Post,
+  Req,
+  UseGuards,
+} from "@nestjs/common";
 import type { Request } from "express";
 
 import { ApiException } from "../common/errors/api.exception";
 import { ZodValidationPipe } from "../common/validation/zod-validation.pipe";
 import { AuthService, InvalidCredentialsError } from "./auth.service";
 import { loginSchema, type LoginInput } from "./login.schema";
+import {
+  LoginRateLimitGuard,
+  LoginRateLimiter,
+  loginRateLimitKey,
+} from "./login-rate-limiter";
 import { Public } from "./public.decorator";
 
 @Controller("auth")
 export class AuthController {
-  constructor(private readonly auth: AuthService) {}
+  constructor(
+    private readonly auth: AuthService,
+    private readonly loginRateLimiter: LoginRateLimiter,
+  ) {}
 
   @Public()
   @Post("login")
   @HttpCode(200)
+  @UseGuards(LoginRateLimitGuard)
   async login(
     @Body(new ZodValidationPipe(loginSchema)) input: LoginInput,
     @Req() request: Request,
@@ -24,6 +41,7 @@ export class AuthController {
       await regenerate(request);
       request.session.userId = user.id;
       await save(request);
+      this.loginRateLimiter.reset(loginRateLimitKey(request));
 
       return { data: user };
     } catch (error) {

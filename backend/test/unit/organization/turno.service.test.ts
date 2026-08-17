@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { UniqueConstraintError } from "../../common/errors/unique-constraint-error";
-import { DiaSemana } from "../../generated/prisma/enums";
-import type { AreaRepository } from "../repositories/area.repository";
-import type { TurnoRepository } from "../repositories/turno.repository";
-import { TurnoService } from "./turno.service";
+import { UniqueConstraintError } from "../../../src/common/errors/unique-constraint-error";
+import { DiaSemana } from "../../../src/generated/prisma/enums";
+import type { AreaRepository } from "../../../src/organization/repositories/area.repository";
+import type { TurnoRepository } from "../../../src/organization/repositories/turno.repository";
+import { TurnoService } from "../../../src/organization/services/turno.service";
 
 const turnos = {
   findAllActivos: vi.fn(),

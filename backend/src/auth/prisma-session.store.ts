@@ -1,12 +1,24 @@
-import { Injectable } from "@nestjs/common";
+import {
+  Injectable,
+  Logger,
+  type OnApplicationBootstrap,
+  type OnModuleDestroy,
+} from "@nestjs/common";
 import session from "express-session";
 
 import { PrismaService } from "../database/prisma.service";
 
 const DEFAULT_TTL_MS = 8 * 60 * 60 * 1000;
+const CLEANUP_INTERVAL_MS = 15 * 60 * 1000;
 
 @Injectable()
-export class PrismaSessionStore extends session.Store {
+export class PrismaSessionStore
+  extends session.Store
+  implements OnApplicationBootstrap, OnModuleDestroy
+{
+  private readonly logger = new Logger(PrismaSessionStore.name);
+  private cleanupTimer?: ReturnType<typeof setInterval>;
+
   constructor(private readonly prisma: PrismaService) {
     super();
   }
@@ -70,6 +82,37 @@ export class PrismaSessionStore extends session.Store {
       })
       .then(() => callback?.())
       .catch((error: unknown) => callback?.(error));
+  }
+
+  onApplicationBootstrap(): void {
+    void this.cleanupExpiredSessions();
+    this.cleanupTimer = setInterval(
+      () => void this.cleanupExpiredSessions(),
+      CLEANUP_INTERVAL_MS,
+    );
+    this.cleanupTimer.unref();
+  }
+
+  onModuleDestroy(): void {
+    if (this.cleanupTimer) clearInterval(this.cleanupTimer);
+  }
+
+  async deleteExpiredSessions(now = new Date()): Promise<number> {
+    const result = await this.prisma.session.deleteMany({
+      where: { expiresAt: { lte: now } },
+    });
+    return result.count;
+  }
+
+  private async cleanupExpiredSessions(): Promise<void> {
+    try {
+      const deleted = await this.deleteExpiredSessions();
+      if (deleted > 0) {
+        this.logger.log(`Deleted ${deleted} expired sessions`);
+      }
+    } catch (error) {
+      this.logger.error("Failed to delete expired sessions", error);
+    }
   }
 }
 

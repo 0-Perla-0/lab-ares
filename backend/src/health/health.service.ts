@@ -6,7 +6,11 @@ import { PrismaService } from "../database/prisma.service";
 export class HealthService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async check() {
+  liveness() {
+    return { status: "ok" };
+  }
+
+  async readiness() {
     try {
       await this.prisma.$queryRaw`SELECT 1`;
       return { status: "ok", database: "connected" };

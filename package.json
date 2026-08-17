@@ -15,16 +15,18 @@
     "build": "npm run build --workspaces --if-present",
     "check": "npm run check --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
+    "test:integration": "npm run test:integration --workspace @ares/backend",
     "quality": "npm run format:check && npm run prisma:validate && npm run prisma:generate && npm test && npm run check && npm run build",
     "format": "npm run format:root && npm run format --workspaces --if-present",
-    "format:root": "prettier --write \"package.json\" \"*.md\" \".github/**/*.yml\"",
+    "format:root": "prettier --write \"package.json\" \"*.md\" \"backend/docs/*.md\" \"compose.yaml\" \".github/**/*.yml\"",
     "format:check": "npm run format:check:root && npm run format:check --workspaces --if-present",
-    "format:check:root": "prettier --check \"package.json\" \"*.md\" \".github/**/*.yml\"",
+    "format:check:root": "prettier --check \"package.json\" \"*.md\" \"backend/docs/*.md\" \"compose.yaml\" \".github/**/*.yml\"",
     "prisma:validate": "npm run prisma:validate --workspace @ares/backend",
     "prisma:generate": "npm run prisma:generate --workspace @ares/backend",
     "prisma:migrate": "npm run prisma:migrate --workspace @ares/backend",
     "prisma:migrate:dev": "npm run prisma:migrate:dev --workspace @ares/backend --",
-    "prisma:migrate:deploy": "npm run prisma:migrate:deploy --workspace @ares/backend"
+    "prisma:migrate:deploy": "npm run prisma:migrate:deploy --workspace @ares/backend",
+    "admin:bootstrap": "npm run admin:bootstrap --workspace @ares/backend"
   },
   "devDependencies": {
     "prettier": "^3.9.6"

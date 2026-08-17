@@ -11,6 +11,20 @@ export class HealthController {
   @Get()
   @HttpCode(200)
   check() {
-    return this.health.check();
+    return this.health.readiness();
+  }
+
+  @Public()
+  @Get("live")
+  @HttpCode(200)
+  liveness() {
+    return this.health.liveness();
+  }
+
+  @Public()
+  @Get("ready")
+  @HttpCode(200)
+  readiness() {
+    return this.health.readiness();
   }
 }

@@ -6,24 +6,36 @@ import type { Server } from "node:http";
 import request from "supertest";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { ApiExceptionFilter } from "../src/common/errors/api-exception.filter";
-import { conflict } from "../src/common/errors/domain-error";
-import { NoStoreInterceptor } from "../src/common/http/no-store.interceptor";
-import { AuthController } from "../src/auth/auth.controller";
-import { AuthService } from "../src/auth/auth.service";
-import { PermissionsGuard } from "../src/auth/permissions.guard";
-import { SessionAuthGuard } from "../src/auth/session-auth.guard";
-import { UserRepository } from "../src/auth/user.repository";
-import { EstadoUsuario, RolUsuario } from "../src/generated/prisma/enums";
-import { AreaController } from "../src/organization/area.controller";
-import { SedeController } from "../src/organization/sede.controller";
-import { AreaService } from "../src/organization/services/area.service";
-import { SedeService } from "../src/organization/services/sede.service";
-import { TurnoService } from "../src/organization/services/turno.service";
-import { TurnoController } from "../src/organization/turno.controller";
+import { AuthController } from "../../src/auth/auth.controller";
+import { AuthService } from "../../src/auth/auth.service";
+import {
+  LoginRateLimitGuard,
+  LoginRateLimiter,
+} from "../../src/auth/login-rate-limiter";
+import { PermissionsGuard } from "../../src/auth/permissions.guard";
+import { SessionAuthGuard } from "../../src/auth/session-auth.guard";
+import { UserRepository } from "../../src/auth/user.repository";
+import { ApiExceptionFilter } from "../../src/common/errors/api-exception.filter";
+import { conflict } from "../../src/common/errors/domain-error";
+import { NoStoreInterceptor } from "../../src/common/http/no-store.interceptor";
+import { EstadoUsuario, RolUsuario } from "../../src/generated/prisma/enums";
+import { OpenApiController } from "../../src/openapi/openapi.controller";
+import { AreaController } from "../../src/organization/area.controller";
+import { OrganizationPolicy } from "../../src/organization/organization.policy";
+import { AreaRepository } from "../../src/organization/repositories/area.repository";
+import { TurnoRepository } from "../../src/organization/repositories/turno.repository";
+import { SedeController } from "../../src/organization/sede.controller";
+import { AreaService } from "../../src/organization/services/area.service";
+import { SedeService } from "../../src/organization/services/sede.service";
+import { TurnoService } from "../../src/organization/services/turno.service";
+import { TurnoController } from "../../src/organization/turno.controller";
 
 const admin = createUser(1, "admin@ares.local", RolUsuario.ADMIN);
 const regular = createUser(2, "user@ares.local", RolUsuario.PRESTADOR);
+const sedeManager = {
+  ...createUser(3, "manager@ares.local", RolUsuario.JEFE_SEDE),
+  sedeId: 1,
+};
 const sede = {
   id: 1,
   nombre: "Centro",
@@ -53,14 +65,18 @@ const turno = {
 };
 
 const auth = {
-  authenticate: vi.fn(async (email: string) =>
-    email === regular.email ? regular : admin,
-  ),
+  authenticate: vi.fn(async (email: string) => {
+    if (email === regular.email) return regular;
+    if (email === sedeManager.email) return sedeManager;
+    return admin;
+  }),
 };
 const users = {
-  findByIdForSession: vi.fn(async (id: number) =>
-    id === regular.id ? regular : admin,
-  ),
+  findByIdForSession: vi.fn(async (id: number) => {
+    if (id === regular.id) return regular;
+    if (id === sedeManager.id) return sedeManager;
+    return admin;
+  }),
 };
 const sedes = {
   listar: vi.fn(async () => [sede]),
@@ -83,6 +99,9 @@ const turnos = {
   actualizar: vi.fn(async () => turno),
   desactivar: vi.fn(async () => ({ ...turno, activo: false })),
 };
+const areaRecords = { findById: vi.fn(async () => area) };
+const turnoRecords = { findById: vi.fn(async () => turno) };
+const loginRateLimiter = { consume: vi.fn(() => null), reset: vi.fn() };
 
 describe("Nest API", () => {
   let app: INestApplication;
@@ -95,13 +114,22 @@ describe("Nest API", () => {
         SedeController,
         AreaController,
         TurnoController,
+        OpenApiController,
       ],
       providers: [
         { provide: AuthService, useValue: auth },
+        { provide: LoginRateLimiter, useValue: loginRateLimiter },
+        {
+          provide: LoginRateLimitGuard,
+          useValue: { canActivate: () => true },
+        },
         { provide: UserRepository, useValue: users },
         { provide: SedeService, useValue: sedes },
         { provide: AreaService, useValue: areas },
         { provide: TurnoService, useValue: turnos },
+        OrganizationPolicy,
+        { provide: AreaRepository, useValue: areaRecords },
+        { provide: TurnoRepository, useValue: turnoRecords },
         { provide: APP_FILTER, useClass: ApiExceptionFilter },
         { provide: APP_INTERCEPTOR, useClass: NoStoreInterceptor },
         { provide: APP_GUARD, useClass: SessionAuthGuard },
@@ -132,6 +160,14 @@ describe("Nest API", () => {
     expect(response.body).toEqual({ error: "UNAUTHORIZED" });
   });
 
+  it("publishes the OpenAPI contract without authentication", async () => {
+    const response = await request(server)
+      .get("/api/docs/openapi.json")
+      .expect(200);
+    expect(response.body.openapi).toBe("3.1.0");
+    expect(response.body.paths).toHaveProperty("/api/auth/login");
+  });
+
   it("validates and normalizes login input", async () => {
     await request(server)
       .post("/api/auth/login")
@@ -160,9 +196,26 @@ describe("Nest API", () => {
   it("enforces permissions after authentication", async () => {
     const agent = await loginAs(regular.email);
     await agent
-      .get("/api/organization/sedes")
+      .post("/api/organization/sedes")
+      .send({ nombre: "Centro" })
       .expect(403)
       .expect({ error: "FORBIDDEN" });
+  });
+
+  it("enforces sede scope after role authorization", async () => {
+    const agent = await loginAs(sedeManager.email);
+    await agent
+      .post("/api/organization/sedes")
+      .send({ nombre: "Nueva sede" })
+      .expect(403);
+    await agent
+      .put("/api/organization/sedes/1")
+      .send({ direccion: "Propia" })
+      .expect(200);
+    await agent
+      .put("/api/organization/sedes/2")
+      .send({ direccion: "Ajena" })
+      .expect(403);
   });
 
   it("returns the preserved data envelope for authorized requests", async () => {

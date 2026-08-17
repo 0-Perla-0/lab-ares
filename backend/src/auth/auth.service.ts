@@ -6,6 +6,9 @@ import { verifyPassword } from "./password";
 import type { AuthUser } from "./auth-user";
 import { UserRepository } from "./user.repository";
 
+const DUMMY_PASSWORD_HASH =
+  "$2b$12$iwnUxm94oKjcXFtxO.S3CemzmIUjRsz/cWNBEx2rlRHzcAUVpiGZa";
+
 export class InvalidCredentialsError extends Error {
   constructor() {
     super("Invalid credentials");
@@ -20,13 +23,13 @@ export class AuthService {
   async authenticate(email: string, password: string): Promise<AuthUser> {
     const user = await this.users.findByEmailForAuth(email);
 
-    if (!user) {
-      throw new InvalidCredentialsError();
-    }
+    // Always perform bcrypt work so a missing email is not measurably faster.
+    const passwordMatches = await verifyPassword(
+      password,
+      user?.passwordHash ?? DUMMY_PASSWORD_HASH,
+    );
 
-    const passwordMatches = await verifyPassword(password, user.passwordHash);
-
-    if (!passwordMatches || user.estado !== EstadoUsuario.ACTIVO) {
+    if (!user || !passwordMatches || user.estado !== EstadoUsuario.ACTIVO) {
       throw new InvalidCredentialsError();
     }
 
