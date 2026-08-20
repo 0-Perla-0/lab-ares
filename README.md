@@ -63,6 +63,11 @@ npm run dev:frontend
 
 Astro escucha normalmente en `http://localhost:4321` y redirige `/api/*` a NestJS en `http://localhost:3000`. Puedes crear `frontend/.env` a partir de `frontend/.env.example` para cambiar `API_PROXY_TARGET` durante desarrollo.
 
+En equipos Windows donde Application Control bloquee el compilador nativo de
+Astro, los comandos del frontend instalan automáticamente el fallback WASI
+oficial de la misma versión. Es una dependencia local de desarrollo y no
+modifica `package.json` ni `package-lock.json`.
+
 ### Docker
 
 Con Docker y una `.env` que contenga un `SESSION_SECRET` real:
