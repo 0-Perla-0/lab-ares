@@ -29,6 +29,10 @@ import { AreaService } from "../../src/organization/services/area.service";
 import { SedeService } from "../../src/organization/services/sede.service";
 import { TurnoService } from "../../src/organization/services/turno.service";
 import { TurnoController } from "../../src/organization/turno.controller";
+import { UsersController } from "../../src/users/users.controller";
+import { UsersPolicy } from "../../src/users/users.policy";
+import { UsersRepository } from "../../src/users/users.repository";
+import { UsersService } from "../../src/users/users.service";
 
 const admin = createUser(1, "admin@ares.local", RolUsuario.ADMIN);
 const regular = createUser(2, "user@ares.local", RolUsuario.PRESTADOR);
@@ -71,13 +75,35 @@ const auth = {
     return admin;
   }),
 };
-const users = {
+const sessionUsers = {
   findByIdForSession: vi.fn(async (id: number) => {
     if (id === regular.id) return regular;
     if (id === sedeManager.id) return sedeManager;
     return admin;
   }),
 };
+const managedUser = {
+  ...regular,
+  id: 20,
+  codigo: "POSTMAN20",
+  email: "postman20@ares.local",
+  sedeId: 1,
+  areaId: 2,
+  turnoId: 3,
+  createdAt: sede.createdAt,
+  updatedAt: sede.updatedAt,
+};
+const managedUsers = {
+  listar: vi.fn(async () => [managedUser]),
+  crear: vi.fn(async () => managedUser),
+  obtener: vi.fn(async () => managedUser),
+  actualizar: vi.fn(async () => managedUser),
+  darDeBaja: vi.fn(async () => ({
+    ...managedUser,
+    estado: EstadoUsuario.BAJA,
+  })),
+};
+const userRecords = { findById: vi.fn(async () => managedUser) };
 const sedes = {
   listar: vi.fn(async () => [sede]),
   crear: vi.fn(async () => sede),
@@ -114,6 +140,7 @@ describe("Nest API", () => {
         SedeController,
         AreaController,
         TurnoController,
+        UsersController,
         OpenApiController,
       ],
       providers: [
@@ -123,7 +150,10 @@ describe("Nest API", () => {
           provide: LoginRateLimitGuard,
           useValue: { canActivate: () => true },
         },
-        { provide: UserRepository, useValue: users },
+        { provide: UserRepository, useValue: sessionUsers },
+        { provide: UsersService, useValue: managedUsers },
+        { provide: UsersRepository, useValue: userRecords },
+        UsersPolicy,
         { provide: SedeService, useValue: sedes },
         { provide: AreaService, useValue: areas },
         { provide: TurnoService, useValue: turnos },
@@ -295,6 +325,52 @@ describe("Nest API", () => {
       dias: ["LUNES"],
     });
     await agent.delete("/api/organization/turnos/3").expect(200);
+  });
+
+  it("exposes the scoped user CRUD without password data", async () => {
+    const agent = await loginAs(admin.email);
+
+    await agent
+      .get("/api/users")
+      .expect(200)
+      .expect({ data: [JSON.parse(JSON.stringify(managedUser))] });
+    expect(managedUsers.listar).toHaveBeenLastCalledWith({ type: "global" });
+
+    await agent
+      .post("/api/users")
+      .send({
+        codigo: " POSTMAN20 ",
+        email: " POSTMAN20@ARES.LOCAL ",
+        password: "A-secure-password-123!",
+        estado: EstadoUsuario.ACTIVO,
+        sedeId: 1,
+        areaId: 2,
+        turnoId: 3,
+      })
+      .expect(201);
+    expect(managedUsers.crear).toHaveBeenLastCalledWith({
+      codigo: "POSTMAN20",
+      email: "postman20@ares.local",
+      password: "A-secure-password-123!",
+      rol: RolUsuario.PRESTADOR,
+      estado: EstadoUsuario.ACTIVO,
+      sedeId: 1,
+      areaId: 2,
+      turnoId: 3,
+    });
+
+    await agent.get("/api/users/20").expect(200);
+    await agent
+      .put("/api/users/20")
+      .send({ email: " UPDATED@ARES.LOCAL " })
+      .expect(200);
+    expect(managedUsers.actualizar).toHaveBeenLastCalledWith(20, {
+      email: "updated@ares.local",
+    });
+
+    const deleted = await agent.delete("/api/users/20").expect(200);
+    expect(deleted.body.data.estado).toBe(EstadoUsuario.BAJA);
+    expect(deleted.body.data).not.toHaveProperty("passwordHash");
   });
 
   it("destroys the session on logout", async () => {

@@ -23,6 +23,8 @@ describe("OpenAPI document", () => {
     "/api/organization/sedes",
     "/api/organization/areas",
     "/api/organization/turnos",
+    "/api/users",
+    "/api/users/{id}",
   ])("documents %s", (path) => {
     expect(document.paths).toHaveProperty(path);
   });

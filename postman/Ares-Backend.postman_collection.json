@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "2cb80208-1f56-4df5-82c4-0fd6427c32cd",
     "name": "Ares Backend API",
-    "description": "Colección local de los endpoints disponibles en Ares. Ejecútala en orden: inicia sesión, crea la jerarquía Sede → Área → Turno, prueba el CRUD lógico y termina destruyendo la sesión.",
+    "description": "Colección local de los endpoints disponibles en Ares. Ejecútala en orden: inicia sesión, crea la jerarquía Sede → Área → Turno, prueba el CRUD de usuarios y los CRUD lógicos, y termina destruyendo la sesión.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -54,6 +54,11 @@
     },
     {
       "key": "turnoId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "userId",
       "value": "",
       "type": "string"
     }
@@ -216,7 +221,8 @@
                   "pm.collectionVariables.set(\"runSuffix\", Date.now().toString());",
                   "pm.collectionVariables.unset(\"sedeId\");",
                   "pm.collectionVariables.unset(\"areaId\");",
-                  "pm.collectionVariables.unset(\"turnoId\");"
+                  "pm.collectionVariables.unset(\"turnoId\");",
+                  "pm.collectionVariables.unset(\"userId\");"
                 ]
               }
             },
@@ -698,7 +704,290 @@
       ]
     },
     {
-      "name": "05 - Limpieza y cierre",
+      "name": "05 - Usuarios",
+      "item": [
+        {
+          "name": "Crear usuario",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigo\": \"USR{{runSuffix}}\",\n  \"email\": \"postman.{{runSuffix}}@ares.local\",\n  \"password\": \"Postman-Test-Password-123!\",\n  \"rol\": \"PRESTADOR\",\n  \"estado\": \"ACTIVO\",\n  \"sedeId\": {{sedeId}},\n  \"areaId\": {{areaId}},\n  \"turnoId\": {{turnoId}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/users",
+            "description": "Crea un usuario dentro de la jerarquía generada por la colección. La contraseña se almacena únicamente como hash."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Usuario creado sin datos sensibles\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "    const user = pm.response.json().data;",
+                  "    pm.expect(user.codigo).to.eql(\"USR\" + pm.collectionVariables.get(\"runSuffix\"));",
+                  "    pm.expect(user.email).to.eql(\"postman.\" + pm.collectionVariables.get(\"runSuffix\") + \"@ares.local\");",
+                  "    pm.expect(user).not.to.have.property(\"passwordHash\");",
+                  "    pm.expect(user).not.to.have.property(\"password\");",
+                  "    pm.collectionVariables.set(\"userId\", String(user.id));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Rechazar usuario duplicado",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigo\": \"USR{{runSuffix}}\",\n  \"email\": \"postman.{{runSuffix}}@ares.local\",\n  \"password\": \"Postman-Test-Password-123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/users",
+            "description": "Prueba negativa: codigo y email son únicos."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"El código duplicado produce conflicto\", function () {",
+                  "    pm.response.to.have.status(409);",
+                  "    pm.expect(pm.response.json()).to.eql({ error: \"USER_CODE_ALREADY_EXISTS\" });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar usuarios",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/users",
+            "description": "ADMIN ve todos los usuarios que no están en BAJA. Otros roles reciben solo su área o sede según RBAC."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"El usuario aparece en el listado\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const users = pm.response.json().data;",
+                  "    const user = users.find((item) => String(item.id) === pm.collectionVariables.get(\"userId\"));",
+                  "    pm.expect(user).to.be.an(\"object\");",
+                  "    pm.expect(user).not.to.have.property(\"passwordHash\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Obtener usuario",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/users/{{userId}}",
+            "description": "Obtiene un usuario por id dentro del alcance autorizado."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Usuario encontrado\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const user = pm.response.json().data;",
+                  "    pm.expect(String(user.id)).to.eql(pm.collectionVariables.get(\"userId\"));",
+                  "    pm.expect(user).not.to.have.property(\"passwordHash\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Actualizar usuario",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigo\": \"USR-UPD-{{runSuffix}}\",\n  \"email\": \"postman.updated.{{runSuffix}}@ares.local\",\n  \"password\": \"Postman-Updated-Password-456!\",\n  \"estado\": \"INACTIVO\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/users/{{userId}}",
+            "description": "PUT parcial: actualiza identidad, contraseña y estado sin devolver el hash."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Usuario actualizado\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const user = pm.response.json().data;",
+                  "    pm.expect(user.codigo).to.eql(\"USR-UPD-\" + pm.collectionVariables.get(\"runSuffix\"));",
+                  "    pm.expect(user.email).to.eql(\"postman.updated.\" + pm.collectionVariables.get(\"runSuffix\") + \"@ares.local\");",
+                  "    pm.expect(user.estado).to.eql(\"INACTIVO\");",
+                  "    pm.expect(user).not.to.have.property(\"passwordHash\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Dar de baja usuario",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/users/{{userId}}",
+            "description": "Borrado lógico: cambia estado a BAJA. No permite que el usuario autenticado se elimine a sí mismo."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Usuario dado de baja\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.json().data.estado).to.eql(\"BAJA\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Obtener usuario en BAJA",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/users/{{userId}}",
+            "description": "La consulta individual conserva el registro y demuestra que DELETE fue lógico."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"La baja conserva el registro\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.json().data.estado).to.eql(\"BAJA\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verificar baja en listado",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/users",
+            "description": "Los usuarios en BAJA no aparecen en el listado normal."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"El usuario dado de baja no aparece\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const users = pm.response.json().data;",
+                  "    pm.expect(users.some((item) => String(item.id) === pm.collectionVariables.get(\"userId\"))).to.eql(false);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "06 - Limpieza y cierre",
       "item": [
         {
           "name": "Desactivar turno",

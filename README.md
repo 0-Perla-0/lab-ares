@@ -91,6 +91,7 @@ imagen de producción del backend. El contenedor expone `http://localhost:3000`.
 - CRUD lógico de `/api/organization/sedes`
 - CRUD lógico de `/api/organization/areas`
 - CRUD lógico de `/api/organization/turnos`
+- CRUD de `/api/users` con baja lógica y alcance RBAC
 
 La autenticación utiliza una cookie HTTP-only y sesiones persistidas en MariaDB. Los permisos se aplican mediante guards de NestJS.
 

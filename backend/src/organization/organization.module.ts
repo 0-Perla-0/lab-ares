@@ -22,5 +22,6 @@ import { TurnoController } from "./turno.controller";
     TurnoService,
     OrganizationPolicy,
   ],
+  exports: [SedeRepository, AreaRepository, TurnoRepository],
 })
 export class OrganizationModule {}

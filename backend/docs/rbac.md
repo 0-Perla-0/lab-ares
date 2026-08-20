@@ -25,3 +25,8 @@ an action and its maximum data scope.
 Creating a new sede requires `global` organization scope. A `JEFE_SEDE` can
 modify only its own sede and the areas/turnos below it. Moving an area or turno
 requires access to both the source and destination.
+
+User reads and writes are filtered by the granted scope. A user cannot assign
+or manage a role above their own (`PRESTADOR` < `COORDINADOR` < `JEFE_AREA` <
+`JEFE_SEDE` < `JEFE_COORDINADORES` < `ADMIN`). Updates that move a user check
+both the current and destination scope, and self-deletion is rejected.

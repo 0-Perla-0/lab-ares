@@ -23,7 +23,7 @@ backend expone actualmente y un entorno local sin credenciales reales.
 
 4. Ejecuta la colección completa en orden y sin paralelismo. El login genera
    nombres únicos y las peticiones de creación guardan automáticamente
-   `sedeId`, `areaId` y `turnoId` como variables de la colección.
+   `sedeId`, `areaId`, `turnoId` y `userId` como variables de la colección.
 
 Postman conserva automáticamente la cookie HTTP-only `ares-session`. No agregues
 un header `Authorization` ni copies la cookie manualmente. Usa siempre el mismo
@@ -59,10 +59,19 @@ frontend.
 | GET    | `/api/organization/turnos/:id` | Cookie        | `organization:read`                |
 | PUT    | `/api/organization/turnos/:id` | Cookie        | Administración con alcance         |
 | DELETE | `/api/organization/turnos/:id` | Cookie        | Desactivación lógica               |
+| GET    | `/api/users`                   | Cookie        | `users:read` con alcance           |
+| POST   | `/api/users`                   | Cookie        | `users:manage` con alcance         |
+| GET    | `/api/users/:id`               | Cookie        | `users:read` con alcance           |
+| PUT    | `/api/users/:id`               | Cookie        | `users:manage` con alcance         |
+| DELETE | `/api/users/:id`               | Cookie        | Baja lógica (`estado = BAJA`)      |
 
 Todos los roles activos pueden leer los catálogos de organización. `ADMIN` tiene
 alcance global; `JEFE_SEDE` solo administra su sede y su jerarquía. La colección
 requiere `ADMIN` porque también prueba la creación de una sede.
+
+En usuarios, `COORDINADOR` y `JEFE_AREA` operan dentro de su área,
+`JEFE_SEDE` dentro de su sede y `JEFE_COORDINADORES`/`ADMIN` globalmente. Un
+usuario no puede asignar un rol superior al suyo ni darse de baja a sí mismo.
 
 ## Cuerpos principales
 
@@ -113,6 +122,28 @@ Los días válidos son `LUNES`, `MARTES`, `MIERCOLES`, `JUEVES`, `VIERNES`,
 y el inicio debe ser menor que el fin. Los tres `PUT` aceptan cuerpos parciales,
 pero no un objeto vacío.
 
+Usuario:
+
+```json
+{
+  "codigo": "USR001",
+  "email": "usuario@ares.local",
+  "password": "una-password-segura",
+  "rol": "PRESTADOR",
+  "estado": "ACTIVO",
+  "sedeId": 1,
+  "areaId": 1,
+  "turnoId": 1
+}
+```
+
+`password` debe tener entre 12 y 128 caracteres y no superar 72 bytes UTF-8,
+el límite de bcrypt. `rol` usa `PRESTADOR` por defecto y `estado` usa
+`PENDIENTE`; las tres asignaciones son opcionales y aceptan `null`, pero deben
+pertenecer a la misma jerarquía. El `PUT` es parcial y `DELETE` conserva el
+registro con estado `BAJA`. Ninguna respuesta incluye `password` o
+`passwordHash`.
+
 ## Respuestas y errores
 
 Las respuestas exitosas del dominio usan `{ "data": ... }`. Los errores usan
@@ -127,9 +158,9 @@ su detalle estructurado.
 | 400    | `VALIDATION_ERROR` o horario inválido            |
 | 401    | `UNAUTHORIZED` o credenciales inválidas          |
 | 403    | `FORBIDDEN`, rol o alcance insuficiente          |
-| 404    | Sede, área o turno inexistente                   |
+| 404    | Usuario, sede, área o turno inexistente          |
 | 409    | Nombre duplicado o padre inactivo                |
 | 429    | Demasiados intentos de login                     |
 
-La fase de limpieza de la colección hace borrados lógicos; los registros quedan
-en la base con `activa` o `activo` en `false`.
+La colección hace borrados lógicos; los registros quedan en la base con
+`activa`/`activo` en `false` o, para usuarios, con `estado = BAJA`.

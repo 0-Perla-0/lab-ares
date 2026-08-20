@@ -1,5 +1,22 @@
 const cookieSecurity = [{ cookieAuth: [] }];
 
+const userRoles = [
+  "PRESTADOR",
+  "COORDINADOR",
+  "JEFE_COORDINADORES",
+  "JEFE_AREA",
+  "JEFE_SEDE",
+  "ADMIN",
+] as const;
+
+const userStates = [
+  "ACTIVO",
+  "PENDIENTE",
+  "INACTIVO",
+  "LIBERADO",
+  "BAJA",
+] as const;
+
 const errorResponses = {
   400: { description: "Invalid request" },
   401: { description: "Authentication required" },
@@ -23,6 +40,14 @@ function idParameter() {
       schema: { type: "integer", minimum: 1 },
     },
   ];
+}
+
+function nullableIdSchema(defaultToNull = false) {
+  const schema = {
+    anyOf: [{ type: "integer", minimum: 1 }, { type: "null" }],
+  };
+
+  return defaultToNull ? { ...schema, default: null } : schema;
 }
 
 function organizationPaths(
@@ -87,12 +112,74 @@ function organizationPaths(
   };
 }
 
+function userPaths() {
+  return {
+    "/api/users": {
+      get: {
+        tags: ["Users"],
+        security: cookieSecurity,
+        responses: {
+          200: { description: "Users visible in the authenticated scope" },
+          ...errorResponses,
+        },
+      },
+      post: {
+        tags: ["Users"],
+        security: cookieSecurity,
+        requestBody: jsonBody({ $ref: "#/components/schemas/UserInput" }),
+        responses: {
+          201: { description: "User created" },
+          409: { description: "Code or email already exists" },
+          ...errorResponses,
+        },
+      },
+    },
+    "/api/users/{id}": {
+      get: {
+        tags: ["Users"],
+        security: cookieSecurity,
+        parameters: idParameter(),
+        responses: {
+          200: { description: "User found" },
+          404: { description: "User not found" },
+          ...errorResponses,
+        },
+      },
+      put: {
+        tags: ["Users"],
+        security: cookieSecurity,
+        parameters: idParameter(),
+        requestBody: jsonBody({
+          $ref: "#/components/schemas/UserUpdateInput",
+        }),
+        responses: {
+          200: { description: "User updated" },
+          404: { description: "User not found" },
+          409: { description: "Code or email already exists" },
+          ...errorResponses,
+        },
+      },
+      delete: {
+        tags: ["Users"],
+        security: cookieSecurity,
+        parameters: idParameter(),
+        responses: {
+          200: { description: "User logically deleted with BAJA state" },
+          404: { description: "User not found" },
+          409: { description: "Self-deletion is not allowed" },
+          ...errorResponses,
+        },
+      },
+    },
+  };
+}
+
 export function createOpenApiDocument() {
   return {
     openapi: "3.1.0",
     info: {
       title: "Ares Backend API",
-      version: "0.1.0",
+      version: "0.2.0",
       description: "NestJS API for authentication and Ares domain services.",
     },
     servers: [{ url: "/" }],
@@ -100,6 +187,7 @@ export function createOpenApiDocument() {
       { name: "Health" },
       { name: "Authentication" },
       { name: "Organization" },
+      { name: "Users" },
     ],
     paths: {
       "/api/health": {
@@ -162,6 +250,7 @@ export function createOpenApiDocument() {
       ...organizationPaths("sedes", "SedeInput", "SedeUpdateInput"),
       ...organizationPaths("areas", "AreaInput", "AreaUpdateInput"),
       ...organizationPaths("turnos", "TurnoInput", "TurnoUpdateInput"),
+      ...userPaths(),
     },
     components: {
       securitySchemes: {
@@ -179,6 +268,49 @@ export function createOpenApiDocument() {
           properties: {
             email: { type: "string", format: "email" },
             password: { type: "string", minLength: 1, maxLength: 128 },
+          },
+        },
+        UserInput: {
+          type: "object",
+          required: ["codigo", "email", "password"],
+          additionalProperties: false,
+          properties: {
+            codigo: { type: "string", minLength: 1, maxLength: 50 },
+            email: { type: "string", format: "email", maxLength: 191 },
+            password: {
+              type: "string",
+              minLength: 12,
+              maxLength: 128,
+              description: "Must also fit bcrypt's 72-byte UTF-8 limit",
+            },
+            rol: { enum: userRoles, default: "PRESTADOR" },
+            estado: {
+              enum: userStates.filter((state) => state !== "BAJA"),
+              default: "PENDIENTE",
+            },
+            sedeId: nullableIdSchema(true),
+            areaId: nullableIdSchema(true),
+            turnoId: nullableIdSchema(true),
+          },
+        },
+        UserUpdateInput: {
+          type: "object",
+          minProperties: 1,
+          additionalProperties: false,
+          properties: {
+            codigo: { type: "string", minLength: 1, maxLength: 50 },
+            email: { type: "string", format: "email", maxLength: 191 },
+            password: {
+              type: "string",
+              minLength: 12,
+              maxLength: 128,
+              description: "Must also fit bcrypt's 72-byte UTF-8 limit",
+            },
+            rol: { enum: userRoles },
+            estado: { enum: userStates },
+            sedeId: nullableIdSchema(),
+            areaId: nullableIdSchema(),
+            turnoId: nullableIdSchema(),
           },
         },
         SedeInput: {
