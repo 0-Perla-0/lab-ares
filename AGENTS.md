@@ -21,3 +21,7 @@ Consult these guides before working on related tasks:
 - [Server and Client Components](https://nextjs.org/docs/app/getting-started/server-and-client-components)
 - [Rewrites](https://nextjs.org/docs/app/api-reference/config/next-config-js/rewrites)
 - [Tailwind CSS with Next.js](https://tailwindcss.com/docs/installation/framework-guides/nextjs)
+
+Check the document located at:
+docs\CONTEXTO_ESTADO_DESARROLLO_ARES.md
+and after completing each activity, update whatever you deem relevant
