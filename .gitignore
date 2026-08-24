@@ -1,9 +1,9 @@
 # build output
 dist/
 **/dist/
+.next/
+**/.next/
 # generated types
-.astro/
-**/.astro/
 *.tsbuildinfo
 
 .vscode/

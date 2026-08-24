@@ -30,8 +30,8 @@ un header `Authorization` ni copies la cookie manualmente. Usa siempre el mismo
 host (`localhost`); las cookies de `localhost` no se comparten con `127.0.0.1`.
 
 La colección usa directamente `http://localhost:3000/api`. Para probar a través
-del proxy de Astro, cambia `baseUrl` a `http://localhost:4321/api` y levanta el
-frontend.
+del proxy de Next.js, cambia `baseUrl` a `http://localhost:4321/api` y levanta
+el frontend.
 
 ## Endpoints disponibles
 

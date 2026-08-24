@@ -2,7 +2,7 @@
 
 Monorepo de la plataforma Ares. El frontend y el backend se despliegan como aplicaciones independientes:
 
-- `frontend/`: Astro, React y Tailwind CSS.
+- `frontend/`: Next.js App Router, React y Tailwind CSS.
 - `backend/`: NestJS, Prisma y MariaDB.
 
 ## Requisitos
@@ -61,12 +61,14 @@ Inicia el frontend en otra terminal:
 npm run dev:frontend
 ```
 
-Astro escucha normalmente en `http://localhost:4321` y redirige `/api/*` a NestJS en `http://localhost:3000`. Puedes crear `frontend/.env` a partir de `frontend/.env.example` para cambiar `API_PROXY_TARGET` durante desarrollo.
+Next.js escucha en `http://localhost:4321` y reescribe `/api/*` hacia NestJS en
+`http://localhost:3000`. Puedes crear `frontend/.env` a partir de
+`frontend/.env.example` para cambiar `API_PROXY_TARGET`.
 
-En equipos Windows donde Application Control bloquee el compilador nativo de
-Astro, los comandos del frontend instalan automáticamente el fallback WASI
-oficial de la misma versión. Es una dependencia local de desarrollo y no
-modifica `package.json` ni `package-lock.json`.
+El portal incluye inicio de sesión, tablero protegido, catálogo y administración
+de sedes, áreas y turnos, además de listado, alta, edición y baja lógica de
+usuarios. Las acciones visibles se ajustan al rol y el backend conserva la
+autoridad final sobre cada permiso y alcance.
 
 ### Docker
 
@@ -76,8 +78,10 @@ Con Docker y una `.env` que contenga un `SESSION_SECRET` real:
 docker compose up --build
 ```
 
-Compose levanta MariaDB, aplica primero las migraciones y después inicia la
-imagen de producción del backend. El contenedor expone `http://localhost:3000`.
+Compose levanta MariaDB, aplica primero las migraciones y después inicia las
+imágenes de producción del backend y del frontend. La aplicación completa queda
+disponible en `http://localhost:4321`; el backend también se expone directamente
+en `http://localhost:3000` para diagnóstico y Postman.
 
 ## Rutas migradas
 

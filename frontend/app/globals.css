@@ -1,0 +1,116 @@
+@import "tailwindcss";
+
+:root {
+  --ares-ink: #12221b;
+  --ares-ink-soft: #243d32;
+  --ares-cream: #f4f0e7;
+  --ares-paper: #fcfbf7;
+  --ares-lime: #c8f169;
+  --ares-lime-deep: #95c62d;
+  --ares-orange: #f4834f;
+  --ares-muted: #66736d;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: var(--ares-paper);
+  color: var(--ares-ink);
+  font-family: "Avenir Next", Avenir, "Segoe UI", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  background: var(--ares-lime);
+  color: var(--ares-ink);
+}
+
+.grid-texture {
+  background-image:
+    linear-gradient(rgba(18, 34, 27, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(18, 34, 27, 0.055) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+.brand-mark {
+  display: inline-grid;
+  width: 2.5rem;
+  height: 2.5rem;
+  place-items: center;
+  border-radius: 0.8rem;
+  background: var(--ares-lime);
+  color: var(--ares-ink);
+  font-size: 1rem;
+  font-weight: 900;
+  letter-spacing: -0.08em;
+  box-shadow: inset 0 0 0 1px rgba(18, 34, 27, 0.12);
+}
+
+.focus-ring:focus-visible {
+  outline: 3px solid rgba(149, 198, 45, 0.45);
+  outline-offset: 2px;
+}
+
+.portal-background {
+  background:
+    radial-gradient(
+      circle at 85% 0%,
+      rgba(200, 241, 105, 0.16),
+      transparent 26rem
+    ),
+    #f7f7f3;
+}
+
+.table-scroll {
+  scrollbar-color: #c7cec9 transparent;
+  scrollbar-width: thin;
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-up {
+  animation: fade-up 350ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

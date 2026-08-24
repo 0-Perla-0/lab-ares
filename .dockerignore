@@ -7,8 +7,6 @@
 node_modules
 **/node_modules
 **/dist
-**/.astro
+**/.next
 **/coverage
 npm-debug.log*
-frontend/*
-!frontend/package.json

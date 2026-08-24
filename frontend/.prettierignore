@@ -1,2 +1,2 @@
-.astro/
-dist/
+.next/
+tsconfig.tsbuildinfo

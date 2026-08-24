@@ -2,7 +2,7 @@
 
 ## Settled
 
-- The backend is an independent NestJS application. Astro only consumes `/api`.
+- The backend is an independent NestJS application. The Next.js frontend consumes `/api` through a same-origin rewrite.
 - MariaDB is the source of truth for domain data and persistent sessions.
 - Authorization uses explicit permission plus `self`, `area`, `sede`, or
   `global` scope. Role checks must not be scattered through controllers.

@@ -33,7 +33,6 @@ jobs:
           --health-timeout=5s
           --health-retries=20
     env:
-      ASTRO_TELEMETRY_DISABLED: "1"
       DATABASE_URL: mysql://ci:ci@127.0.0.1:3306/ares_ci
 
     steps:
@@ -60,3 +59,6 @@ jobs:
 
       - name: Build backend container
         run: docker build --target runtime --file backend/Dockerfile .
+
+      - name: Build frontend container
+        run: docker build --target runtime --file frontend/Dockerfile .

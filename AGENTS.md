@@ -1,26 +1,23 @@
 ## Development
 
-The repository is split into `frontend/` (Astro) and `backend/` (NestJS).
+The repository is split into `frontend/` (Next.js App Router) and `backend/` (NestJS).
 
-When starting the Astro dev server, run it from `frontend/` in background mode:
+Start the frontend from the repository root. It listens on port 4321 and proxies `/api/*` to NestJS on port 3000:
 
 ```
-astro dev --background
+npm run dev:frontend
 ```
-
-Manage the background server with `astro dev stop`, `astro dev status`, and `astro dev logs`.
 
 Start the NestJS backend from the repository root with `npm run dev:backend`.
 
 ## Documentation
 
-Full documentation: https://docs.astro.build
+Full documentation: https://nextjs.org/docs
 
 Consult these guides before working on related tasks:
 
-- [Adding pages, dynamic routes, or middleware](https://docs.astro.build/en/guides/routing/)
-- [Working with Astro components](https://docs.astro.build/en/basics/astro-components/)
-- [Using React, Vue, Svelte, or other framework components](https://docs.astro.build/en/guides/framework-components/)
-- [Adding or managing content](https://docs.astro.build/en/guides/content-collections/)
-- [Adding styles or using Tailwind](https://docs.astro.build/en/guides/styling/)
-- [Supporting multiple languages](https://docs.astro.build/en/guides/internationalization/)
+- [App Router](https://nextjs.org/docs/app)
+- [Layouts and pages](https://nextjs.org/docs/app/getting-started/layouts-and-pages)
+- [Server and Client Components](https://nextjs.org/docs/app/getting-started/server-and-client-components)
+- [Rewrites](https://nextjs.org/docs/app/api-reference/config/next-config-js/rewrites)
+- [Tailwind CSS with Next.js](https://tailwindcss.com/docs/installation/framework-guides/nextjs)

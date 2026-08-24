@@ -7,37 +7,26 @@
     "node": ">=22.12.0"
   },
   "scripts": {
-    "prepare:astro": "node scripts/ensure-astro-compiler.mjs",
-    "predev": "npm run prepare:astro",
-    "dev": "astro dev",
-    "precheck": "npm run prepare:astro",
-    "check": "astro check",
-    "prebuild": "npm run prepare:astro",
-    "build": "astro build",
-    "prepreview": "npm run prepare:astro",
-    "preview": "astro preview",
-    "prestart": "npm run prepare:astro",
-    "start": "astro preview",
-    "format": "prettier --plugin=prettier-plugin-astro --write \"src/**/*.{astro,ts,css}\" \"scripts/**/*.mjs\" \"astro.config.mjs\" \"package.json\" \"tsconfig.json\"",
-    "format:check": "prettier --plugin=prettier-plugin-astro --check \"src/**/*.{astro,ts,css}\" \"scripts/**/*.mjs\" \"astro.config.mjs\" \"package.json\" \"tsconfig.json\""
+    "dev": "next dev --port 4321",
+    "check": "tsc --noEmit",
+    "build": "next build",
+    "start": "next start --port 4321",
+    "format": "prettier --write \"app/**/*.{ts,tsx,css}\" \"components/**/*.{ts,tsx}\" \"lib/**/*.ts\" \"*.{mjs,json}\"",
+    "format:check": "prettier --check \"app/**/*.{ts,tsx,css}\" \"components/**/*.{ts,tsx}\" \"lib/**/*.ts\" \"*.{mjs,json}\""
   },
   "dependencies": {
-    "@astrojs/react": "^6.0.2",
-    "@tailwindcss/vite": "^4.3.3",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
-    "astro": "^7.2.4",
+    "lucide-react": "^0.542.0",
+    "next": "^16.3.2",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
-    "@astrojs/check": "^0.9.10",
+    "@tailwindcss/postcss": "^4.3.3",
+    "postcss": "^8.5.6",
     "prettier": "^3.9.6",
-    "prettier-plugin-astro": "^0.14.1",
     "typescript": "^6.0.3"
-  },
-  "optionalDependencies": {
-    "sharp": "^0.35.3"
   }
 }
