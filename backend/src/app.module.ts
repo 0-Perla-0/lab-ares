@@ -3,6 +3,7 @@ import { ConfigModule } from "@nestjs/config";
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from "@nestjs/core";
 
 import { AuthModule } from "./auth/auth.module";
+import { AttendanceModule } from "./attendance/attendance.module";
 import { PermissionsGuard } from "./auth/permissions.guard";
 import { SessionAuthGuard } from "./auth/session-auth.guard";
 import { ApiExceptionFilter } from "./common/errors/api-exception.filter";
@@ -23,6 +24,7 @@ import { UsersModule } from "./users/users.module";
     }),
     DatabaseModule,
     AuthModule,
+    AttendanceModule,
     HealthModule,
     OrganizationModule,
     UsersModule,

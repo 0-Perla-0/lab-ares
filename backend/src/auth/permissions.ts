@@ -2,8 +2,10 @@ import { RolUsuario } from "../generated/prisma/enums";
 import type { AuthUser } from "./auth-user";
 
 export enum Permission {
-  ATTENDANCE_SELF_READ = "attendance:self:read",
+  ATTENDANCE_READ = "attendance:read",
   ATTENDANCE_CHECK_IN = "attendance:check-in",
+  ATTENDANCE_CHECK_OUT = "attendance:check-out",
+  ATTENDANCE_CORRECT = "attendance:correct",
   HOURS_VALIDATE = "hours:validate",
   ORGANIZATION_READ = "organization:read",
   ORGANIZATION_MANAGE = "organization:manage",
@@ -22,14 +24,17 @@ export enum AccessScope {
 type RoleGrants = Readonly<Partial<Record<Permission, AccessScope>>>;
 
 const commonUserGrants: RoleGrants = {
-  [Permission.ATTENDANCE_SELF_READ]: AccessScope.SELF,
+  [Permission.ATTENDANCE_READ]: AccessScope.SELF,
   [Permission.ATTENDANCE_CHECK_IN]: AccessScope.SELF,
+  [Permission.ATTENDANCE_CHECK_OUT]: AccessScope.SELF,
   // Organization data is a shared catalogue needed by authenticated flows.
   [Permission.ORGANIZATION_READ]: AccessScope.GLOBAL,
 };
 
 const areaManagerGrants: RoleGrants = {
   ...commonUserGrants,
+  [Permission.ATTENDANCE_READ]: AccessScope.AREA,
+  [Permission.ATTENDANCE_CORRECT]: AccessScope.AREA,
   [Permission.USERS_READ]: AccessScope.AREA,
   [Permission.USERS_MANAGE]: AccessScope.AREA,
   [Permission.KAIROS_PROJECT_CREATE]: AccessScope.AREA,
@@ -44,6 +49,8 @@ const permissionsByRole: Record<RolUsuario, RoleGrants> = {
   },
   [RolUsuario.JEFE_SEDE]: {
     ...areaManagerGrants,
+    [Permission.ATTENDANCE_READ]: AccessScope.SEDE,
+    [Permission.ATTENDANCE_CORRECT]: AccessScope.SEDE,
     [Permission.HOURS_VALIDATE]: AccessScope.SEDE,
     [Permission.ORGANIZATION_MANAGE]: AccessScope.SEDE,
     [Permission.USERS_READ]: AccessScope.SEDE,
@@ -52,6 +59,8 @@ const permissionsByRole: Record<RolUsuario, RoleGrants> = {
   },
   [RolUsuario.JEFE_COORDINADORES]: {
     ...areaManagerGrants,
+    [Permission.ATTENDANCE_READ]: AccessScope.GLOBAL,
+    [Permission.ATTENDANCE_CORRECT]: AccessScope.GLOBAL,
     [Permission.HOURS_VALIDATE]: AccessScope.GLOBAL,
     [Permission.USERS_READ]: AccessScope.GLOBAL,
     [Permission.USERS_MANAGE]: AccessScope.GLOBAL,

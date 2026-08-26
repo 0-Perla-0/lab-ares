@@ -20,6 +20,10 @@ describe("OpenAPI document", () => {
     "/api/auth/login",
     "/api/auth/logout",
     "/api/auth/me",
+    "/api/attendance/check-in",
+    "/api/attendance/check-out",
+    "/api/attendance/me/current",
+    "/api/attendance/me",
     "/api/organization/sedes",
     "/api/organization/areas",
     "/api/organization/turnos",
@@ -27,5 +31,13 @@ describe("OpenAPI document", () => {
     "/api/users/{id}",
   ])("documents %s", (path) => {
     expect(document.paths).toHaveProperty(path);
+  });
+
+  it("requires idempotency for attendance commands", () => {
+    const operation = document.paths["/api/attendance/check-in"].post;
+    expect(operation.parameters).toContainEqual(
+      expect.objectContaining({ name: "Idempotency-Key", required: true }),
+    );
+    expect(operation.requestBody.required).toBe(false);
   });
 });

@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "2cb80208-1f56-4df5-82c4-0fd6427c32cd",
     "name": "Ares Backend API",
-    "description": "Colección local de los endpoints disponibles en Ares. Ejecútala en orden: inicia sesión, crea la jerarquía Sede → Área → Turno, prueba el CRUD de usuarios y los CRUD lógicos, y termina destruyendo la sesión.",
+    "description": "Colección local de los endpoints disponibles en Ares. Ejecútala en orden: inicia sesión, prueba asistencia idempotente, crea la jerarquía Sede → Área → Turno, prueba el CRUD de usuarios y los CRUD lógicos, y termina destruyendo la sesión.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -59,6 +59,11 @@
     },
     {
       "key": "userId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "attendanceId",
       "value": "",
       "type": "string"
     }
@@ -175,6 +180,7 @@
                   "    const body = pm.response.json();",
                   "    pm.expect(body.openapi).to.eql(\"3.1.0\");",
                   "    pm.expect(body.paths).to.have.property(\"/api/auth/login\");",
+                  "    pm.expect(body.paths).to.have.property(\"/api/attendance/check-in\");",
                   "});"
                 ]
               }
@@ -222,7 +228,8 @@
                   "pm.collectionVariables.unset(\"sedeId\");",
                   "pm.collectionVariables.unset(\"areaId\");",
                   "pm.collectionVariables.unset(\"turnoId\");",
-                  "pm.collectionVariables.unset(\"userId\");"
+                  "pm.collectionVariables.unset(\"userId\");",
+                  "pm.collectionVariables.unset(\"attendanceId\");"
                 ]
               }
             },
@@ -275,7 +282,257 @@
       ]
     },
     {
-      "name": "02 - Sedes",
+      "name": "02 - Asistencia",
+      "item": [
+        {
+          "name": "Cerrar sesión previa si existe",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "postman-preflight-check-out-{{runSuffix}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/attendance/check-out",
+            "description": "Deja un estado inicial limpio si una ejecución anterior se interrumpió después del check-in."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Estado inicial de asistencia limpio\", function () {",
+                  "    pm.expect([200, 409]).to.include(pm.response.code);",
+                  "    if (pm.response.code === 409) {",
+                  "        pm.expect(pm.response.json()).to.eql({ error: \"ATTENDANCE_NOT_OPEN\" });",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Registrar entrada",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "postman-check-in-{{runSuffix}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/attendance/check-in",
+            "description": "Abre una sesión propia con hora de servidor. La ubicación es opcional."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Check-in confirmado\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const attendance = pm.response.json().data;",
+                  "    pm.expect(attendance.estado).to.eql(\"ABIERTA\");",
+                  "    pm.expect(attendance).not.to.have.property(\"entradaIp\");",
+                  "    pm.expect(attendance).not.to.have.property(\"entradaLatitud\");",
+                  "    pm.collectionVariables.set(\"attendanceId\", attendance.id);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Repetir entrada con la misma clave",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "postman-check-in-{{runSuffix}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/attendance/check-in",
+            "description": "El reintento no crea otra sesión y conserva el mismo identificador."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Check-in reproducido sin duplicar\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.json().data.id).to.eql(pm.collectionVariables.get(\"attendanceId\"));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Consultar sesión actual",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/attendance/me/current"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Sesión abierta visible\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    pm.expect(pm.response.json().data.id).to.eql(pm.collectionVariables.get(\"attendanceId\"));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Registrar salida",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "postman-check-out-{{runSuffix}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/attendance/check-out",
+            "description": "Cierra la sesión con hora de servidor y calcula duración/riesgo."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Check-out confirmado\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const attendance = pm.response.json().data;",
+                  "    pm.expect(attendance.id).to.eql(pm.collectionVariables.get(\"attendanceId\"));",
+                  "    pm.expect(attendance.estado).to.eql(\"CERRADA\");",
+                  "    pm.expect(attendance.duracionMinutos).to.be.a(\"number\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Consultar historial propio",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/attendance/me"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Historial propio contiene la sesión cerrada\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const records = pm.response.json().data;",
+                  "    const attendance = records.find((item) => item.id === pm.collectionVariables.get(\"attendanceId\"));",
+                  "    pm.expect(attendance.estado).to.eql(\"CERRADA\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 - Sedes",
       "item": [
         {
           "name": "Crear sede",
@@ -419,7 +676,7 @@
       ]
     },
     {
-      "name": "03 - Áreas",
+      "name": "04 - Áreas",
       "item": [
         {
           "name": "Crear área",
@@ -560,7 +817,7 @@
       ]
     },
     {
-      "name": "04 - Turnos",
+      "name": "05 - Turnos",
       "item": [
         {
           "name": "Crear turno",
@@ -704,7 +961,7 @@
       ]
     },
     {
-      "name": "05 - Usuarios",
+      "name": "06 - Usuarios",
       "item": [
         {
           "name": "Crear usuario",
@@ -987,7 +1244,7 @@
       ]
     },
     {
-      "name": "06 - Limpieza y cierre",
+      "name": "07 - Limpieza y cierre",
       "item": [
         {
           "name": "Desactivar turno",

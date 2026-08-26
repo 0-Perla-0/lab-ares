@@ -92,6 +92,10 @@ en `http://localhost:3000` para diagnóstico y Postman.
 - `POST /api/auth/logout`
 - `GET /api/auth/me`
 - `GET /api/docs/openapi.json`
+- `POST /api/attendance/check-in` con `Idempotency-Key`
+- `POST /api/attendance/check-out` con `Idempotency-Key`
+- `GET /api/attendance/me/current`
+- `GET /api/attendance/me`
 - CRUD lógico de `/api/organization/sedes`
 - CRUD lógico de `/api/organization/areas`
 - CRUD lógico de `/api/organization/turnos`
@@ -102,7 +106,9 @@ La autenticación utiliza una cookie HTTP-only y sesiones persistidas en MariaDB
 La matriz de autorización está documentada en
 [`backend/docs/rbac.md`](backend/docs/rbac.md), y las decisiones de arquitectura
 de la fase inicial en
-[`backend/docs/phase-0-decisions.md`](backend/docs/phase-0-decisions.md).
+[`backend/docs/phase-0-decisions.md`](backend/docs/phase-0-decisions.md). El
+contrato funcional y técnico de asistencia está en
+[`backend/docs/attendance-contract.md`](backend/docs/attendance-contract.md).
 
 ## Comprobaciones
 
@@ -112,9 +118,9 @@ npm run test:integration
 ```
 
 `quality` comprueba formato, Prisma, pruebas unitarias/E2E aisladas, tipos y
-build. `test:integration` usa MariaDB real para comprobar el store de sesiones y
-las restricciones de Prisma. CI ejecuta ambos y también construye la imagen del
-backend.
+build. `test:integration` usa MariaDB real para comprobar el store de sesiones,
+las restricciones de Prisma y la idempotencia concurrente de asistencia. CI
+ejecuta ambos y también construye la imagen del backend.
 
 Las pruebas del backend viven bajo `backend/test/`: `unit/`, `e2e/` e
 `integration/`. El código productivo de `backend/src/` no contiene archivos de

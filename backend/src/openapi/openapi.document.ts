@@ -42,6 +42,118 @@ function idParameter() {
   ];
 }
 
+function idempotencyHeader() {
+  return {
+    name: "Idempotency-Key",
+    in: "header",
+    required: true,
+    description:
+      "Stable key for safely replaying this command after a lost response",
+    schema: {
+      type: "string",
+      minLength: 16,
+      maxLength: 128,
+      pattern: "^[A-Za-z0-9._:-]+$",
+    },
+  } as const;
+}
+
+function attendancePaths() {
+  const command = (summary: string) => ({
+    post: {
+      tags: ["Attendance"],
+      summary,
+      security: cookieSecurity,
+      parameters: [idempotencyHeader()],
+      requestBody: {
+        required: false,
+        content: {
+          "application/json": {
+            schema: { $ref: "#/components/schemas/AttendanceCommandInput" },
+          },
+        },
+      },
+      responses: {
+        200: {
+          description: "Command confirmed or safely replayed",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/AttendanceResponse" },
+            },
+          },
+        },
+        409: {
+          description:
+            "Attendance state conflict or idempotency key reused with different input",
+        },
+        ...errorResponses,
+      },
+    },
+  });
+
+  return {
+    "/api/attendance/check-in": command("Start an attendance session"),
+    "/api/attendance/check-out": command("Close the open attendance session"),
+    "/api/attendance/me/current": {
+      get: {
+        tags: ["Attendance"],
+        summary: "Read the authenticated user's open attendance session",
+        security: cookieSecurity,
+        responses: {
+          200: {
+            description: "Current session or null",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["data"],
+                  properties: {
+                    data: {
+                      anyOf: [
+                        { $ref: "#/components/schemas/Attendance" },
+                        { type: "null" },
+                      ],
+                    },
+                  },
+                },
+              },
+            },
+          },
+          ...errorResponses,
+        },
+      },
+    },
+    "/api/attendance/me": {
+      get: {
+        tags: ["Attendance"],
+        summary:
+          "Read up to 50 recent sessions owned by the authenticated user",
+        security: cookieSecurity,
+        responses: {
+          200: {
+            description: "Attendance history ordered from newest to oldest",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["data"],
+                  properties: {
+                    data: {
+                      type: "array",
+                      items: { $ref: "#/components/schemas/Attendance" },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          ...errorResponses,
+        },
+      },
+    },
+  };
+}
+
 function nullableIdSchema(defaultToNull = false) {
   const schema = {
     anyOf: [{ type: "integer", minimum: 1 }, { type: "null" }],
@@ -179,13 +291,14 @@ export function createOpenApiDocument() {
     openapi: "3.1.0",
     info: {
       title: "Ares Backend API",
-      version: "0.2.0",
+      version: "0.3.0",
       description: "NestJS API for authentication and Ares domain services.",
     },
     servers: [{ url: "/" }],
     tags: [
       { name: "Health" },
       { name: "Authentication" },
+      { name: "Attendance" },
       { name: "Organization" },
       { name: "Users" },
     ],
@@ -247,6 +360,7 @@ export function createOpenApiDocument() {
           },
         },
       },
+      ...attendancePaths(),
       ...organizationPaths("sedes", "SedeInput", "SedeUpdateInput"),
       ...organizationPaths("areas", "AreaInput", "AreaUpdateInput"),
       ...organizationPaths("turnos", "TurnoInput", "TurnoUpdateInput"),
@@ -268,6 +382,108 @@ export function createOpenApiDocument() {
           properties: {
             email: { type: "string", format: "email" },
             password: { type: "string", minLength: 1, maxLength: 128 },
+          },
+        },
+        AttendanceCommandInput: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            ubicacion: {
+              type: "object",
+              required: ["latitud", "longitud", "precisionMetros"],
+              additionalProperties: false,
+              properties: {
+                latitud: { type: "number", minimum: -90, maximum: 90 },
+                longitud: { type: "number", minimum: -180, maximum: 180 },
+                precisionMetros: {
+                  type: "number",
+                  minimum: 0,
+                  maximum: 100000,
+                },
+              },
+            },
+          },
+        },
+        AttendanceEvidenceSummary: {
+          type: "object",
+          required: ["ubicacionRegistrada", "ipRegistrada"],
+          additionalProperties: false,
+          properties: {
+            ubicacionRegistrada: { type: "boolean" },
+            ipRegistrada: { type: "boolean" },
+          },
+        },
+        Attendance: {
+          type: "object",
+          required: [
+            "id",
+            "usuarioId",
+            "sedeId",
+            "areaId",
+            "turnoId",
+            "estado",
+            "entradaAt",
+            "salidaAt",
+            "duracionMinutos",
+            "nivelRiesgo",
+            "motivosRiesgo",
+            "versionReglaRiesgo",
+            "estadoValidacion",
+            "evidenciaEntrada",
+            "evidenciaSalida",
+            "createdAt",
+            "updatedAt",
+          ],
+          additionalProperties: false,
+          properties: {
+            id: { type: "string", format: "uuid" },
+            usuarioId: { type: "integer", minimum: 1 },
+            sedeId: nullableIdSchema(),
+            areaId: nullableIdSchema(),
+            turnoId: nullableIdSchema(),
+            estado: { enum: ["ABIERTA", "CERRADA", "CHECKOUT_OMITIDO"] },
+            entradaAt: { type: "string", format: "date-time" },
+            salidaAt: {
+              anyOf: [
+                { type: "string", format: "date-time" },
+                { type: "null" },
+              ],
+            },
+            duracionMinutos: {
+              anyOf: [{ type: "integer", minimum: 0 }, { type: "null" }],
+            },
+            nivelRiesgo: {
+              enum: ["NO_EVALUADO", "VERDE", "AMARILLO", "ROJO"],
+            },
+            motivosRiesgo: {
+              type: "array",
+              uniqueItems: true,
+              items: { type: "string" },
+            },
+            versionReglaRiesgo: { type: "string" },
+            estadoValidacion: {
+              enum: [
+                "PENDIENTE",
+                "REQUIERE_REVISION",
+                "AUTORIZADA",
+                "RECHAZADA",
+              ],
+            },
+            evidenciaEntrada: {
+              $ref: "#/components/schemas/AttendanceEvidenceSummary",
+            },
+            evidenciaSalida: {
+              $ref: "#/components/schemas/AttendanceEvidenceSummary",
+            },
+            createdAt: { type: "string", format: "date-time" },
+            updatedAt: { type: "string", format: "date-time" },
+          },
+        },
+        AttendanceResponse: {
+          type: "object",
+          required: ["data"],
+          properties: {
+            data: { $ref: "#/components/schemas/Attendance" },
           },
         },
         UserInput: {

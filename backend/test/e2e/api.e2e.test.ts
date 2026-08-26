@@ -15,6 +15,8 @@ import {
 import { PermissionsGuard } from "../../src/auth/permissions.guard";
 import { SessionAuthGuard } from "../../src/auth/session-auth.guard";
 import { UserRepository } from "../../src/auth/user.repository";
+import { AttendanceController } from "../../src/attendance/attendance.controller";
+import { AttendanceService } from "../../src/attendance/attendance.service";
 import { ApiExceptionFilter } from "../../src/common/errors/api-exception.filter";
 import { conflict } from "../../src/common/errors/domain-error";
 import { NoStoreInterceptor } from "../../src/common/http/no-store.interceptor";
@@ -128,6 +130,44 @@ const turnos = {
 const areaRecords = { findById: vi.fn(async () => area) };
 const turnoRecords = { findById: vi.fn(async () => turno) };
 const loginRateLimiter = { consume: vi.fn(() => null), reset: vi.fn() };
+const attendanceRecord = {
+  id: "550e8400-e29b-41d4-a716-446655440000",
+  usuarioId: regular.id,
+  sedeId: null,
+  areaId: null,
+  turnoId: null,
+  estado: "ABIERTA",
+  entradaAt: new Date("2026-08-25T15:00:00.000Z"),
+  salidaAt: null,
+  duracionMinutos: null,
+  nivelRiesgo: "AMARILLO",
+  motivosRiesgo: ["TURNO_NO_VERIFICADO"],
+  versionReglaRiesgo: "attendance-risk-2026-08-25-v1",
+  estadoValidacion: "PENDIENTE",
+  evidenciaEntrada: {
+    ubicacionRegistrada: false,
+    ipRegistrada: true,
+  },
+  evidenciaSalida: {
+    ubicacionRegistrada: false,
+    ipRegistrada: false,
+  },
+  createdAt: new Date("2026-08-25T15:00:00.000Z"),
+  updatedAt: new Date("2026-08-25T15:00:00.000Z"),
+};
+const attendance = {
+  checkIn: vi.fn(async () => attendanceRecord),
+  checkOut: vi.fn(async () => ({
+    ...attendanceRecord,
+    estado: "CERRADA",
+    salidaAt: new Date("2026-08-25T16:00:00.000Z"),
+    duracionMinutos: 60,
+    nivelRiesgo: "VERDE",
+    motivosRiesgo: [],
+  })),
+  current: vi.fn(async () => attendanceRecord),
+  ownHistory: vi.fn(async () => [attendanceRecord]),
+};
 
 describe("Nest API", () => {
   let app: INestApplication;
@@ -137,6 +177,7 @@ describe("Nest API", () => {
     const module = await Test.createTestingModule({
       controllers: [
         AuthController,
+        AttendanceController,
         SedeController,
         AreaController,
         TurnoController,
@@ -145,6 +186,7 @@ describe("Nest API", () => {
       ],
       providers: [
         { provide: AuthService, useValue: auth },
+        { provide: AttendanceService, useValue: attendance },
         { provide: LoginRateLimiter, useValue: loginRateLimiter },
         {
           provide: LoginRateLimitGuard,
@@ -230,6 +272,45 @@ describe("Nest API", () => {
       .send({ nombre: "Centro" })
       .expect(403)
       .expect({ error: "FORBIDDEN" });
+  });
+
+  it("exposes the idempotent self-attendance vertical slice", async () => {
+    const agent = await loginAs(regular.email);
+
+    await agent
+      .post("/api/attendance/check-in")
+      .send({})
+      .expect(400)
+      .expect(({ body }) => expect(body.error).toBe("VALIDATION_ERROR"));
+
+    await agent
+      .post("/api/attendance/check-in")
+      .set("Idempotency-Key", "550e8400-e29b-41d4-a716-446655440001")
+      .send({})
+      .expect(200)
+      .expect(({ body }) => expect(body.data.estado).toBe("ABIERTA"));
+    expect(attendance.checkIn).toHaveBeenLastCalledWith(
+      regular,
+      "550e8400-e29b-41d4-a716-446655440001",
+      {},
+      expect.objectContaining({ ip: expect.any(String) }),
+    );
+
+    await agent
+      .get("/api/attendance/me/current")
+      .expect(200)
+      .expect(({ body }) => expect(body.data.id).toBe(attendanceRecord.id));
+    await agent
+      .get("/api/attendance/me")
+      .expect(200)
+      .expect(({ body }) => expect(body.data).toHaveLength(1));
+
+    await agent
+      .post("/api/attendance/check-out")
+      .set("Idempotency-Key", "550e8400-e29b-41d4-a716-446655440002")
+      .send({})
+      .expect(200)
+      .expect(({ body }) => expect(body.data.estado).toBe("CERRADA"));
   });
 
   it("enforces sede scope after role authorization", async () => {

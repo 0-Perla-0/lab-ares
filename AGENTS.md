@@ -10,6 +10,14 @@ npm run dev:frontend
 
 Start the NestJS backend from the repository root with `npm run dev:backend`.
 
+Utiliza ramas de Git Flow
+feature/backend/**
+feature/frontend/**
+feature/docs/**
+feature/test/**
+realese/**
+hotfix/**
+
 ## Documentation
 
 Full documentation: https://nextjs.org/docs

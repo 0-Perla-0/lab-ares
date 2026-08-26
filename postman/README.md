@@ -44,6 +44,10 @@ el frontend.
 | POST   | `/api/auth/login`              | Pública       | Crea la sesión; límite de intentos |
 | GET    | `/api/auth/me`                 | Cookie        | Usuario autenticado                |
 | POST   | `/api/auth/logout`             | Pública       | Destruye la sesión si existe       |
+| POST   | `/api/attendance/check-in`     | Cookie        | Entrada propia idempotente         |
+| POST   | `/api/attendance/check-out`    | Cookie        | Salida propia idempotente          |
+| GET    | `/api/attendance/me/current`   | Cookie        | Sesión propia abierta o `null`     |
+| GET    | `/api/attendance/me`           | Cookie        | Historial propio reciente          |
 | GET    | `/api/organization/sedes`      | Cookie        | `organization:read`                |
 | POST   | `/api/organization/sedes`      | Cookie        | `organization:manage` global       |
 | GET    | `/api/organization/sedes/:id`  | Cookie        | `organization:read`                |
@@ -144,23 +148,40 @@ pertenecer a la misma jerarquía. El `PUT` es parcial y `DELETE` conserva el
 registro con estado `BAJA`. Ninguna respuesta incluye `password` o
 `passwordHash`.
 
+Asistencia:
+
+```json
+{
+  "ubicacion": {
+    "latitud": 19.4326,
+    "longitud": -99.1332,
+    "precisionMetros": 12.5
+  }
+}
+```
+
+El cuerpo es opcional, pero check-in y check-out requieren un header
+`Idempotency-Key` de 16 a 128 caracteres. La hora siempre proviene del servidor.
+La ubicación es consentida y opcional; la respuesta sólo indica si se registró
+ubicación/IP, sin devolver sus valores completos.
+
 ## Respuestas y errores
 
 Las respuestas exitosas del dominio usan `{ "data": ... }`. Los errores usan
 principalmente `{ "error": "CODIGO" }`; una validación inválida devuelve además
 su detalle estructurado.
 
-| Estado | Significado habitual                             |
-| ------ | ------------------------------------------------ |
-| 200    | Consulta, actualización o desactivación correcta |
-| 201    | Recurso creado o reactivado                      |
-| 204    | Logout correcto, sin cuerpo                      |
-| 400    | `VALIDATION_ERROR` o horario inválido            |
-| 401    | `UNAUTHORIZED` o credenciales inválidas          |
-| 403    | `FORBIDDEN`, rol o alcance insuficiente          |
-| 404    | Usuario, sede, área o turno inexistente          |
-| 409    | Nombre duplicado o padre inactivo                |
-| 429    | Demasiados intentos de login                     |
+| Estado | Significado habitual                                           |
+| ------ | -------------------------------------------------------------- |
+| 200    | Consulta, actualización o desactivación correcta               |
+| 201    | Recurso creado o reactivado                                    |
+| 204    | Logout correcto, sin cuerpo                                    |
+| 400    | `VALIDATION_ERROR` o horario inválido                          |
+| 401    | `UNAUTHORIZED` o credenciales inválidas                        |
+| 403    | `FORBIDDEN`, rol o alcance insuficiente                        |
+| 404    | Usuario, sede, área o turno inexistente                        |
+| 409    | Duplicado, estado incompatible o clave idempotente reutilizada |
+| 429    | Demasiados intentos de login                                   |
 
 La colección hace borrados lógicos; los registros quedan en la base con
 `activa`/`activo` en `false` o, para usuarios, con `estado = BAJA`.

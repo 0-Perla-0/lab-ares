@@ -14,8 +14,10 @@ an action and its maximum data scope.
 
 | Permission                  | Prestador | Coordinador | Jefe área | Jefe sede | Jefe coordinadores | Admin  |
 | --------------------------- | --------- | ----------- | --------- | --------- | ------------------ | ------ |
-| Read own attendance         | self      | self        | self      | self      | self               | global |
-| Check in/out                | self      | self        | self      | self      | self               | global |
+| Read attendance             | self      | area        | area      | sede      | global             | global |
+| Check in                    | self      | self        | self      | self      | self               | global |
+| Check out                   | self      | self        | self      | self      | self               | global |
+| Correct attendance          | -         | area        | area      | sede      | global             | global |
 | Validate hours              | -         | -           | area      | sede      | global             | global |
 | Read/manage users           | -         | area        | area      | sede      | global             | global |
 | Create Kairos projects      | -         | area        | area      | sede      | global             | global |
@@ -30,3 +32,8 @@ User reads and writes are filtered by the granted scope. A user cannot assign
 or manage a role above their own (`PRESTADOR` < `COORDINADOR` < `JEFE_AREA` <
 `JEFE_SEDE` < `JEFE_COORDINADORES` < `ADMIN`). Updates that move a user check
 both the current and destination scope, and self-deletion is rejected.
+
+The current attendance API exposes only `self` reads and self check-in/out.
+Hierarchical reads, corrections and validation use the scopes above when their
+next endpoints are introduced. A person who corrects a session cannot issue its
+final validation, even when their global role grants both permissions.
