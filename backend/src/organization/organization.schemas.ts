@@ -84,7 +84,7 @@ const turnoBase = z.object({
 });
 
 export const crearTurnoSchema = turnoBase.refine(
-  ({ horaInicio, horaFin }) => horaInicio < horaFin,
+  ({ horaInicio, horaFin }) => horaInicio !== horaFin,
 );
 
 /**
@@ -96,7 +96,9 @@ export const actualizarTurnoSchema = turnoBase
   .refine((input) => Object.keys(input).length > 0)
   .refine(
     ({ horaInicio, horaFin }) =>
-      horaInicio === undefined || horaFin === undefined || horaInicio < horaFin,
+      horaInicio === undefined ||
+      horaFin === undefined ||
+      horaInicio !== horaFin,
   );
 
 export type CrearTurnoInput = z.infer<typeof crearTurnoSchema>;

@@ -22,6 +22,7 @@ import { canReadUsers, roleLabels } from "@/lib/permissions";
 
 const navigation = [
   { href: "/portal", label: "Resumen", icon: LayoutDashboard, exact: true },
+  { href: "/portal/asistencia", label: "Asistencia", icon: Clock3 },
   { href: "/portal/sedes", label: "Sedes", icon: Building2 },
   { href: "/portal/areas", label: "Áreas", icon: MapPinned },
   { href: "/portal/turnos", label: "Turnos", icon: Clock3 },

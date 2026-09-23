@@ -121,7 +121,7 @@ export class TurnoService {
 function ensureSchedule(turno: Turno, input: ActualizarTurnoInput) {
   const start = input.horaInicio ?? toMinutes(turno.horaInicio);
   const end = input.horaFin ?? toMinutes(turno.horaFin);
-  if (start >= end) throw invalidInput("TURNO_HORARIO_INVALIDO");
+  if (start === end) throw invalidInput("TURNO_HORARIO_INVALIDO");
 }
 
 function toDate(minutes: number) {

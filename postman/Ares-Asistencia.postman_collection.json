@@ -1,0 +1,100 @@
+{
+  "info": {
+    "name": "Ares - Asistencia (incremento 1)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Inicia sesión con la colección principal. El usuario debe estar activo y tener sede, área y turno activos. Cambia operationKey para cada operación nueva; conserva la clave para reintentar el mismo payload. No crea ni modifica usuarios."
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000/api" },
+    { "key": "operationKey", "value": "replace-with-unique-key-0001" },
+    { "key": "attendanceId", "value": "" },
+    { "key": "closeReason", "value": "Salida no registrada por el prestador" }
+  ],
+  "item": [
+    {
+      "name": "Mi historial y bolsa",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/attendance/me?limit=20"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Consulta autorizada', () => pm.response.to.have.status(200));",
+              "if (pm.response.code === 200 && pm.response.json().data.open) pm.collectionVariables.set('attendanceId', pm.response.json().data.open.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Registrar entrada",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/attendance/check-in",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Idempotency-Key", "value": "{{operationKey}}" }
+        ],
+        "body": { "mode": "raw", "raw": "{}" }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Entrada registrada', () => pm.response.to.have.status(200));",
+              "if (pm.response.code === 200) pm.collectionVariables.set('attendanceId', pm.response.json().data.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Registrar salida (usar nueva operationKey)",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/attendance/check-out",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Idempotency-Key", "value": "{{operationKey}}" }
+        ],
+        "body": { "mode": "raw", "raw": "{\"attendanceId\": {{attendanceId}}}" }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Salida pendiente de validar', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().data.status).to.eql('PENDIENTE'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Sesiones abiertas en mi ámbito",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/attendance/open?limit=20"
+      }
+    },
+    {
+      "name": "Cierre manual (gestor, nueva operationKey)",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/attendance/{{attendanceId}}/close",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Idempotency-Key", "value": "{{operationKey}}" }
+        ],
+        "body": { "mode": "raw", "raw": "{\"reason\": \"{{closeReason}}\"}" }
+      }
+    }
+  ]
+}

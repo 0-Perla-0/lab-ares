@@ -1,3 +1,5 @@
+import { attendancePaths, attendanceSchemas } from "./attendance.openapi";
+
 const cookieSecurity = [{ cookieAuth: [] }];
 
 const userRoles = [
@@ -179,7 +181,7 @@ export function createOpenApiDocument() {
     openapi: "3.1.0",
     info: {
       title: "Ares Backend API",
-      version: "0.2.0",
+      version: "0.3.0",
       description: "NestJS API for authentication and Ares domain services.",
     },
     servers: [{ url: "/" }],
@@ -188,6 +190,7 @@ export function createOpenApiDocument() {
       { name: "Authentication" },
       { name: "Organization" },
       { name: "Users" },
+      { name: "Attendance" },
     ],
     paths: {
       "/api/health": {
@@ -251,6 +254,7 @@ export function createOpenApiDocument() {
       ...organizationPaths("areas", "AreaInput", "AreaUpdateInput"),
       ...organizationPaths("turnos", "TurnoInput", "TurnoUpdateInput"),
       ...userPaths(),
+      ...attendancePaths,
     },
     components: {
       securitySchemes: {
@@ -261,6 +265,7 @@ export function createOpenApiDocument() {
         },
       },
       schemas: {
+        ...attendanceSchemas,
         LoginInput: {
           type: "object",
           required: ["email", "password"],

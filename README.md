@@ -66,9 +66,10 @@ Next.js escucha en `http://localhost:4321` y reescribe `/api/*` hacia NestJS en
 `frontend/.env.example` para cambiar `API_PROXY_TARGET`.
 
 El portal incluye inicio de sesión, tablero protegido, catálogo y administración
-de sedes, áreas y turnos, además de listado, alta, edición y baja lógica de
-usuarios. Las acciones visibles se ajustan al rol y el backend conserva la
-autoridad final sobre cada permiso y alcance.
+de sedes, áreas y turnos, usuarios y el flujo de asistencia del incremento 1:
+entrada, salida, historial y cierre manual con motivo. Las acciones visibles se
+ajustan al rol y el backend conserva la autoridad final sobre cada permiso y
+alcance. El detalle está en [`backend/docs/attendance.md`](backend/docs/attendance.md).
 
 ### Docker
 
@@ -96,6 +97,7 @@ en `http://localhost:3000` para diagnóstico y Postman.
 - CRUD lógico de `/api/organization/areas`
 - CRUD lógico de `/api/organization/turnos`
 - CRUD de `/api/users` con baja lógica y alcance RBAC
+- `GET/POST /api/attendance/me`, `/open`, `/check-in`, `/check-out` y `/:id/close`
 
 La autenticación utiliza una cookie HTTP-only y sesiones persistidas en MariaDB. Los permisos se aplican mediante guards de NestJS.
 

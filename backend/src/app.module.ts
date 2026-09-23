@@ -13,6 +13,7 @@ import { HealthModule } from "./health/health.module";
 import { OrganizationModule } from "./organization/organization.module";
 import { OpenApiModule } from "./openapi/openapi.module";
 import { UsersModule } from "./users/users.module";
+import { AttendanceModule } from "./attendance/attendance.module";
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { UsersModule } from "./users/users.module";
     HealthModule,
     OrganizationModule,
     UsersModule,
+    AttendanceModule,
     OpenApiModule,
   ],
   providers: [

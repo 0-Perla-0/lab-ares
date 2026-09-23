@@ -9,10 +9,11 @@
   "scripts": {
     "dev": "next dev --port 4321",
     "check": "tsc --noEmit",
+    "test": "vitest run --config vitest.config.ts",
     "build": "next build",
     "start": "next start --port 4321",
-    "format": "prettier --write \"app/**/*.{ts,tsx,css}\" \"components/**/*.{ts,tsx}\" \"lib/**/*.ts\" \"*.{mjs,json}\"",
-    "format:check": "prettier --check \"app/**/*.{ts,tsx,css}\" \"components/**/*.{ts,tsx}\" \"lib/**/*.ts\" \"*.{mjs,json}\""
+    "format": "prettier --write \"app/**/*.{ts,tsx,css}\" \"components/**/*.{ts,tsx}\" \"lib/**/*.ts\" \"test/**/*.ts\" \"vitest.config.ts\" \"*.{mjs,json}\"",
+    "format:check": "prettier --check \"app/**/*.{ts,tsx,css}\" \"components/**/*.{ts,tsx}\" \"lib/**/*.ts\" \"test/**/*.ts\" \"vitest.config.ts\" \"*.{mjs,json}\""
   },
   "dependencies": {
     "@types/react": "^19.2.18",
@@ -27,6 +28,7 @@
     "@tailwindcss/postcss": "^4.3.3",
     "postcss": "^8.5.6",
     "prettier": "^3.9.6",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.10"
   }
 }

@@ -4,6 +4,7 @@ import type { AuthUser } from "./auth-user";
 export enum Permission {
   ATTENDANCE_SELF_READ = "attendance:self:read",
   ATTENDANCE_CHECK_IN = "attendance:check-in",
+  ATTENDANCE_MANAGE = "attendance:manage",
   HOURS_VALIDATE = "hours:validate",
   ORGANIZATION_READ = "organization:read",
   ORGANIZATION_MANAGE = "organization:manage",
@@ -30,6 +31,7 @@ const commonUserGrants: RoleGrants = {
 
 const areaManagerGrants: RoleGrants = {
   ...commonUserGrants,
+  [Permission.ATTENDANCE_MANAGE]: AccessScope.AREA,
   [Permission.USERS_READ]: AccessScope.AREA,
   [Permission.USERS_MANAGE]: AccessScope.AREA,
   [Permission.KAIROS_PROJECT_CREATE]: AccessScope.AREA,
@@ -44,6 +46,7 @@ const permissionsByRole: Record<RolUsuario, RoleGrants> = {
   },
   [RolUsuario.JEFE_SEDE]: {
     ...areaManagerGrants,
+    [Permission.ATTENDANCE_MANAGE]: AccessScope.SEDE,
     [Permission.HOURS_VALIDATE]: AccessScope.SEDE,
     [Permission.ORGANIZATION_MANAGE]: AccessScope.SEDE,
     [Permission.USERS_READ]: AccessScope.SEDE,
@@ -52,6 +55,7 @@ const permissionsByRole: Record<RolUsuario, RoleGrants> = {
   },
   [RolUsuario.JEFE_COORDINADORES]: {
     ...areaManagerGrants,
+    [Permission.ATTENDANCE_MANAGE]: AccessScope.GLOBAL,
     [Permission.HOURS_VALIDATE]: AccessScope.GLOBAL,
     [Permission.USERS_READ]: AccessScope.GLOBAL,
     [Permission.USERS_MANAGE]: AccessScope.GLOBAL,

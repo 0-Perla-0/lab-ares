@@ -118,6 +118,8 @@ model Usuario {
   area  Area?  @relation(fields: [areaId], references: [id], onDelete: SetNull)
   turno Turno? @relation(fields: [turnoId], references: [id], onDelete: SetNull)
 
+  asistencias Asistencia[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -136,4 +138,56 @@ model Session {
   updatedAt DateTime @updatedAt
 
   @@index([expiresAt])
+}
+
+enum EstadoAsistencia {
+  ABIERTA
+  PENDIENTE
+  AUTORIZADA
+  RECHAZADA
+}
+
+model Asistencia {
+  id Int @id @default(autoincrement())
+  userId Int
+  user Usuario @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  // NULL after closing. A unique nullable key enforces one open interval per user.
+  openUserId Int? @unique
+  // Organizational assignment at check-in, retained even after a transfer.
+  sedeId Int
+  areaId Int
+  turnoId Int
+  checkInAt DateTime @db.DateTime(3)
+  checkOutAt DateTime? @db.DateTime(3)
+  durationSeconds Int?
+  status EstadoAsistencia @default(ABIERTA)
+  closeReason String? @db.VarChar(500)
+  closedById Int?
+  events AsistenciaEvento[]
+
+  @@index([userId, id])
+  @@index([status, areaId, id])
+  @@index([status, sedeId, id])
+}
+
+model AsistenciaEvento {
+  id Int @id @default(autoincrement())
+  attendanceId Int
+  attendance Asistencia @relation(fields: [attendanceId], references: [id], onDelete: Restrict)
+  actorId Int
+  action String @db.VarChar(30)
+  occurredAt DateTime @db.DateTime(3)
+  reason String? @db.VarChar(500)
+
+  @@index([attendanceId, id])
+}
+
+model AsistenciaSolicitud {
+  actorId Int
+  key String @db.VarChar(100)
+  fingerprint String @db.Char(64)
+  response Json
+  createdAt DateTime @default(now())
+
+  @@id([actorId, key])
 }

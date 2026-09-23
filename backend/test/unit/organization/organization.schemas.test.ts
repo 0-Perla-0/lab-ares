@@ -42,7 +42,7 @@ describe("organization schemas", () => {
     ).toMatchObject({ horaInicio: 495, horaFin: 750 });
   });
 
-  it("rejects inverted schedules, duplicate days and unknown days", () => {
+  it("allows overnight schedules but rejects equal times, duplicate and unknown days", () => {
     const base = {
       nombre: "Matutino",
       areaId: 1,
@@ -51,6 +51,13 @@ describe("organization schemas", () => {
     };
     expect(
       crearTurnoSchema.safeParse({ ...base, dias: [DiaSemana.LUNES] }).success,
+    ).toBe(true);
+    expect(
+      crearTurnoSchema.safeParse({
+        ...base,
+        horaFin: "12:00",
+        dias: [DiaSemana.LUNES],
+      }).success,
     ).toBe(false);
     expect(
       crearTurnoSchema.safeParse({

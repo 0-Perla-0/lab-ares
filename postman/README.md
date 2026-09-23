@@ -1,7 +1,18 @@
 # Pruebas del backend con Postman
 
-Esta carpeta contiene una colección ejecutable con todos los endpoints que el
-backend expone actualmente y un entorno local sin credenciales reales.
+Esta carpeta contiene la colección de administración, una colección adicional
+de asistencia y un entorno local sin credenciales reales.
+
+## Asistencia
+
+Importa también `Ares-Asistencia.postman_collection.json`. Inicia sesión con
+un usuario activo con sede, área y turno activos y conserva la cookie en el
+mismo host. Define una `operationKey` nueva por operación y consérvala para
+reintentar exactamente el mismo payload; entrada, salida y cierre manual
+deben usar claves distintas. La entrada captura `attendanceId` automáticamente.
+El cierre manual y la cola requieren coordinador o superior dentro de su
+alcance. No ejecutes la colección completa como una secuencia sin ajustar
+las claves y el usuario: los recorridos propio y supervisado son independientes.
 
 ## Preparación
 

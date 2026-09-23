@@ -28,6 +28,7 @@ const environmentSchema = z
     BACKEND_PORT: z.coerce.number().int().positive().max(65535).default(3000),
     FRONTEND_ORIGIN: z.url().default("http://localhost:4321"),
     APP_TIME_ZONE: timeZone.default("America/Mexico_City"),
+    ATTENDANCE_ALERT_HOURS: z.coerce.number().int().min(1).max(168).default(12),
     SESSION_SECRET: z.string().min(32).default(DEVELOPMENT_SESSION_SECRET),
   })
   .superRefine(({ NODE_ENV, SESSION_SECRET }, context) => {

@@ -25,7 +25,24 @@ Las instrucciones o recomendaciones contenidas en los PDF se trataron como mater
 
 ## 2. Resumen ejecutivo
 
-Ares ya cuenta con una base administrativa sólida y verificable, pero todavía no es funcionalmente equivalente al sistema documentado. El desarrollo actual cubre infraestructura, autenticación con sesiones, autorización centralizada, usuarios y catálogos de organización. No cubre aún los dos grandes núcleos operativos del producto: **Servicio Social** y **Kairos**.
+### Corte de implementación — 22 de septiembre de 2026
+
+El incremento 1 de asistencia ya tiene recorrido vertical en backend y
+frontend: check-in/check-out, historial propio, cola de sesiones abiertas y
+cierre manual con motivo. Usa hora del servidor, conserva snapshots de
+sede/área/turno y deja los cierres en `PENDIENTE`; `AUTORIZADA` y `RECHAZADA`
+siguen reservados para validación posterior. No se aplican GPS, IP ni
+tolerancias, se permiten cruces de medianoche y el umbral de 12 horas sólo
+genera un aviso de duración prolongada. Validación v1/v2, faltas, semáforo definitivo, masiva,
+documentos y Kairos siguen pendientes.
+
+Verificación del incremento: `npm run quality` completo, 160 pruebas backend,
+4 frontend y 9 de integración con MariaDB 11.8.3 aislada, además del recorrido
+real en navegador de entrada, salida y cierre manual por coordinador. La
+migración se probó únicamente en esa base temporal. El alcance entregado y
+las decisiones aún abiertas están en [asistencia](../backend/docs/attendance.md).
+
+Ares ya cuenta con una base administrativa sólida y verificable, pero todavía no es funcionalmente equivalente al sistema documentado. El desarrollo actual cubre infraestructura, autenticación con sesiones, autorización centralizada, usuarios, catálogos y asistencia vertical. **Servicio Social** sigue parcial hasta completar validación, faltas y documentos; **Kairos** continúa pendiente.
 
 El siguiente objetivo no debería ser migrar pantallas aisladas. Debe construirse primero un recorrido vertical completo de Servicio Social:
 
@@ -40,7 +57,8 @@ Varias capacidades del legado no deben entrar automáticamente al alcance. Gamif
 No se asigna un porcentaje global de avance porque daría el mismo peso a una pantalla de catálogo que al flujo completo de asistencia. La lectura correcta es:
 
 - **Base técnica y administración inicial:** implementadas.
-- **Operación de Servicio Social:** pendiente.
+- **Operación de Servicio Social:** asistencia incremento 1 implementada;
+  validación, faltas, documentos y bolsa de horas pendientes.
 - **Kairos:** pendiente.
 - **Funciones secundarias o experimentales:** pendientes de decisión o pospuestas.
 
@@ -177,7 +195,7 @@ La estrategia correcta es reconstruir contratos de negocio sobre esta arquitectu
 | Usuarios                        | CRUD, aprobación, estados, baja segura y cambios sensibles auditados                        | Parcial avanzado                                             | Flujo de activación/rechazo, historial de email/rol/credenciales, perfil académico y filtros/paginación                   | P1                    |
 | Sedes, áreas y turnos           | Organización multinivel; documentos nuevos añaden centros y carreras                        | Implementado en su alcance base                              | Confirmar centros universitarios, carreras/generaciones y reglas de turnos nocturnos                                      | P1 de decisión        |
 | Auditoría transversal           | Quién cambió, aprobó o rechazó qué y cuándo                                                 | Pendiente                                                    | Modelo y servicio común para usuarios, organización, asistencia, documentos y Kairos; consulta administrativa             | P0                    |
-| Check-in/check-out              | Una sesión abierta, cierre propio, cierre manual autorizado y alertas de sesiones anormales | Pendiente                                                    | Modelos, endpoints, UI, hora del servidor, idempotencia, concurrencia, motivo de cierre manual y alertas                  | P0                    |
+| Check-in/check-out              | Una sesión abierta, cierre propio, cierre manual autorizado y alertas de sesiones anormales | Parcial: incremento 1 implementado                           | Validación, faltas y semáforo de negocio; el umbral de 12 h es configurable y provisional                                 | P0                    |
 | Bolsa de horas y riesgo         | Horas autorizadas, pendientes y rechazadas; semáforo verde/amarillo/rojo                    | Pendiente                                                    | Política de cálculo, umbrales aceptados, saldo, comentarios del validador e historial inmutable                           | P0                    |
 | Validación de horas             | Revisión individual y masiva, filtros por sede/área/usuario/estado y rechazo comentado      | Decisión requerida                                           | Elegir v1/v2, definir cuándo se permite acción masiva y preservar autoridad por alcance                                   | P0                    |
 | Faltas                          | Cálculo por ausencia, consulta, justificación con soporte y resolución                      | Pendiente                                                    | Generación, adjuntos, revisión, estados y relación con asistencia/calendario                                              | P0                    |

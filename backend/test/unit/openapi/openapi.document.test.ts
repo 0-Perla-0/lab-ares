@@ -25,6 +25,11 @@ describe("OpenAPI document", () => {
     "/api/organization/turnos",
     "/api/users",
     "/api/users/{id}",
+    "/api/attendance/me",
+    "/api/attendance/open",
+    "/api/attendance/check-in",
+    "/api/attendance/check-out",
+    "/api/attendance/{id}/close",
   ])("documents %s", (path) => {
     expect(document.paths).toHaveProperty(path);
   });
