@@ -12,17 +12,16 @@ an action and its maximum data scope.
 
 ## Grants
 
-| Permission                  | Prestador | Coordinador | Jefe área | Jefe sede | Jefe coordinadores | Admin  |
-| --------------------------- | --------- | ----------- | --------- | --------- | ------------------ | ------ |
-| Read attendance             | self      | area        | area      | sede      | global             | global |
-| Check in                    | self      | self        | self      | self      | self               | global |
-| Check out                   | self      | self        | self      | self      | self               | global |
-| Correct attendance          | -         | area        | area      | sede      | global             | global |
-| Validate hours              | -         | -           | area      | sede      | global             | global |
-| Read/manage users           | -         | area        | area      | sede      | global             | global |
-| Create Kairos projects      | -         | area        | area      | sede      | global             | global |
-| Read organization catalogue | global    | global      | global    | global    | global             | global |
-| Manage organization         | -         | -           | -         | sede      | -                  | global |
+| Permission                            | Prestador | Coordinador | Jefe área | Jefe sede | Jefe coordinadores | Admin  |
+| ------------------------------------- | --------- | ----------- | --------- | --------- | ------------------ | ------ |
+| Read own attendance                   | self      | self        | self      | self      | self               | global |
+| Check in/out                          | self      | self        | self      | self      | self               | global |
+| Manage open attendance / manual close | -         | area        | area      | sede      | global             | global |
+| Validate hours                        | -         | -           | area      | sede      | global             | global |
+| Read/manage users                     | -         | area        | area      | sede      | global             | global |
+| Create Kairos projects                | -         | area        | area      | sede      | global             | global |
+| Read organization catalogue           | global    | global      | global    | global    | global             | global |
+| Manage organization                   | -         | -           | -         | sede      | -                  | global |
 
 Creating a new sede requires `global` organization scope. A `JEFE_SEDE` can
 modify only its own sede and the areas/turnos below it. Moving an area or turno
@@ -33,7 +32,6 @@ or manage a role above their own (`PRESTADOR` < `COORDINADOR` < `JEFE_AREA` <
 `JEFE_SEDE` < `JEFE_COORDINADORES` < `ADMIN`). Updates that move a user check
 both the current and destination scope, and self-deletion is rejected.
 
-The current attendance API exposes only `self` reads and self check-in/out.
-Hierarchical reads, corrections and validation use the scopes above when their
-next endpoints are introduced. A person who corrects a session cannot issue its
-final validation, even when their global role grants both permissions.
+Attendance management lists only open records in the manager's area, sede or
+global scope. Manual closure requires a reason and retains the check-in
+assignment snapshot; prestadores cannot close another user's session.

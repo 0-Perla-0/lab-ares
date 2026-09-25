@@ -1,19 +1,10 @@
 import { Module } from "@nestjs/common";
-
-import { ServerClock } from "../common/time/server-clock";
 import { AttendanceController } from "./attendance.controller";
-import { AttendanceRepository } from "./attendance.repository";
-import { AttendanceRiskPolicy } from "./attendance-risk.policy";
 import { AttendanceService } from "./attendance.service";
+import { AttendancePolicy } from "./attendance.policy";
 
 @Module({
   controllers: [AttendanceController],
-  providers: [
-    AttendanceRepository,
-    AttendanceRiskPolicy,
-    AttendanceService,
-    ServerClock,
-  ],
-  exports: [AttendanceRepository, AttendanceService],
+  providers: [AttendanceService, AttendancePolicy],
 })
 export class AttendanceModule {}

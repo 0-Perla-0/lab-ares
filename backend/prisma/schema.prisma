@@ -35,31 +35,6 @@ enum DiaSemana {
   DOMINGO
 }
 
-enum EstadoAsistencia {
-  ABIERTA
-  CERRADA
-  CHECKOUT_OMITIDO
-}
-
-enum NivelRiesgoAsistencia {
-  NO_EVALUADO
-  VERDE
-  AMARILLO
-  ROJO
-}
-
-enum EstadoValidacionAsistencia {
-  PENDIENTE
-  REQUIERE_REVISION
-  AUTORIZADA
-  RECHAZADA
-}
-
-enum TipoOperacionAsistencia {
-  CHECK_IN
-  CHECK_OUT
-}
-
 model Sede {
   id        Int     @id @default(autoincrement())
   nombre    String  @unique @db.VarChar(150)
@@ -143,9 +118,7 @@ model Usuario {
   area  Area?  @relation(fields: [areaId], references: [id], onDelete: SetNull)
   turno Turno? @relation(fields: [turnoId], references: [id], onDelete: SetNull)
 
-  asistencias           Asistencia[]
-  operacionesAsistencia OperacionIdempotenteAsistencia[]
-  eventosAuditoria      EventoAuditoria[]
+  asistencias Asistencia[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -167,94 +140,54 @@ model Session {
   @@index([expiresAt])
 }
 
+enum EstadoAsistencia {
+  ABIERTA
+  PENDIENTE
+  AUTORIZADA
+  RECHAZADA
+}
+
 model Asistencia {
-  id String @id @default(uuid()) @db.Char(36)
+  id Int @id @default(autoincrement())
+  userId Int
+  user Usuario @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  // NULL after closing. A unique nullable key enforces one open interval per user.
+  openUserId Int? @unique
+  // Organizational assignment at check-in, retained even after a transfer.
+  sedeId Int
+  areaId Int
+  turnoId Int
+  checkInAt DateTime @db.DateTime(3)
+  checkOutAt DateTime? @db.DateTime(3)
+  durationSeconds Int?
+  status EstadoAsistencia @default(ABIERTA)
+  closeReason String? @db.VarChar(500)
+  closedById Int?
+  events AsistenciaEvento[]
 
-  usuarioId Int
-  usuario   Usuario @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
-
-  /// Copias históricas del alcance al momento del check-in. No conceden permisos.
-  sedeId  Int?
-  areaId  Int?
-  turnoId Int?
-
-  estado EstadoAsistencia @default(ABIERTA)
-
-  entradaAt DateTime
-  salidaAt  DateTime?
-
-  /// `true` únicamente mientras la sesión está abierta. MySQL permite varios
-  /// `NULL`, por lo que el índice compuesto garantiza una sola abierta por usuario.
-  openSlot Boolean? @default(true)
-
-  duracionMinutos Int?
-
-  nivelRiesgo        NivelRiesgoAsistencia      @default(NO_EVALUADO)
-  motivosRiesgo      Json
-  versionReglaRiesgo String                     @db.VarChar(80)
-  estadoValidacion   EstadoValidacionAsistencia @default(PENDIENTE)
-
-  entradaLatitud         Decimal? @db.Decimal(10, 7)
-  entradaLongitud        Decimal? @db.Decimal(10, 7)
-  entradaPrecisionMetros Float?
-  entradaIp              String?  @db.VarChar(45)
-
-  salidaLatitud         Decimal? @db.Decimal(10, 7)
-  salidaLongitud        Decimal? @db.Decimal(10, 7)
-  salidaPrecisionMetros Float?
-  salidaIp              String?  @db.VarChar(45)
-
-  operaciones OperacionIdempotenteAsistencia[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([usuarioId, openSlot])
-  @@index([usuarioId, entradaAt])
-  @@index([sedeId, entradaAt])
-  @@index([areaId, entradaAt])
-  @@index([estado, entradaAt])
+  @@index([userId, id])
+  @@index([status, areaId, id])
+  @@index([status, sedeId, id])
 }
 
-model OperacionIdempotenteAsistencia {
-  id String @id @default(uuid()) @db.Char(36)
+model AsistenciaEvento {
+  id Int @id @default(autoincrement())
+  attendanceId Int
+  attendance Asistencia @relation(fields: [attendanceId], references: [id], onDelete: Restrict)
+  actorId Int
+  action String @db.VarChar(30)
+  occurredAt DateTime @db.DateTime(3)
+  reason String? @db.VarChar(500)
 
-  usuarioId Int
-  usuario   Usuario @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
-
-  asistenciaId String     @db.Char(36)
-  asistencia   Asistencia @relation(fields: [asistenciaId], references: [id], onDelete: Restrict)
-
-  tipo            TipoOperacionAsistencia
-  clave           String                  @db.VarChar(128)
-  huellaSolicitud String                  @db.Char(64)
-
-  createdAt DateTime @default(now())
-
-  @@unique([usuarioId, tipo, clave])
-  @@index([asistenciaId])
+  @@index([attendanceId, id])
 }
 
-model EventoAuditoria {
-  id BigInt @id @default(autoincrement())
-
-  actorUsuarioId Int?
-  actorUsuario   Usuario?    @relation(fields: [actorUsuarioId], references: [id], onDelete: SetNull)
-  actorRol       RolUsuario?
-  actorAlcance   String?     @db.VarChar(20)
-
-  correlacionId   String  @db.Char(36)
-  accion          String  @db.VarChar(100)
-  objetoTipo      String  @db.VarChar(80)
-  objetoId        String? @db.VarChar(191)
-  resultado       String  @db.VarChar(40)
-  motivo          String? @db.VarChar(255)
-  diffPermitido   Json?
-  versionPolitica String? @db.VarChar(80)
-
+model AsistenciaSolicitud {
+  actorId Int
+  key String @db.VarChar(100)
+  fingerprint String @db.Char(64)
+  response Json
   createdAt DateTime @default(now())
 
-  @@index([actorUsuarioId, createdAt])
-  @@index([objetoTipo, objetoId, createdAt])
-  @@index([correlacionId])
+  @@id([actorId, key])
 }

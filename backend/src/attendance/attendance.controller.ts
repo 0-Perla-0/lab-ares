@@ -4,82 +4,103 @@ import {
   Get,
   Headers,
   HttpCode,
-  HttpStatus,
+  Param,
   Post,
+  Query,
   Req,
 } from "@nestjs/common";
 import type { Request } from "express";
-
 import { getAuthenticatedUser } from "../auth/authenticated-user";
 import { Permission } from "../auth/permissions";
 import { RequirePermissions } from "../auth/require-permissions.decorator";
+import { PositiveIntPipe } from "../common/validation/positive-int.pipe";
 import { ZodValidationPipe } from "../common/validation/zod-validation.pipe";
 import {
+  attendanceQuerySchema,
+  checkInSchema,
+  checkOutSchema,
   idempotencyKeySchema,
-  registrarAsistenciaSchema,
-  type RegistrarAsistenciaInput,
+  manualCloseSchema,
+  type AttendanceQuery,
 } from "./attendance.schemas";
 import { AttendanceService } from "./attendance.service";
-
-const idempotencyKeyPipe = new ZodValidationPipe(idempotencyKeySchema);
+const keyPipe = new ZodValidationPipe(idempotencyKeySchema);
 
 @Controller("attendance")
 export class AttendanceController {
   constructor(private readonly attendance: AttendanceService) {}
 
+  @Get("me")
+  @RequirePermissions(Permission.ATTENDANCE_SELF_READ)
+  async mine(
+    @Req() request: Request,
+    @Query(new ZodValidationPipe(attendanceQuerySchema)) query: AttendanceQuery,
+  ) {
+    return {
+      data: await this.attendance.mine(getAuthenticatedUser(request), query),
+    };
+  }
+
+  @Get("open")
+  @RequirePermissions(Permission.ATTENDANCE_MANAGE)
+  async open(
+    @Req() request: Request,
+    @Query(new ZodValidationPipe(attendanceQuerySchema)) query: AttendanceQuery,
+  ) {
+    return {
+      data: await this.attendance.open(getAuthenticatedUser(request), query),
+    };
+  }
+
   @Post("check-in")
-  @HttpCode(HttpStatus.OK)
+  @HttpCode(200)
   @RequirePermissions(Permission.ATTENDANCE_CHECK_IN)
   async checkIn(
-    @Headers("idempotency-key") rawKey: unknown,
-    @Body(new ZodValidationPipe(registrarAsistenciaSchema))
-    input: RegistrarAsistenciaInput,
     @Req() request: Request,
+    @Headers("idempotency-key") key: string,
+    @Body(new ZodValidationPipe(checkInSchema)) _body: Record<string, never>,
   ) {
-    const key = idempotencyKeyPipe.transform(rawKey);
     return {
       data: await this.attendance.checkIn(
         getAuthenticatedUser(request),
-        key,
-        input,
-        { ip: request.ip },
+        keyPipe.transform(key),
       ),
     };
   }
 
   @Post("check-out")
-  @HttpCode(HttpStatus.OK)
-  @RequirePermissions(Permission.ATTENDANCE_CHECK_OUT)
+  @HttpCode(200)
+  @RequirePermissions(Permission.ATTENDANCE_CHECK_IN)
   async checkOut(
-    @Headers("idempotency-key") rawKey: unknown,
-    @Body(new ZodValidationPipe(registrarAsistenciaSchema))
-    input: RegistrarAsistenciaInput,
     @Req() request: Request,
+    @Headers("idempotency-key") key: string,
+    @Body(new ZodValidationPipe(checkOutSchema)) body: { attendanceId: number },
   ) {
-    const key = idempotencyKeyPipe.transform(rawKey);
     return {
       data: await this.attendance.checkOut(
         getAuthenticatedUser(request),
-        key,
-        input,
-        { ip: request.ip },
+        keyPipe.transform(key),
+        body.attendanceId,
       ),
     };
   }
 
-  @Get("me/current")
-  @RequirePermissions(Permission.ATTENDANCE_READ)
-  async current(@Req() request: Request) {
+  @Post(":id/close")
+  @HttpCode(200)
+  @RequirePermissions(Permission.ATTENDANCE_MANAGE)
+  async close(
+    @Req() request: Request,
+    @Param("id", new PositiveIntPipe()) id: number,
+    @Headers("idempotency-key") key: string,
+    @Body(new ZodValidationPipe(manualCloseSchema)) body: { reason: string },
+  ) {
     return {
-      data: await this.attendance.current(getAuthenticatedUser(request).id),
-    };
-  }
-
-  @Get("me")
-  @RequirePermissions(Permission.ATTENDANCE_READ)
-  async ownHistory(@Req() request: Request) {
-    return {
-      data: await this.attendance.ownHistory(getAuthenticatedUser(request).id),
+      data: await this.attendance.close(
+        getAuthenticatedUser(request),
+        keyPipe.transform(key),
+        id,
+        body.reason,
+      ),
     };
   }
 }

@@ -33,9 +33,8 @@ describe("can", () => {
     "allows %s to read its own attendance and check in",
     (rol) => {
       const user = createUser(rol);
-      expect(can(user, Permission.ATTENDANCE_READ)).toBe(true);
+      expect(can(user, Permission.ATTENDANCE_SELF_READ)).toBe(true);
       expect(can(user, Permission.ATTENDANCE_CHECK_IN)).toBe(true);
-      expect(can(user, Permission.ATTENDANCE_CHECK_OUT)).toBe(true);
     },
   );
 
@@ -69,11 +68,11 @@ describe("can", () => {
     ).toBe(true);
   });
 
-  it("separates attendance correction from final validation", () => {
+  it("separates attendance management from final validation", () => {
     expect(
       getAccessScope(
         createUser(RolUsuario.COORDINADOR),
-        Permission.ATTENDANCE_CORRECT,
+        Permission.ATTENDANCE_MANAGE,
       ),
     ).toBe(AccessScope.AREA);
     expect(
@@ -82,7 +81,7 @@ describe("can", () => {
     expect(
       getAccessScope(
         createUser(RolUsuario.JEFE_SEDE),
-        Permission.ATTENDANCE_CORRECT,
+        Permission.ATTENDANCE_MANAGE,
       ),
     ).toBe(AccessScope.SEDE);
   });

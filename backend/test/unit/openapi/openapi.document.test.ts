@@ -20,15 +20,16 @@ describe("OpenAPI document", () => {
     "/api/auth/login",
     "/api/auth/logout",
     "/api/auth/me",
-    "/api/attendance/check-in",
-    "/api/attendance/check-out",
-    "/api/attendance/me/current",
-    "/api/attendance/me",
     "/api/organization/sedes",
     "/api/organization/areas",
     "/api/organization/turnos",
     "/api/users",
     "/api/users/{id}",
+    "/api/attendance/me",
+    "/api/attendance/open",
+    "/api/attendance/check-in",
+    "/api/attendance/check-out",
+    "/api/attendance/{id}/close",
   ])("documents %s", (path) => {
     expect(document.paths).toHaveProperty(path);
   });
@@ -38,6 +39,6 @@ describe("OpenAPI document", () => {
     expect(operation.parameters).toContainEqual(
       expect.objectContaining({ name: "Idempotency-Key", required: true }),
     );
-    expect(operation.requestBody.required).toBe(false);
+    expect(operation.requestBody.required).toBe(true);
   });
 });

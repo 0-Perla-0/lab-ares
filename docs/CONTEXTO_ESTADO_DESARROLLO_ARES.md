@@ -4,9 +4,9 @@
 
 | Dato                        | Valor                                                                                                             |
 | --------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| Fecha de revisión           | 25 de agosto de 2026                                                                                              |
-| Rama de trabajo             | `codex/backend-attendance-core`                                                                                   |
-| Commit base revisado        | `53c3e88` (`develop`); corte de asistencia aún en el worktree                                                     |
+| Fecha de revisión           | 25 de septiembre de 2026                                                                                          |
+| Rama de trabajo             | `develop`                                                                                                         |
+| Commit base revisado        | Merge de `7602eb3` sobre `542d2ed`                                                                                |
 | Sistema actual              | Monorepo con Next.js App Router, NestJS, Prisma y MariaDB                                                         |
 | Fuentes funcionales         | Cinco PDF del sistema heredado: plan, análisis integral, reporte de estado, documento técnico y manual de usuario |
 | Evidencia de implementación | Código, esquema Prisma, migraciones, OpenAPI, pruebas, CI, Docker y Postman del repositorio actual                |
@@ -25,7 +25,7 @@ Las instrucciones o recomendaciones contenidas en los PDF se trataron como mater
 
 ## 2. Resumen ejecutivo
 
-Ares ya cuenta con una base administrativa sólida y verificable, pero todavía no es funcionalmente equivalente al sistema documentado. El desarrollo actual cubre infraestructura, autenticación con sesiones, autorización centralizada, usuarios, catálogos de organización y el primer corte backend de asistencia propia. Servicio Social sigue incompleto porque faltan corte omitido, corrección, bolsa, validación, ausencias, calendario, documentos y su UI; **Kairos** aún no inicia.
+Ares ya cuenta con una base administrativa sólida y verificable, pero todavía no es funcionalmente equivalente al sistema documentado. El desarrollo actual cubre infraestructura, autenticación con sesiones, autorización centralizada, usuarios, catálogos de organización y el incremento 1 de asistencia en backend y frontend: check-in/check-out, historial propio, bolsa de horas por estado, cola jerárquica de sesiones abiertas y cierre manual con motivo. Servicio Social sigue incompleto porque faltan validación, ausencias, calendario y documentos; **Kairos** aún no inicia.
 
 El siguiente objetivo no debería ser migrar pantallas aisladas. Debe construirse primero un recorrido vertical completo de Servicio Social:
 
@@ -40,7 +40,7 @@ El cierre funcional incorpora versiones pequeñas pero completas de gamificació
 No se asigna un porcentaje global de avance porque daría el mismo peso a una pantalla de catálogo que al flujo completo de asistencia. La lectura correcta es:
 
 - **Base técnica y administración inicial:** implementadas.
-- **Operación de Servicio Social:** parcial; backend de check-in/check-out y consulta propia implementado, resto del recorrido pendiente.
+- **Operación de Servicio Social:** asistencia incremento 1 implementada; validación, ausencias, calendario y documentos pendientes.
 - **Kairos:** pendiente.
 - **Funciones secundarias requeridas:** pendientes de desarrollo con un MVP obligatorio ya delimitado.
 
@@ -104,21 +104,23 @@ Ante estas contradicciones, el manual se usa para proponer contratos funcionales
 - Validaciones de pertenencia entre sede, área, turno y usuario.
 - Alta idempotente del primer administrador mediante script de bootstrap.
 
-### 3.4 Primer corte backend de asistencia
+### 3.4 Incremento 1 de asistencia
 
 - Check-in y check-out propios con hora del servidor y `Idempotency-Key` obligatorio.
 - Restricción transaccional y de base de datos para conservar una sola sesión abierta por usuario.
-- Consulta de sesión actual e historial propio de hasta 50 registros.
-- Semáforo de duración v1 con versión y códigos de motivo persistidos; riesgo separado de validación.
-- Captura opcional de coordenadas consentidas e IP observada por el servidor; la respuesta ordinaria sólo expone indicadores de presencia.
-- Registro idempotente y evento de auditoría en la misma transacción que la asistencia.
-- Contrato de estados, transiciones futuras, errores y separación corrección/validación en `backend/docs/attendance-contract.md`.
+- Historial propio paginado, sesión abierta y bolsa de horas pendientes, autorizadas y rechazadas.
+- Cola paginada de sesiones abiertas con alcance por área, sede o global.
+- Cierre manual por coordinador o superior, con motivo obligatorio, actor y hora registrados.
+- Estados `ABIERTA`, `PENDIENTE`, `AUTORIZADA` y `RECHAZADA`; todo cierre queda `PENDIENTE` hasta la futura validación.
+- Umbral configurable de 12 horas como aviso operativo, sin cierre automático.
+- No se aplican GPS, IP ni tolerancias en este incremento y se permiten cruces de medianoche.
+- UI adaptable de asistencia para prestadores y responsables con alcance.
 
-Todavía no están implementados el corte de las 23:59, la corrección autorizada, las consultas jerárquicas, la validación, la bolsa de horas ni la evaluación contra perímetros/redes configurables.
+Todavía no están implementados la validación individual o masiva, las ausencias, el calendario ni el semáforo definitivo de negocio. El contrato vigente está en `backend/docs/attendance.md`.
 
 ### 3.5 Frontend disponible
 
-El frontend contiene nueve rutas de página:
+El frontend contiene diez rutas de página:
 
 - Sitio público institucional.
 - Login.
@@ -129,20 +131,21 @@ El frontend contiene nueve rutas de página:
 - Listado de usuarios.
 - Alta de usuario.
 - Edición de usuario.
+- Asistencia.
 
 Las pantallas incluyen navegación adaptable, estados de carga y error, confirmación de bajas y visibilidad de acciones basada en rol.
 
 ### 3.6 Backend y calidad
 
-El backend expone 31 operaciones HTTP si se cuentan salud, autenticación, OpenAPI, organización, usuarios y las cuatro operaciones propias de asistencia. El esquema actual contiene nueve modelos Prisma; a los seis iniciales se añadieron `Asistencia`, `OperacionIdempotenteAsistencia` y `EventoAuditoria`.
+El backend expone 32 operaciones HTTP si se cuentan salud, autenticación, OpenAPI, organización, usuarios y las cinco operaciones de asistencia. El esquema actual contiene nueve modelos Prisma; a los seis iniciales se añadieron `Asistencia`, `AsistenciaEvento` y `AsistenciaSolicitud`.
 
 En esta revisión se ejecutó la suite no integrada del backend:
 
 - 23 archivos de prueba aprobados.
-- 173 pruebas aprobadas.
+- 162 pruebas aprobadas.
 - Cobertura funcional de autenticación, permisos, sesiones, usuarios, organización, asistencia, OpenAPI, configuración, salud y bootstrap.
 
-La suite de integración con MariaDB aprueba tres pruebas, incluida la repetición concurrente de check-in/check-out y las restricciones reales de idempotencia/sesión abierta. El frontend todavía no tiene pruebas automatizadas propias; sólo cuenta con validación de tipos, formato y build dentro del flujo de calidad.
+El frontend ejecuta cuatro pruebas automatizadas del flujo de asistencia. La suite de integración con MariaDB contiene nueve pruebas aisladas, incluidas concurrencia, idempotencia, alcance y cierre manual; no se volvió a ejecutar durante este merge porque no se configuró una base temporal `_test` o `_ci`. La verificación local sí completó formato, validación y generación de Prisma, pruebas no integradas, tipos y builds de producción.
 
 ### 3.7 Diferencia entre el sitio viejo y la reconstrucción
 
@@ -151,8 +154,8 @@ La suite de integración con MariaDB aprueba tres pruebas, incluida la repetici�
 | Arquitectura     | Next.js 15 monolítico: páginas, endpoints y dominio en el mismo proyecto                                                          | Next.js 16 para UI y NestJS 11 como backend independiente                                                                            |
 | Autenticación    | NextAuth 5 con JWT, middleware y verificaciones distribuidas                                                                      | Sesión persistente server-side, cookie HTTP-only y guards globales NestJS                                                            |
 | Acceso a datos   | Prisma 6 desde rutas y utilidades del monolito                                                                                    | Prisma 7 encapsulado en repositorios/servicios del backend                                                                           |
-| Alcance de datos | Decenas de modelos para asistencia, documentos, Kairos, gamificación, laboratorio y contenido                                     | Seis modelos para organización, usuarios y sesiones; los demás dominios aún no existen                                               |
-| API              | Aproximadamente 103 archivos `route.ts` reportados, con duplicados y endpoints sin consumidor detectados por el análisis integral | 27 operaciones HTTP intencionales y documentadas en OpenAPI para el alcance actual                                                   |
+| Alcance de datos | Decenas de modelos para asistencia, documentos, Kairos, gamificación, laboratorio y contenido                                     | Nueve modelos para organización, usuarios, sesiones y asistencia; los demás dominios aún no existen                                  |
+| API              | Aproximadamente 103 archivos `route.ts` reportados, con duplicados y endpoints sin consumidor detectados por el análisis integral | 32 operaciones HTTP intencionales y documentadas en OpenAPI para el alcance actual                                                   |
 | Calidad          | El documento de marzo menciona Jest/ESLint; el análisis integral encontró pruebas y CI inefectivos                                | Vitest, pruebas unitarias/E2E/integración, typecheck, build y CI                                                                     |
 | Despliegue       | Desarrollo local y previews de Vercel; sin evidencia consistente de producción estable                                            | Docker/CI reproducibles; modelo administrado y liberación por anillos aprobados, todavía sin proveedor, entornos ni piloto ejecutado |
 
@@ -181,41 +184,41 @@ La estrategia correcta es reconstruir contratos de negocio sobre esta arquitectu
 - **Decisión requerida:** no debe desarrollarse hasta que producto confirme comportamiento o permanencia.
 - **Pospuesto:** el plan de migración indicó backlog, feature nueva o no migrar.
 
-| Dominio o módulo                | Expectativa recuperada del legado                                                           | Estado actual                                            | Falta principal                                                                                                                                     | Prioridad recomendada |
-| ------------------------------- | ------------------------------------------------------------------------------------------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
-| Infraestructura base            | Aplicaciones desplegables, base persistente, variables seguras y CI                         | Implementado en local/CI; objetivo aprobado              | Mantener despliegue portable, respaldos y observabilidad; el aprovisionamiento externo no forma parte de las decisiones funcionales del repositorio | Mantenimiento         |
-| Autenticación                   | Login, registro opcional, activación administrativa, perfil, foto y preferencias            | Parcial; contratos de acceso, MFA y contraseña aprobados | Implementar tokens, sesiones, TOTP opcional, lista de contraseñas bloqueadas y transición de bcrypt a Argon2id                                      | P1                    |
-| Roles y permisos                | Seis roles de plataforma y permisos por operación/alcance                                   | Implementado para módulos actuales                       | Extender permisos por dominio, incluyendo cierre manual, validaciones masivas, auditoría y Kairos                                                   | P0 transversal        |
-| Usuarios                        | CRUD, aprobación, estados, baja segura y cambios sensibles auditados                        | Parcial avanzado                                         | Flujo de activación/rechazo, historial de email/rol/credenciales, perfil académico y filtros/paginación                                             | P1                    |
-| Sedes, áreas, turnos y academia | Organización operativa más procedencia académica del prestador                              | Organización operativa implementada; academia pendiente  | Mantener permisos por sede/área y añadir institución, unidad académica, programa, cohorte y adscripción histórica como dimensión independiente      | P1                    |
-| Auditoría transversal           | Quién cambió, aprobó o rechazó qué y cuándo                                                 | Parcial; base append-only usada por check-in/check-out   | Ampliar catálogo, hashes/manifiestos de integridad, consulta por alcance y retención; integrar los demás dominios                                   | P0                    |
-| Conservación y supresión        | Conservar historial necesario sin retener indefinidamente datos personales temporales       | Pendiente; matriz configurable aprobada                  | Categorías/versiones, bloqueo, retención legal, supresión/anonimización, jobs, solicitudes y compatibilidad con respaldos                           | P0 transversal        |
-| Check-in/check-out              | Una sesión abierta, cierre propio, cierre manual autorizado y alertas de sesiones anormales | Backend propio parcial implementado                      | UI, corte omitido, corrección autorizada, consulta jerárquica, política por sede y alertas                                                          | P0                    |
-| Bolsa de horas y riesgo         | Horas autorizadas, pendientes y rechazadas; semáforo verde/amarillo/rojo                    | Riesgo de duración v1 implementado; bolsa pendiente      | Evaluar ubicación/red versionadas, saldo, comentarios del validador e historial inmutable                                                          | P0                    |
-| Validación de horas             | Revisión individual y masiva, filtros por sede/área/usuario/estado y rechazo comentado      | Pendiente; contrato jerárquico aprobado                  | Implementar separación de funciones, alcance organizacional y lotes verdes de máximo 100 registros                                                  | P0                    |
-| Faltas                          | Cálculo por ausencia, consulta, justificación con soporte y resolución                      | Pendiente                                                | Generación, adjuntos, revisión, estados y relación con asistencia/calendario                                                                        | P0                    |
-| Calendario y excepciones        | Festivos, vacaciones, suspensiones y posibles ajustes manuales de horas                     | Pendiente                                                | Catálogo, reglas de exclusión, permisos y decisión sobre regalos/ajustes manuales                                                                   | P0                    |
-| Jobs de cierre, faltas y avisos | Cierre automático, aviso de cierre y cálculo diario de faltas                               | Pendiente                                                | Scheduler real, idempotencia, bloqueo, reintentos, notificaciones efectivas, métricas y logs                                                        | P0                    |
-| Documentos del prestador        | Carga y revisión con estados `PENDIENTE -> EN_REVISION -> AUTORIZADO/RECHAZADO`             | Pendiente; contrato documental y análisis aprobados      | S3/MinIO, requisitos/versiones, retroalimentación, cuarentena, scanner asíncrono y descargas privadas                                               | P1                    |
-| Documentación de coordinadores  | Sustituir directorios, manuales y bitácoras operadas en Excel                               | Pendiente; biblioteca operativa aprobada                 | Implementar documentos versionados por alcance; mantener directorios y bitácoras consultables como datos estructurados, no como hojas sustitutas    | P2                    |
-| Kairos - proyectos              | Nombre, descripción, prioridad, estado, miembros, favoritos y reportes                      | Pendiente                                                | Modelo canónico, API autorizada, pantallas y alcance por proyecto                                                                                   | P1                    |
-| Kairos - miembros               | Roles `DUEÑO`, `SUBLÍDER`, `COLABORADOR` y `OBSERVADOR`                                     | Pendiente                                                | Invitación/asignación, matriz de acciones y compatibilidad con roles globales                                                                       | P1                    |
-| Kairos - actividades            | Título, descripción, fechas, complejidad, asignados, estado, duplicado y movimiento         | Pendiente                                                | CRUD, transiciones, reasignación, trazabilidad al mover entre proyectos y validación                                                                | P1                    |
-| Evidencias Kairos               | Archivos y comentarios con revisión e historial                                             | Pendiente                                                | Almacenamiento, autorización, versión, retroalimentación y vínculo inequívoco con actividad                                                         | P1                    |
-| Kairos - Kanban                 | Carriles `PENDIENTES -> REVISADOS -> EN_PROCESO -> TERMINADO`                               | Pendiente                                                | Confirmar esos estados, reglas de movimiento y evidencia mínima; construir sobre actividades estables                                               | P2                    |
-| Gamificación y XP               | XP base por calidad, nivel, racha, monedas y progreso                                       | Pendiente; MVP obligatorio aprobado                      | Puntos privados por actividades Kairos aprobadas, nivel derivado, insignias limitadas y libro de eventos; asistencia no otorga XP                   | P3                    |
-| Insignias y ranking             | Logros, medallas y clasificación                                                            | Pendiente; sólo insignias en MVP                         | Catálogo y otorgamiento auditable de insignias; no habrá ranking público inicial                                                                    | P3                    |
-| Tienda y recompensas            | Canje de monedas, catálogo, stock y carrito                                                 | Fuera del MVP                                            | No implementar monedas, carrito, stock de recompensas ni canje en el cierre actual                                                                  | Backlog posterior     |
-| Monitoreo y reportes            | Pendientes por módulo, sesiones abiertas, ocupación, tiempos de validación y Excel/CSV      | Pendiente; alcance aprobado                              | Tableros por alcance, refresco de 60 segundos, CSV controlado y exportación asíncrona para más de 5,000 filas                                       | P1/P2                 |
-| Directorio público              | Consulta de contactos autorizados                                                           | Sustituido por directorio interno                        | Implementar visibilidad por área/proyecto y preferencias; un directorio público requeriría contrato separado                                        | P2                    |
-| Sitio público                   | Landing, FAQ, contacto y contenido institucional                                            | Parcial; alcance público limitado aprobado               | Completar páginas institucionales y contenido versionado, sin directorio público, autorregistro, datos personales ni formularios anónimos iniciales | P3                    |
-| Solicitud de impresión 3D       | Solicitud y seguimiento                                                                     | Pendiente; MVP obligatorio aprobado                      | Implementar `TrabajoImpresion3D` canónico, archivo STL privado, estados, asignación y resolución                                                    | P3                    |
-| Bitácora de impresión 3D        | Tiempo, peso, material y archivo STL                                                        | Pendiente; ejecución mínima aprobada                     | Registrar intentos/ejecuciones separados con inicio, fin, material, peso opcional, resultado y observación                                          | P3                    |
-| Inventario                      | Catálogo del laboratorio                                                                    | Pendiente; MVP obligatorio aprobado                      | Separar consumibles y activos; ubicaciones, movimientos auditables y préstamos/devoluciones sin compras, contabilidad o ERP                         | P3                    |
-| Visitas                         | Registro público, aprobación y control de entrada/salida                                    | Pendiente; MVP obligatorio aprobado                      | Invitación interna privada y temporal, QR opaco y confirmación de entrada/salida por personal autorizado; sin solicitud pública                     | P3                    |
-| Subtareas y comentarios Kairos  | Desglose, menciones y colaboración                                                          | Pospuesto                                                | Existían modelos o intención, sin recorrido confiable confirmado                                                                                    | Backlog               |
-| Capacitación RV                 | Contenido de capacitación                                                                   | Pospuesto                                                | No se detectó uso; confirmar antes de diseñar                                                                                                       | Backlog               |
-| Modelos legacy duplicados       | Mantener variantes históricas                                                               | No migrar                                                | Diseñar modelos canónicos en el nuevo dominio                                                                                                       | Fuera de alcance      |
+| Dominio o módulo                | Expectativa recuperada del legado                                                           | Estado actual                                                | Falta principal                                                                                                                                     | Prioridad recomendada |
+| ------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
+| Infraestructura base            | Aplicaciones desplegables, base persistente, variables seguras y CI                         | Implementado en local/CI; objetivo aprobado                  | Mantener despliegue portable, respaldos y observabilidad; el aprovisionamiento externo no forma parte de las decisiones funcionales del repositorio | Mantenimiento         |
+| Autenticación                   | Login, registro opcional, activación administrativa, perfil, foto y preferencias            | Parcial; contratos de acceso, MFA y contraseña aprobados     | Implementar tokens, sesiones, TOTP opcional, lista de contraseñas bloqueadas y transición de bcrypt a Argon2id                                      | P1                    |
+| Roles y permisos                | Seis roles de plataforma y permisos por operación/alcance                                   | Implementado para módulos actuales                           | Extender permisos por dominio, incluyendo cierre manual, validaciones masivas, auditoría y Kairos                                                   | P0 transversal        |
+| Usuarios                        | CRUD, aprobación, estados, baja segura y cambios sensibles auditados                        | Parcial avanzado                                             | Flujo de activación/rechazo, historial de email/rol/credenciales, perfil académico y filtros/paginación                                             | P1                    |
+| Sedes, áreas, turnos y academia | Organización operativa más procedencia académica del prestador                              | Organización operativa implementada; academia pendiente      | Mantener permisos por sede/área y añadir institución, unidad académica, programa, cohorte y adscripción histórica como dimensión independiente      | P1                    |
+| Auditoría transversal           | Quién cambió, aprobó o rechazó qué y cuándo                                                 | Parcial; base append-only usada por check-in/check-out       | Ampliar catálogo, hashes/manifiestos de integridad, consulta por alcance y retención; integrar los demás dominios                                   | P0                    |
+| Conservación y supresión        | Conservar historial necesario sin retener indefinidamente datos personales temporales       | Pendiente; matriz configurable aprobada                      | Categorías/versiones, bloqueo, retención legal, supresión/anonimización, jobs, solicitudes y compatibilidad con respaldos                           | P0 transversal        |
+| Check-in/check-out              | Una sesión abierta, cierre propio, cierre manual autorizado y alertas de sesiones anormales | Incremento 1 implementado en backend y frontend              | Validación, ausencias y política definitiva de riesgo                                                                                               | P0                    |
+| Bolsa de horas y riesgo         | Horas autorizadas, pendientes y rechazadas; semáforo verde/amarillo/rojo                    | Bolsa por estado implementada; semáforo definitivo pendiente | Definir umbrales, comentarios del validador e historial inmutable                                                                                   | P0                    |
+| Validación de horas             | Revisión individual y masiva, filtros por sede/área/usuario/estado y rechazo comentado      | Pendiente; contrato jerárquico aprobado                      | Implementar separación de funciones, alcance organizacional y lotes verdes de máximo 100 registros                                                  | P0                    |
+| Faltas                          | Cálculo por ausencia, consulta, justificación con soporte y resolución                      | Pendiente                                                    | Generación, adjuntos, revisión, estados y relación con asistencia/calendario                                                                        | P0                    |
+| Calendario y excepciones        | Festivos, vacaciones, suspensiones y posibles ajustes manuales de horas                     | Pendiente                                                    | Catálogo, reglas de exclusión, permisos y decisión sobre regalos/ajustes manuales                                                                   | P0                    |
+| Jobs de cierre, faltas y avisos | Cierre automático, aviso de cierre y cálculo diario de faltas                               | Pendiente                                                    | Scheduler real, idempotencia, bloqueo, reintentos, notificaciones efectivas, métricas y logs                                                        | P0                    |
+| Documentos del prestador        | Carga y revisión con estados `PENDIENTE -> EN_REVISION -> AUTORIZADO/RECHAZADO`             | Pendiente; contrato documental y análisis aprobados          | S3/MinIO, requisitos/versiones, retroalimentación, cuarentena, scanner asíncrono y descargas privadas                                               | P1                    |
+| Documentación de coordinadores  | Sustituir directorios, manuales y bitácoras operadas en Excel                               | Pendiente; biblioteca operativa aprobada                     | Implementar documentos versionados por alcance; mantener directorios y bitácoras consultables como datos estructurados, no como hojas sustitutas    | P2                    |
+| Kairos - proyectos              | Nombre, descripción, prioridad, estado, miembros, favoritos y reportes                      | Pendiente                                                    | Modelo canónico, API autorizada, pantallas y alcance por proyecto                                                                                   | P1                    |
+| Kairos - miembros               | Roles `DUEÑO`, `SUBLÍDER`, `COLABORADOR` y `OBSERVADOR`                                     | Pendiente                                                    | Invitación/asignación, matriz de acciones y compatibilidad con roles globales                                                                       | P1                    |
+| Kairos - actividades            | Título, descripción, fechas, complejidad, asignados, estado, duplicado y movimiento         | Pendiente                                                    | CRUD, transiciones, reasignación, trazabilidad al mover entre proyectos y validación                                                                | P1                    |
+| Evidencias Kairos               | Archivos y comentarios con revisión e historial                                             | Pendiente                                                    | Almacenamiento, autorización, versión, retroalimentación y vínculo inequívoco con actividad                                                         | P1                    |
+| Kairos - Kanban                 | Carriles `PENDIENTES -> REVISADOS -> EN_PROCESO -> TERMINADO`                               | Pendiente                                                    | Confirmar esos estados, reglas de movimiento y evidencia mínima; construir sobre actividades estables                                               | P2                    |
+| Gamificación y XP               | XP base por calidad, nivel, racha, monedas y progreso                                       | Pendiente; MVP obligatorio aprobado                          | Puntos privados por actividades Kairos aprobadas, nivel derivado, insignias limitadas y libro de eventos; asistencia no otorga XP                   | P3                    |
+| Insignias y ranking             | Logros, medallas y clasificación                                                            | Pendiente; sólo insignias en MVP                             | Catálogo y otorgamiento auditable de insignias; no habrá ranking público inicial                                                                    | P3                    |
+| Tienda y recompensas            | Canje de monedas, catálogo, stock y carrito                                                 | Fuera del MVP                                                | No implementar monedas, carrito, stock de recompensas ni canje en el cierre actual                                                                  | Backlog posterior     |
+| Monitoreo y reportes            | Pendientes por módulo, sesiones abiertas, ocupación, tiempos de validación y Excel/CSV      | Pendiente; alcance aprobado                                  | Tableros por alcance, refresco de 60 segundos, CSV controlado y exportación asíncrona para más de 5,000 filas                                       | P1/P2                 |
+| Directorio público              | Consulta de contactos autorizados                                                           | Sustituido por directorio interno                            | Implementar visibilidad por área/proyecto y preferencias; un directorio público requeriría contrato separado                                        | P2                    |
+| Sitio público                   | Landing, FAQ, contacto y contenido institucional                                            | Parcial; alcance público limitado aprobado                   | Completar páginas institucionales y contenido versionado, sin directorio público, autorregistro, datos personales ni formularios anónimos iniciales | P3                    |
+| Solicitud de impresión 3D       | Solicitud y seguimiento                                                                     | Pendiente; MVP obligatorio aprobado                          | Implementar `TrabajoImpresion3D` canónico, archivo STL privado, estados, asignación y resolución                                                    | P3                    |
+| Bitácora de impresión 3D        | Tiempo, peso, material y archivo STL                                                        | Pendiente; ejecución mínima aprobada                         | Registrar intentos/ejecuciones separados con inicio, fin, material, peso opcional, resultado y observación                                          | P3                    |
+| Inventario                      | Catálogo del laboratorio                                                                    | Pendiente; MVP obligatorio aprobado                          | Separar consumibles y activos; ubicaciones, movimientos auditables y préstamos/devoluciones sin compras, contabilidad o ERP                         | P3                    |
+| Visitas                         | Registro público, aprobación y control de entrada/salida                                    | Pendiente; MVP obligatorio aprobado                          | Invitación interna privada y temporal, QR opaco y confirmación de entrada/salida por personal autorizado; sin solicitud pública                     | P3                    |
+| Subtareas y comentarios Kairos  | Desglose, menciones y colaboración                                                          | Pospuesto                                                    | Existían modelos o intención, sin recorrido confiable confirmado                                                                                    | Backlog               |
+| Capacitación RV                 | Contenido de capacitación                                                                   | Pospuesto                                                    | No se detectó uso; confirmar antes de diseñar                                                                                                       | Backlog               |
+| Modelos legacy duplicados       | Mantener variantes históricas                                                               | No migrar                                                    | Diseñar modelos canónicos en el nuevo dominio                                                                                                       | Fuera de alcance      |
 
 ### 5.1 Contratos funcionales consolidados
 
@@ -310,11 +313,11 @@ Estos contratos recuperados ya incorporan las decisiones aprobadas de la secció
 
 ### Incremento 1 - asistencia vertical
 
-- Check-in/check-out. **Backend implementado; UI pendiente.**
-- Cierre manual auditado y alertas de sesiones anormales.
-- Consulta de asistencia propia. **Backend implementado; UI pendiente.**
-- Bolsa de horas.
-- Pruebas de idempotencia, concurrencia y turnos. **Base backend implementada; falta alcance jerárquico.**
+- Check-in/check-out. **Backend y UI implementados.**
+- Cierre manual con motivo y alertas de sesiones anormales. **Implementado.**
+- Consulta de asistencia propia y cola jerárquica. **Implementado.**
+- Bolsa de horas por estado. **Implementada.**
+- Pruebas de idempotencia, concurrencia y alcance. **Implementadas para el incremento 1.**
 
 ### Incremento 2 - validación, ausencias, documentos y perfil académico
 
@@ -817,20 +820,20 @@ El contrato funcional principal ya produjo el primer recorrido backend implement
 
 **Decisiones funcionales pendientes: ninguna.** Las decisiones externas al control del repositorio se omiten de esta secuencia y se resolverán por separado cuando corresponda; no bloquean los contratos ni la implementación local.
 
-1. Implementar en Backend 1 el job idempotente de corte de las 23:59 y la corrección autorizada con motivo, versión esperada y separación de funciones.
-2. Añadir consulta jerárquica por alcance, bandeja de sesiones anormales y pruebas explícitas para `area`, `sede` y `global`.
-3. Implementar validación individual y autorización masiva verde de máximo 100, seguidas por la bolsa de horas derivada de decisiones inmutables.
-4. Permitir que Frontend 1 integre ya `check-in`, `check-out`, sesión actual e historial propio desde el OpenAPI vigente, sin replicar el cálculo de riesgo.
-5. Continuar después con ausencias/calendario; en paralelo se mantienen los carriles ya asignados a Backend 2 y Frontend 2.
+1. Implementar validación individual y autorización masiva verde de máximo 100, con decisiones inmutables.
+2. Sustituir la bolsa agregada provisional por el historial de decisiones de validación y el semáforo definitivo.
+3. Implementar ausencias, calendario y los jobs idempotentes de aviso/cálculo acordados.
+4. Completar auditoría transversal y separación de funciones para validación y correcciones futuras.
+5. Continuar con documentos; en paralelo se mantienen los carriles ya asignados a Backend 2 y Frontend 2.
 
-Backend 1 ya comenzó el Incremento 1 y debe cerrar corte/corrección antes de abrir visitas o inventario. Frontend 1 puede consumir el corte propio actual mientras Backend 1 continúa el flujo. En paralelo, Backend 2 puede preparar almacenamiento/documentos y Frontend 2 los componentes de estados y navegación de Kairos. Los cuatro MVP P3 siguen comprometidos, pero comienzan después de estabilizar sus dependencias y no desplazan el núcleo de Servicio Social.
+El Incremento 1 quedó integrado en `develop`. Backend 1 y Frontend 1 deben continuar con validación, ausencias y calendario sin duplicar las reglas ya centralizadas. En paralelo, Backend 2 puede preparar almacenamiento/documentos y Frontend 2 los componentes de estados y navegación de Kairos. Los cuatro MVP P3 siguen comprometidos, pero comienzan después de estabilizar sus dependencias y no desplazan el núcleo de Servicio Social.
 
 ## 13. Referencias del repositorio actual
 
 - Arquitectura y operación: [`../README.md`](../README.md)
 - Decisiones de fase inicial: [`../backend/docs/phase-0-decisions.md`](../backend/docs/phase-0-decisions.md)
 - Matriz RBAC: [`../backend/docs/rbac.md`](../backend/docs/rbac.md)
-- Contrato backend de asistencia: [`../backend/docs/attendance-contract.md`](../backend/docs/attendance-contract.md)
+- Contrato backend de asistencia: [`../backend/docs/attendance.md`](../backend/docs/attendance.md)
 - Modelo vigente: [`../backend/prisma/schema.prisma`](../backend/prisma/schema.prisma)
 - Módulos backend: [`../backend/src/app.module.ts`](../backend/src/app.module.ts)
 - Permisos backend: [`../backend/src/auth/permissions.ts`](../backend/src/auth/permissions.ts)

@@ -66,9 +66,10 @@ Next.js escucha en `http://localhost:4321` y reescribe `/api/*` hacia NestJS en
 `frontend/.env.example` para cambiar `API_PROXY_TARGET`.
 
 El portal incluye inicio de sesión, tablero protegido, catálogo y administración
-de sedes, áreas y turnos, además de listado, alta, edición y baja lógica de
-usuarios. Las acciones visibles se ajustan al rol y el backend conserva la
-autoridad final sobre cada permiso y alcance.
+de sedes, áreas y turnos, usuarios y el flujo de asistencia del incremento 1:
+entrada, salida, historial y cierre manual con motivo. Las acciones visibles se
+ajustan al rol y el backend conserva la autoridad final sobre cada permiso y
+alcance. El detalle está en [`backend/docs/attendance.md`](backend/docs/attendance.md).
 
 ### Docker
 
@@ -94,8 +95,9 @@ en `http://localhost:3000` para diagnóstico y Postman.
 - `GET /api/docs/openapi.json`
 - `POST /api/attendance/check-in` con `Idempotency-Key`
 - `POST /api/attendance/check-out` con `Idempotency-Key`
-- `GET /api/attendance/me/current`
-- `GET /api/attendance/me`
+- `GET /api/attendance/me` con historial, sesión abierta y bolsa de horas
+- `GET /api/attendance/open` para sesiones abiertas dentro del alcance
+- `POST /api/attendance/:id/close` con `Idempotency-Key` y motivo
 - CRUD lógico de `/api/organization/sedes`
 - CRUD lógico de `/api/organization/areas`
 - CRUD lógico de `/api/organization/turnos`
@@ -108,7 +110,7 @@ La matriz de autorización está documentada en
 de la fase inicial en
 [`backend/docs/phase-0-decisions.md`](backend/docs/phase-0-decisions.md). El
 contrato funcional y técnico de asistencia está en
-[`backend/docs/attendance-contract.md`](backend/docs/attendance-contract.md).
+[`backend/docs/attendance.md`](backend/docs/attendance.md).
 
 ## Comprobaciones
 

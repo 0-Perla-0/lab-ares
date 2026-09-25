@@ -1,238 +1,266 @@
-import { Injectable } from "@nestjs/common";
-import { createHash, randomUUID } from "node:crypto";
-
+import { createHash } from "node:crypto";
+import { Injectable, Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import type { AuthUser } from "../auth/auth-user";
-import { conflict } from "../common/errors/domain-error";
-import { UniqueConstraintError } from "../common/errors/unique-constraint-error";
-import { ServerClock } from "../common/time/server-clock";
-import {
-  EstadoValidacionAsistencia,
-  TipoOperacionAsistencia,
-} from "../generated/prisma/enums";
-import type { RegistrarAsistenciaInput } from "./attendance.schemas";
-import {
-  AttendanceRepository,
-  type AttendanceRecord,
-} from "./attendance.repository";
-import {
-  ATTENDANCE_RISK_POLICY_VERSION,
-  AttendanceRiskPolicy,
-} from "./attendance-risk.policy";
+import { ApiException } from "../common/errors/api.exception";
+import { PrismaService } from "../database/prisma.service";
+import { Prisma } from "../generated/prisma/client";
+import { AttendancePolicy } from "./attendance.policy";
+import type { AttendanceQuery } from "./attendance.schemas";
 
-type RequestContext = { ip?: string };
+const includeUser = { user: { select: { codigo: true } } } as const;
+type AttendanceRow = Prisma.AsistenciaGetPayload<{
+  include: typeof includeUser;
+}>;
+type Operation =
+  | { action: "CHECK_IN" }
+  | { action: "CHECK_OUT"; attendanceId: number }
+  | { action: "MANUAL_CLOSE"; attendanceId: number; reason: string };
 
 @Injectable()
 export class AttendanceService {
+  private readonly logger = new Logger(AttendanceService.name);
+  readonly abnormalAfterSeconds: number;
+  readonly timeZone: string;
+
   constructor(
-    private readonly attendance: AttendanceRepository,
-    private readonly clock: ServerClock,
-    private readonly risk: AttendanceRiskPolicy,
-  ) {}
-
-  async checkIn(
-    user: AuthUser,
-    key: string,
-    input: RegistrarAsistenciaInput,
-    context: RequestContext,
+    private readonly prisma: PrismaService,
+    private readonly policy: AttendancePolicy,
+    config: ConfigService,
   ) {
-    const fingerprint = requestFingerprint(input);
-    const replay = await this.findReplay(
-      user.id,
-      TipoOperacionAsistencia.CHECK_IN,
-      key,
-      fingerprint,
-    );
-    if (replay) return toPublicAttendance(replay);
-
-    const at = this.clock.now();
-    const turno = await this.attendance.findTurno(user.turnoId);
-    const evaluation = this.risk.evaluateCheckIn(at, turno);
-
-    try {
-      return toPublicAttendance(
-        await this.attendance.createCheckIn({
-          attendanceId: randomUUID(),
-          operationId: randomUUID(),
-          user,
-          key,
-          fingerprint,
-          at,
-          evidence: toEvidence(input, context),
-          nivelRiesgo: evaluation.nivel,
-          motivosRiesgo: evaluation.motivos,
-          versionReglaRiesgo: ATTENDANCE_RISK_POLICY_VERSION,
-        }),
-      );
-    } catch (error) {
-      if (!(error instanceof UniqueConstraintError)) throw error;
-
-      const concurrentReplay = await this.findReplay(
-        user.id,
-        TipoOperacionAsistencia.CHECK_IN,
-        key,
-        fingerprint,
-      );
-      if (concurrentReplay) return toPublicAttendance(concurrentReplay);
-      throw conflict("ATTENDANCE_ALREADY_OPEN");
-    }
+    this.abnormalAfterSeconds =
+      config.get<number>("ATTENDANCE_ALERT_HOURS", 12) * 3600;
+    this.timeZone = config.get<string>("APP_TIME_ZONE", "America/Mexico_City");
   }
 
-  async checkOut(
-    user: AuthUser,
-    key: string,
-    input: RegistrarAsistenciaInput,
-    context: RequestContext,
-  ) {
-    const fingerprint = requestFingerprint(input);
-    const replay = await this.findReplay(
-      user.id,
-      TipoOperacionAsistencia.CHECK_OUT,
-      key,
-      fingerprint,
-    );
-    if (replay) return toPublicAttendance(replay);
-
-    const current = await this.attendance.findCurrent(user.id);
-    if (!current) {
-      const concurrentReplay = await this.findReplay(
-        user.id,
-        TipoOperacionAsistencia.CHECK_OUT,
-        key,
-        fingerprint,
-      );
-      if (concurrentReplay) return toPublicAttendance(concurrentReplay);
-      throw conflict("ATTENDANCE_NOT_OPEN");
-    }
-
-    const at = this.clock.now();
-    const evaluation = this.risk.evaluateCheckOut(
-      current.entradaAt,
-      at,
-      riskReasons(current.motivosRiesgo),
-    );
-
-    try {
-      return toPublicAttendance(
-        await this.attendance.closeCheckOut({
-          attendanceId: current.id,
-          operationId: randomUUID(),
-          user,
-          key,
-          fingerprint,
-          at,
-          evidence: toEvidence(input, context),
-          duracionMinutos: evaluation.duracionMinutos,
-          nivelRiesgo: evaluation.nivel,
-          motivosRiesgo: evaluation.motivos,
-          versionReglaRiesgo: ATTENDANCE_RISK_POLICY_VERSION,
-          estadoValidacion: EstadoValidacionAsistencia.PENDIENTE,
+  async mine(user: AuthUser, query: AttendanceQuery) {
+    const now = new Date();
+    const [items, open, groups] = await this.prisma.$transaction(
+      [
+        this.prisma.asistencia.findMany({
+          where: {
+            userId: user.id,
+            ...(query.cursor ? { id: { lt: query.cursor } } : {}),
+          },
+          orderBy: { id: "desc" },
+          take: query.limit + 1,
+          include: includeUser,
         }),
-      );
-    } catch (error) {
-      if (
-        !(error instanceof UniqueConstraintError) &&
-        !isDomainCode(error, "ATTENDANCE_NOT_OPEN")
-      ) {
+        this.prisma.asistencia.findUnique({
+          where: { openUserId: user.id },
+          include: includeUser,
+        }),
+        this.prisma.asistencia.groupBy({
+          by: ["status"],
+          where: { userId: user.id, status: { not: "ABIERTA" } },
+          _sum: { durationSeconds: true },
+        }),
+      ],
+      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+    );
+    const sum = (status: string) =>
+      groups.find((group) => group.status === status)?._sum.durationSeconds ??
+      0;
+    return {
+      ...this.page(items, query.limit, now),
+      open: open ? this.serialize(open, now) : null,
+      bank: {
+        pendingSeconds: sum("PENDIENTE"),
+        authorizedSeconds: sum("AUTORIZADA"),
+        rejectedSeconds: sum("RECHAZADA"),
+      },
+    };
+  }
+
+  async open(user: AuthUser, query: AttendanceQuery) {
+    const rows = await this.prisma.asistencia.findMany({
+      where: {
+        ...this.policy.scope(user),
+        status: "ABIERTA",
+        ...(query.cursor ? { id: { lt: query.cursor } } : {}),
+      },
+      orderBy: { id: "desc" },
+      take: query.limit + 1,
+      include: includeUser,
+    });
+    return this.page(rows, query.limit, new Date());
+  }
+
+  checkIn(user: AuthUser, key: string) {
+    return this.write(user, key, { action: "CHECK_IN" });
+  }
+  checkOut(user: AuthUser, key: string, attendanceId: number) {
+    return this.write(user, key, { action: "CHECK_OUT", attendanceId });
+  }
+  close(user: AuthUser, key: string, attendanceId: number, reason: string) {
+    return this.write(user, key, {
+      action: "MANUAL_CLOSE",
+      attendanceId,
+      reason,
+    });
+  }
+
+  private async write(user: AuthUser, key: string, operation: Operation) {
+    const fingerprint = createHash("sha256")
+      .update(JSON.stringify(operation))
+      .digest("hex");
+    // Retries cover deadlocks and concurrent claims of the same idempotency key.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        return await this.prisma.$transaction(
+          async (tx) => {
+            let targetUserId = user.id;
+            if (operation.action !== "CHECK_IN") {
+              const target = await tx.asistencia.findUnique({
+                where: { id: operation.attendanceId },
+              });
+              if (!target) throw new ApiException("ATTENDANCE_NOT_FOUND", 404);
+              if (operation.action === "MANUAL_CLOSE")
+                this.policy.requireManage(user, target);
+              else if (target.userId !== user.id)
+                throw new ApiException("FORBIDDEN", 403);
+              targetUserId = target.userId;
+            }
+            // Serialize check-in, own checkout and manual closure on the SAME user row.
+            await tx.$queryRaw`SELECT id FROM Usuario WHERE id = ${targetUserId} FOR UPDATE`;
+            const previous = await tx.asistenciaSolicitud.findUnique({
+              where: { actorId_key: { actorId: user.id, key } },
+            });
+            if (previous) {
+              if (previous.fingerprint !== fingerprint)
+                throw new ApiException("IDEMPOTENCY_KEY_REUSED", 409);
+              return previous.response;
+            }
+            const now = new Date();
+            let row: AttendanceRow;
+            if (operation.action === "CHECK_IN") {
+              const owner = await tx.usuario.findUnique({
+                where: { id: user.id },
+                include: { sede: true, area: true, turno: true },
+              });
+              if (!owner || owner.estado !== "ACTIVO")
+                throw new ApiException("UNAUTHORIZED", 401);
+              if (
+                !owner.sede?.activa ||
+                !owner.area?.activa ||
+                !owner.turno?.activo ||
+                owner.area.sedeId !== owner.sede.id ||
+                owner.turno.areaId !== owner.area.id
+              ) {
+                throw new ApiException("ATTENDANCE_ASSIGNMENT_REQUIRED", 409);
+              }
+              if (
+                await tx.asistencia.findUnique({
+                  where: { openUserId: user.id },
+                })
+              )
+                throw new ApiException("ATTENDANCE_ALREADY_OPEN", 409);
+              row = await tx.asistencia.create({
+                data: {
+                  userId: user.id,
+                  openUserId: user.id,
+                  sedeId: owner.sede.id,
+                  areaId: owner.area.id,
+                  turnoId: owner.turno.id,
+                  checkInAt: now,
+                },
+                include: includeUser,
+              });
+            } else {
+              // Read again after acquiring the lock so concurrent closures see committed state.
+              const target = await tx.asistencia.findUnique({
+                where: { id: operation.attendanceId },
+                include: includeUser,
+              });
+              if (!target || target.status !== "ABIERTA")
+                throw new ApiException("ATTENDANCE_NOT_OPEN", 409);
+              if (now < target.checkInAt)
+                throw new ApiException("ATTENDANCE_CLOCK_ERROR", 409);
+              row = await tx.asistencia.update({
+                where: { id: target.id },
+                data: {
+                  checkOutAt: now,
+                  openUserId: null,
+                  status: "PENDIENTE",
+                  durationSeconds: elapsedSeconds(target.checkInAt, now),
+                  closedById: user.id,
+                  closeReason:
+                    operation.action === "MANUAL_CLOSE"
+                      ? operation.reason
+                      : null,
+                },
+                include: includeUser,
+              });
+            }
+            await tx.asistenciaEvento.create({
+              data: {
+                attendanceId: row.id,
+                actorId: user.id,
+                action: operation.action,
+                occurredAt: now,
+                reason:
+                  operation.action === "MANUAL_CLOSE" ? operation.reason : null,
+              },
+            });
+            const response = this.serialize(row, now);
+            await tx.asistenciaSolicitud.create({
+              data: { actorId: user.id, key, fingerprint, response },
+            });
+            return response;
+          },
+          {
+            isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
+            maxWait: 10000,
+            timeout: 15000,
+          },
+        );
+      } catch (error) {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          ["P2034", "P2002"].includes(error.code)
+        ) {
+          if (attempt < 2) continue;
+          this.logger.warn("Attendance write contention exhausted retries");
+          throw new ApiException("ATTENDANCE_RETRY_REQUIRED", 409);
+        }
         throw error;
       }
-
-      const concurrentReplay = await this.findReplay(
-        user.id,
-        TipoOperacionAsistencia.CHECK_OUT,
-        key,
-        fingerprint,
-      );
-      if (concurrentReplay) return toPublicAttendance(concurrentReplay);
-      throw conflict("ATTENDANCE_NOT_OPEN");
     }
+    throw new ApiException("ATTENDANCE_RETRY_REQUIRED", 409);
   }
 
-  async current(userId: number) {
-    const current = await this.attendance.findCurrent(userId);
-    return current ? toPublicAttendance(current) : null;
+  private page(rows: AttendanceRow[], limit: number, now: Date) {
+    const items = rows.slice(0, limit);
+    return {
+      items: items.map((row) => this.serialize(row, now)),
+      nextCursor: rows.length > limit ? items.at(-1)!.id : null,
+      serverTime: now.toISOString(),
+      timeZone: this.timeZone,
+      abnormalAfterSeconds: this.abnormalAfterSeconds,
+    };
   }
 
-  async ownHistory(userId: number) {
-    return (await this.attendance.findOwnHistory(userId)).map(
-      toPublicAttendance,
-    );
-  }
-
-  private async findReplay(
-    userId: number,
-    type: TipoOperacionAsistencia,
-    key: string,
-    fingerprint: string,
-  ): Promise<AttendanceRecord | null> {
-    const operation = await this.attendance.findIdempotentOperation(
-      userId,
-      type,
-      key,
-    );
-    if (!operation) return null;
-    if (operation.huellaSolicitud !== fingerprint) {
-      throw conflict("IDEMPOTENCY_KEY_REUSED");
-    }
-    return operation.asistencia;
+  private serialize(row: AttendanceRow, now: Date) {
+    return {
+      id: row.id,
+      userId: row.userId,
+      user: row.user,
+      sedeId: row.sedeId,
+      areaId: row.areaId,
+      turnoId: row.turnoId,
+      checkInAt: row.checkInAt.toISOString(),
+      checkOutAt: row.checkOutAt?.toISOString() ?? null,
+      durationSeconds: row.durationSeconds,
+      status: row.status,
+      closeReason: row.closeReason,
+      closedById: row.closedById,
+      abnormal:
+        row.status === "ABIERTA" &&
+        elapsedSeconds(row.checkInAt, now) >= this.abnormalAfterSeconds,
+    };
   }
 }
 
-function requestFingerprint(input: RegistrarAsistenciaInput): string {
-  return createHash("sha256").update(JSON.stringify(input)).digest("hex");
-}
-
-function toEvidence(input: RegistrarAsistenciaInput, context: RequestContext) {
-  return {
-    latitud: input.ubicacion?.latitud,
-    longitud: input.ubicacion?.longitud,
-    precisionMetros: input.ubicacion?.precisionMetros,
-    ip: context.ip,
-  };
-}
-
-function riskReasons(value: PrismaJsonValue): string[] {
-  return Array.isArray(value)
-    ? value.filter((reason): reason is string => typeof reason === "string")
-    : [];
-}
-
-type PrismaJsonValue = AttendanceRecord["motivosRiesgo"];
-
-function toPublicAttendance(record: AttendanceRecord) {
-  return {
-    id: record.id,
-    usuarioId: record.usuarioId,
-    sedeId: record.sedeId,
-    areaId: record.areaId,
-    turnoId: record.turnoId,
-    estado: record.estado,
-    entradaAt: record.entradaAt,
-    salidaAt: record.salidaAt,
-    duracionMinutos: record.duracionMinutos,
-    nivelRiesgo: record.nivelRiesgo,
-    motivosRiesgo: riskReasons(record.motivosRiesgo),
-    versionReglaRiesgo: record.versionReglaRiesgo,
-    estadoValidacion: record.estadoValidacion,
-    evidenciaEntrada: {
-      ubicacionRegistrada:
-        record.entradaLatitud !== null && record.entradaLongitud !== null,
-      ipRegistrada: record.entradaIp !== null,
-    },
-    evidenciaSalida: {
-      ubicacionRegistrada:
-        record.salidaLatitud !== null && record.salidaLongitud !== null,
-      ipRegistrada: record.salidaIp !== null,
-    },
-    createdAt: record.createdAt,
-    updatedAt: record.updatedAt,
-  };
-}
-
-function isDomainCode(error: unknown, code: string): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    error.code === code
-  );
+export function elapsedSeconds(start: Date, end: Date): number {
+  return Math.max(0, Math.floor((end.getTime() - start.getTime()) / 1000));
 }

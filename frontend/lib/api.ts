@@ -67,8 +67,7 @@ const apiMessages: Record<string, string> = {
   TURNO_ALREADY_EXISTS: "Ya existe un turno con ese nombre en el área.",
   TURNO_NOT_FOUND: "El turno seleccionado ya no está disponible.",
   TURNO_INACTIVE: "El turno seleccionado se encuentra inactivo.",
-  TURNO_HORARIO_INVALIDO:
-    "La hora de inicio debe ser anterior a la hora de fin.",
+  TURNO_HORARIO_INVALIDO: "La entrada y la salida deben tener horas distintas.",
   USER_CODE_ALREADY_EXISTS: "El código ya pertenece a otra persona.",
   USER_EMAIL_ALREADY_EXISTS: "El correo ya pertenece a otra persona.",
   USER_ALREADY_EXISTS: "Ya existe una persona con ese código o correo.",
@@ -78,6 +77,17 @@ const apiMessages: Record<string, string> = {
   USER_AREA_NOT_IN_SEDE: "El área no pertenece a la sede seleccionada.",
   USER_TURNO_NOT_IN_AREA: "El turno no pertenece al área seleccionada.",
   SELF_DELETION_NOT_ALLOWED: "No puedes dar de baja tu propia cuenta.",
+  ATTENDANCE_ASSIGNMENT_REQUIRED:
+    "No tienes una asignación activa para registrar asistencia.",
+  ATTENDANCE_ALREADY_OPEN: "Ya tienes una sesión de asistencia abierta.",
+  ATTENDANCE_NOT_OPEN: "La sesión seleccionada ya está cerrada.",
+  ATTENDANCE_NOT_FOUND: "La sesión de asistencia ya no está disponible.",
+  IDEMPOTENCY_KEY_REUSED:
+    "La operación ya fue enviada con otra información. Actualiza e inténtalo nuevamente.",
+  ATTENDANCE_CLOCK_ERROR:
+    "La hora oficial no pudo sincronizarse. Actualiza e inténtalo nuevamente.",
+  RETRY_REQUIRED:
+    "No se confirmó la operación. Puedes reintentarlo con seguridad.",
 };
 
 export function getApiErrorMessage(

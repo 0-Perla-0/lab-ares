@@ -144,7 +144,7 @@ describe("TurnoService", () => {
     turnos.findById.mockResolvedValue(turno);
     areas.findById.mockResolvedValue(area);
     turnos.findByNombreEnArea.mockResolvedValue(null);
-    await expect(service.actualizar(2, { horaFin: 400 })).rejects.toMatchObject(
+    await expect(service.actualizar(2, { horaFin: 480 })).rejects.toMatchObject(
       {
         code: "TURNO_HORARIO_INVALIDO",
       },

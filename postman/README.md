@@ -1,7 +1,18 @@
 # Pruebas del backend con Postman
 
-Esta carpeta contiene una colección ejecutable con todos los endpoints que el
-backend expone actualmente y un entorno local sin credenciales reales.
+Esta carpeta contiene la colección de administración, una colección adicional
+de asistencia y un entorno local sin credenciales reales.
+
+## Asistencia
+
+Importa también `Ares-Asistencia.postman_collection.json`. Inicia sesión con
+un usuario activo con sede, área y turno activos y conserva la cookie en el
+mismo host. Define una `operationKey` nueva por operación y consérvala para
+reintentar exactamente el mismo payload; entrada, salida y cierre manual
+deben usar claves distintas. La entrada captura `attendanceId` automáticamente.
+El cierre manual y la cola requieren coordinador o superior dentro de su
+alcance. No ejecutes la colección completa como una secuencia sin ajustar
+las claves y el usuario: los recorridos propio y supervisado son independientes.
 
 ## Preparación
 
@@ -46,8 +57,9 @@ el frontend.
 | POST   | `/api/auth/logout`             | Pública       | Destruye la sesión si existe       |
 | POST   | `/api/attendance/check-in`     | Cookie        | Entrada propia idempotente         |
 | POST   | `/api/attendance/check-out`    | Cookie        | Salida propia idempotente          |
-| GET    | `/api/attendance/me/current`   | Cookie        | Sesión propia abierta o `null`     |
-| GET    | `/api/attendance/me`           | Cookie        | Historial propio reciente          |
+| GET    | `/api/attendance/me`           | Cookie        | Historial, sesión y bolsa propias  |
+| GET    | `/api/attendance/open`         | Cookie        | Sesiones abiertas según alcance    |
+| POST   | `/api/attendance/:id/close`    | Cookie        | Cierre manual con motivo           |
 | GET    | `/api/organization/sedes`      | Cookie        | `organization:read`                |
 | POST   | `/api/organization/sedes`      | Cookie        | `organization:manage` global       |
 | GET    | `/api/organization/sedes/:id`  | Cookie        | `organization:read`                |

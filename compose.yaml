@@ -44,6 +44,7 @@ services:
       BACKEND_PORT: 3000
       FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:4321}
       APP_TIME_ZONE: ${APP_TIME_ZONE:-America/Mexico_City}
+      ATTENDANCE_ALERT_HOURS: ${ATTENDANCE_ALERT_HOURS:-12}
       SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET in .env before starting the backend}
     ports:
       - "3000:3000"

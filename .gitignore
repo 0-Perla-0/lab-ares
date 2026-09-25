@@ -10,6 +10,9 @@ dist/
 
 # dependencies
 node_modules/
+.npm-cache/
+.test-runtime/
+.agent-system/
 **/node_modules/
 
 # logs

@@ -87,8 +87,8 @@ export function TurnosPage() {
     const data = new FormData(event.currentTarget);
     const horaInicio = String(data.get("horaInicio") ?? "");
     const horaFin = String(data.get("horaFin") ?? "");
-    if (horaInicio >= horaFin) {
-      setFormError("La hora de inicio debe ser anterior a la hora de fin.");
+    if (horaInicio === horaFin) {
+      setFormError("La entrada y la salida deben tener horas distintas.");
       setSaving(false);
       return;
     }
@@ -277,7 +277,7 @@ export function TurnosPage() {
         open={editor !== null}
         onClose={() => !saving && setEditor(null)}
         title={editor?.mode === "edit" ? "Editar turno" : "Registrar turno"}
-        description="El horario utiliza formato de 24 horas y requiere al menos un día."
+        description="El horario utiliza formato de 24 horas y requiere al menos un día. Si la salida es anterior a la entrada, termina al día siguiente."
       >
         {editor && (
           <form onSubmit={save}>

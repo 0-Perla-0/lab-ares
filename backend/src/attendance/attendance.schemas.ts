@@ -1,27 +1,17 @@
 import { z } from "zod";
 
-const ubicacionSchema = z
+export const idempotencyKeySchema = z.string().regex(/^[A-Za-z0-9_-]{16,100}$/);
+export const checkInSchema = z.object({}).strict();
+export const checkOutSchema = z
+  .object({ attendanceId: z.number().int().positive() })
+  .strict();
+export const manualCloseSchema = z
+  .object({ reason: z.string().trim().min(5).max(500) })
+  .strict();
+export const attendanceQuerySchema = z
   .object({
-    latitud: z.number().finite().min(-90).max(90),
-    longitud: z.number().finite().min(-180).max(180),
-    precisionMetros: z.number().finite().nonnegative().max(100_000),
+    cursor: z.coerce.number().int().positive().optional(),
+    limit: z.coerce.number().int().min(1).max(100).default(20),
   })
   .strict();
-
-export const registrarAsistenciaSchema = z
-  .object({
-    ubicacion: ubicacionSchema.optional(),
-  })
-  .strict()
-  .default({});
-
-export const idempotencyKeySchema = z
-  .string()
-  .trim()
-  .min(16)
-  .max(128)
-  .regex(/^[A-Za-z0-9._:-]+$/);
-
-export type RegistrarAsistenciaInput = z.infer<
-  typeof registrarAsistenciaSchema
->;
+export type AttendanceQuery = z.infer<typeof attendanceQuerySchema>;
