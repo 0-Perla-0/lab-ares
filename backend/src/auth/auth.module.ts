@@ -8,6 +8,9 @@ import { UserRepository } from "./user.repository";
 import { OutboxService } from "./outbox.service";
 import { IdentityCleanupService } from "./identity-cleanup.service";
 import { AuditService } from "./audit.service";
+import { MfaService } from "./mfa.service";
+import { EmailService } from "./email.service";
+import { OutboxDispatcherService } from "./outbox-dispatcher.service";
 
 @Module({
   controllers: [AuthController],
@@ -20,7 +23,10 @@ import { AuditService } from "./audit.service";
     OutboxService,
     IdentityCleanupService,
     AuditService,
+    MfaService,
+    EmailService,
+    OutboxDispatcherService,
   ],
-  exports: [AuthService, UserRepository, PrismaSessionStore, OutboxService, AuditService],
+  exports: [AuthService, UserRepository, PrismaSessionStore, OutboxService, AuditService, MfaService, EmailService],
 })
 export class AuthModule {}

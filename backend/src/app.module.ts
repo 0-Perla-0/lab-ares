@@ -16,6 +16,7 @@ import { OpenApiModule } from "./openapi/openapi.module";
 import { UsersModule } from "./users/users.module";
 import { StorageModule } from "./storage/storage.module";
 import { InvitationsModule } from "./invitations/invitations.module";
+import { NotificationsModule } from "./notifications/notifications.module";
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { InvitationsModule } from "./invitations/invitations.module";
     UsersModule,
     StorageModule,
     InvitationsModule,
+    NotificationsModule,
     OpenApiModule,
   ],
   providers: [

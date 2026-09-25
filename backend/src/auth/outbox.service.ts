@@ -29,4 +29,15 @@ export class OutboxService {
     const tag = cipher.getAuthTag();
     return client.outboxEvent.create({ data: { type: event.type, aggregateId: event.aggregateId, payload: { alg: "A256GCM", iv: iv.toString("base64url"), tag: tag.toString("base64url"), ciphertext: ciphertext.toString("base64url") } } });
   }
+  async claim(owner: string, now = new Date()) {
+    const until = new Date(now.getTime() + 60_000);
+    return this.prisma.$transaction(async (tx) => {
+      const candidate = await tx.outboxEvent.findFirst({ where: { OR: [{ state: "PENDING", nextAttemptAt: { lte: now } }, { state: "PROCESSING", leaseUntil: { lt: now } }], failedAt: null }, orderBy: { occurredAt: "asc" } });
+      if (!candidate) return null;
+      const claimed = await tx.outboxEvent.updateMany({ where: { id: candidate.id, OR: [{ state: "PENDING", nextAttemptAt: { lte: now } }, { state: "PROCESSING", leaseUntil: { lt: now } }] }, data: { state: "PROCESSING", leaseOwner: owner, leaseUntil: until, attempts: { increment: 1 } } });
+      return claimed.count ? tx.outboxEvent.findUnique({ where: { id: candidate.id } }) : null;
+    });
+  }
+  async markSent(id: string, owner: string) { return this.prisma.outboxEvent.updateMany({ where: { id, state: "PROCESSING", leaseOwner: owner }, data: { state: "SENT", processedAt: new Date(), leaseOwner: null, leaseUntil: null } }); }
+  async markFailure(id: string, owner: string, error: string, maxAttempts = 5) { return this.prisma.$transaction(async tx => { const row = await tx.outboxEvent.findFirst({ where: { id, state: "PROCESSING", leaseOwner: owner }, select: { attempts: true } }); if (!row) return { count: 0 }; const permanent = row.attempts >= maxAttempts; return tx.outboxEvent.updateMany({ where: { id, state: "PROCESSING", leaseOwner: owner, attempts: row.attempts }, data: { state: permanent ? "FAILED" : "PENDING", failedAt: permanent ? new Date() : null, nextAttemptAt: new Date(Date.now() + Math.min(3_600_000, 1000 * 2 ** Math.max(0, row.attempts - 1))), lastError: error.slice(0, 500), leaseOwner: null, leaseUntil: null } }); }); }
 }

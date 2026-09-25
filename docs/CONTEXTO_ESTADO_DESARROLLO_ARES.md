@@ -78,7 +78,7 @@ Ante estas contradicciones, el manual se usa para proponer contratos funcionales
 | Configuración               | Implementada                        | Validación de entorno, zona horaria, secretos y orígenes.                                     |
 | CI                          | Implementada                        | GitHub Actions instala, migra, ejecuta calidad e integración y construye ambos contenedores.  |
 | Contrato HTTP               | Implementado para el alcance actual | OpenAPI 3.1 disponible en `/api/docs/openapi.json`.                                           |
-| Colección de API            | Implementada para el alcance actual | Colección y ambiente Postman versionados en `postman/`.                                       |
+| Colección de API            | Implementada para el alcance actual | Colección, ambiente y README de Postman versionados en `docs/api/postman/`.                    |
 
 ### 3.2 Autenticación y autorización
 
@@ -94,17 +94,22 @@ Ante estas contradicciones, el manual se usa para proponer contratos funcionales
 
 #### 3.2.1 Identidad core de Backend 2
 
-Esta entrega queda implementada y verificada en backend, con 241 pruebas aprobadas. La evidencia cubre:
+Esta entrega queda implementada y verificada en backend, con 279 pruebas aprobadas. La evidencia cubre:
 
 - Estados de usuario `INVITADA`, `ACTIVA`, `SUSPENDIDA`, `DESACTIVADA` y `BLOQUEADA`.
 - Invitaciones con expiración máxima de 72 horas, token de un solo uso, hash persistido, revocación y validación de alcance; aceptación y efectos asociados dentro de transacción.
 - Recuperación de acceso con respuesta genérica, token hash de 30 minutos y consumo atómico de un solo uso.
 - Cambio de contraseña con política vigente, auditoría, outbox transaccional y revocación de sesiones según el flujo.
 - Sesiones con límite de inactividad de 30 minutos, límite absoluto de 8 horas y revocación individual o masiva.
-- `AuditEvent` append-only para acciones críticas y outbox transaccional con payload cifrado; el dispatcher/correo real aún no está implementado.
-- Limpieza de tokens/sesiones expirados y archivado no destructivo de invitaciones, conservando historial.
+- MFA/TOTP opcional con desafío de login: el login no crea sesión hasta verificar el desafío; se aceptan códigos TOTP o códigos de recuperación.
+- Diez códigos de recuperación por generación, almacenados como hashes y consumibles una sola vez; los desafíos y pasos TOTP tienen consumo condicional y protección contra replay.
+- Secretos TOTP y payloads de outbox cifrados; la configuración rechaza claves de desarrollo inseguras en producción.
+- Centro de notificaciones propio, paginado y acotado al usuario autenticado, con marcado individual o masivo como leído.
+- `AuditEvent` append-only para acciones críticas y outbox transaccional con payload cifrado; el dispatcher usa leases/propietario, recuperación de leases vencidos, backoff exponencial y estado de fallo permanente tras el máximo de intentos.
+- SMTP real mediante `EmailService`, con Mailpit/local habilitable, `EmailDelivery` estable e idempotente por `outboxEventId`/`messageId`, y clasificación de fallos no reintentables.
+- Limpieza de tokens, desafíos MFA, códigos usados, sesiones y registros temporales expirados, además de archivado no destructivo de invitaciones, conservando historial.
 
-Quedan explícitamente pendientes en esta área MFA/TOTP y códigos de recuperación, el dispatcher y correo transaccional real, el centro de notificaciones, la actualización formal de OpenAPI/Postman y toda integración de frontend para estos recorridos.
+Queda pendiente la integración de frontend para estos recorridos y el resto de dominios asignados a Backend 2; la implementación documental/API de esta fase ya está actualizada.
 
 ### 3.3 Usuarios y organización
 
@@ -155,10 +160,10 @@ El backend expone 32 operaciones HTTP si se cuentan salud, autenticación, OpenA
 
 En esta revisión se ejecutó la suite no integrada del backend:
 
-- 241 pruebas aprobadas, incluyendo identidad core, invitaciones, recuperación, sesiones, auditoría, outbox y limpieza.
+- 279 pruebas aprobadas, incluyendo MFA/TOTP y replay protection, códigos de recuperación one-use, notificaciones, outbox/leases/backoff, SMTP/Mailpit/EmailDelivery, limpieza, invitaciones, recuperación, sesiones y auditoría.
 - Cobertura funcional de autenticación, permisos, sesiones, usuarios, organización, asistencia, OpenAPI, configuración, salud y bootstrap.
 
-La verificación local completó formato, validación y generación de Prisma, pruebas, tipos y builds de producción; la cifra de esta entrega es la suite backend de 241 pruebas aprobadas. La cobertura frontend previa no se presenta como evidencia de esta identidad core.
+La verificación local completó formato, validación y generación de Prisma, pruebas, tipos y builds de producción; la cifra de esta entrega es la suite backend de 279 pruebas aprobadas. La cobertura frontend previa no se presenta como evidencia de estos recorridos de identidad.
 
 ### 3.7 Diferencia entre el sitio viejo y la reconstrucción
 
@@ -852,7 +857,10 @@ El Incremento 1 quedó integrado en `develop`. Backend 1 y Frontend 1 deben cont
 - Modelo vigente: [`../backend/prisma/schema.prisma`](../backend/prisma/schema.prisma)
 - Módulos backend: [`../backend/src/app.module.ts`](../backend/src/app.module.ts)
 - Permisos backend: [`../backend/src/auth/permissions.ts`](../backend/src/auth/permissions.ts)
-- Contrato OpenAPI: [`../backend/src/openapi/openapi.document.ts`](../backend/src/openapi/openapi.document.ts)
+- Contrato OpenAPI 3.1: [`../backend/src/openapi/openapi.document.ts`](../backend/src/openapi/openapi.document.ts)
+- Identidad MFA/notificaciones: [`../backend/src/auth/mfa.service.ts`](../backend/src/auth/mfa.service.ts) y [`../backend/src/notifications/notifications.service.ts`](../backend/src/notifications/notifications.service.ts)
+- Outbox, entrega SMTP y limpieza: [`../backend/src/auth/outbox.service.ts`](../backend/src/auth/outbox.service.ts), [`../backend/src/auth/outbox-dispatcher.service.ts`](../backend/src/auth/outbox-dispatcher.service.ts), [`../backend/src/auth/email.service.ts`](../backend/src/auth/email.service.ts) y [`../backend/src/auth/identity-cleanup.service.ts`](../backend/src/auth/identity-cleanup.service.ts)
+- Colección y entorno Postman: [`../docs/api/postman/README.md`](../docs/api/postman/README.md), [`../docs/api/postman/ares-backend2.postman_collection.json`](../docs/api/postman/ares-backend2.postman_collection.json) y [`../docs/api/postman/ares-local.postman_environment.json`](../docs/api/postman/ares-local.postman_environment.json)
 - Tipos frontend: [`../frontend/lib/types.ts`](../frontend/lib/types.ts)
 - Permisos frontend: [`../frontend/lib/permissions.ts`](../frontend/lib/permissions.ts)
 - CI: [`../.github/workflows/ci.yml`](../.github/workflows/ci.yml)

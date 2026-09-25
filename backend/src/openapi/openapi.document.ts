@@ -1,4 +1,5 @@
 import { attendancePaths, attendanceSchemas } from "./attendance.openapi";
+import { identityPaths, identitySchemas } from "./identity.openapi";
 
 const cookieSecurity = [{ cookieAuth: [] }];
 
@@ -254,6 +255,7 @@ export function createOpenApiDocument() {
       ...organizationPaths("areas", "AreaInput", "AreaUpdateInput"),
       ...organizationPaths("turnos", "TurnoInput", "TurnoUpdateInput"),
       ...userPaths(),
+      ...identityPaths,
       ...attendancePaths,
     },
     components: {
@@ -272,7 +274,7 @@ export function createOpenApiDocument() {
           additionalProperties: false,
           properties: {
             email: { type: "string", format: "email" },
-            password: { type: "string", minLength: 1, maxLength: 128 },
+            password: { type: "string", minLength: 1, maxLength: 128, writeOnly: true },
           },
         },
         UserInput: {
@@ -286,6 +288,7 @@ export function createOpenApiDocument() {
               type: "string",
               minLength: 12,
               maxLength: 128,
+              writeOnly: true,
               description: "Must also fit bcrypt's 72-byte UTF-8 limit",
             },
             rol: { enum: userRoles, default: "PRESTADOR" },
@@ -309,6 +312,7 @@ export function createOpenApiDocument() {
               type: "string",
               minLength: 12,
               maxLength: 128,
+              writeOnly: true,
               description: "Must also fit bcrypt's 72-byte UTF-8 limit",
             },
             rol: { enum: userRoles },
@@ -421,6 +425,7 @@ export function createOpenApiDocument() {
             },
           },
         },
+        ...identitySchemas,
       },
     },
   } as const;

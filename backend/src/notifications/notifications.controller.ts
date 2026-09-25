@@ -1,0 +1,4 @@
+import { Controller, Get, Patch, Post, Param, Query, Req, BadRequestException } from "@nestjs/common";
+import type { Request } from "express";
+import { NotificationsService } from "./notifications.service";
+@Controller("notifications") export class NotificationsController { constructor(private readonly s:NotificationsService){} @Get() async list(@Req() r:Request,@Query("page") page?:string,@Query("limit") limit?:string){const p=Number(page??1),l=Number(limit??20);if(!Number.isInteger(p)||p<1||!Number.isInteger(l)||l<1||l>100)throw new BadRequestException("Invalid pagination");return {data:await this.s.list(r.user!.id,p,l)}} @Patch(":id/read") async read(@Req()r:Request,@Param("id")id:string){return {data:await this.s.read(r.user!.id,id)}} @Post("read-all") async readAll(@Req()r:Request){return {data:await this.s.readAll(r.user!.id)}} }

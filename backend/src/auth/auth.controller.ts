@@ -8,6 +8,7 @@ import {
   Req,
   Param,
   UseGuards,
+  Optional,
 } from "@nestjs/common";
 import type { Request } from "express";
 
@@ -22,16 +23,21 @@ import {
 } from "./login-rate-limiter";
 import { Public } from "./public.decorator";
 import { z } from "zod";
+import { MfaService } from "./mfa.service";
 
 const recoveryRequestSchema = z.object({ email: z.email() });
 const recoveryResetSchema = z.object({ token: z.string().min(20), password: z.string().min(15).max(128) });
 const passwordChangeSchema = z.object({ currentPassword: z.string().min(1), newPassword: z.string().min(15).max(128) });
+const mfaVerifySchema = z.object({ challenge: z.string().min(32).max(200), code: z.string().regex(/^\d{6}$/) });
+const mfaRecoverySchema = z.object({ challenge: z.string().min(32).max(200), code: z.string().min(8).max(32) });
+const mfaPasswordSchema = z.object({ password: z.string().min(1).max(128), code: z.string().regex(/^\d{6}$/) });
 
 @Controller("auth")
 export class AuthController {
   constructor(
     private readonly auth: AuthService,
     private readonly loginRateLimiter: LoginRateLimiter,
+    @Optional() private readonly mfa?: MfaService,
   ) {}
 
   @Public()
@@ -44,6 +50,7 @@ export class AuthController {
   ) {
     try {
       const user = await this.auth.authenticate(input.email, input.password);
+      if (this.mfa && (await this.mfa.status(user.id)).enabled) return { data: await this.mfa.createChallenge(user.id) };
 
       await regenerate(request);
       request.session.userId = user.id;
@@ -59,6 +66,16 @@ export class AuthController {
       throw error;
     }
   }
+
+  @Public() @Post("mfa/verify") @HttpCode(200)
+  async mfaVerify(@Body(new ZodValidationPipe(mfaVerifySchema)) input: { challenge: string; code: string }, @Req() request: Request) { const id = await this.mfa!.consumeChallenge(input.challenge, input.code); await regenerate(request); request.session.userId = id; await save(request); return { data: { authenticated: true } }; }
+  @Public() @Post("mfa/recovery") @HttpCode(200)
+  async mfaRecovery(@Body(new ZodValidationPipe(mfaRecoverySchema)) input: { challenge: string; code: string }, @Req() request: Request) { const id = await this.mfa!.consumeChallenge(input.challenge, input.code, true); await regenerate(request); request.session.userId = id; await save(request); return { data: { authenticated: true } }; }
+  @Get("mfa") async mfaStatus(@Req() request: Request) { return { data: await this.mfa!.status(request.user!.id) }; }
+  @Post("mfa/setup") async mfaSetup(@Req() request: Request) { return { data: await this.mfa!.setup(request.user!.id) }; }
+  @Post("mfa/enable") async mfaEnable(@Req() request: Request, @Body(new ZodValidationPipe(z.object({code:z.string().regex(/^\d{6}$/)}))) body: { code: string }) { return { data: await this.mfa!.enable(request.user!.id, body.code) }; }
+  @Post("mfa/disable") async mfaDisable(@Req() request: Request, @Body(new ZodValidationPipe(mfaPasswordSchema)) body: { password: string; code: string }) { return { data: await this.mfa!.disable(request.user!.id, body.password, body.code) }; }
+  @Post("mfa/recovery-codes/regenerate") async mfaRegenerate(@Req() request: Request, @Body(new ZodValidationPipe(mfaPasswordSchema)) body: { password: string; code: string }) { return { data: await this.mfa!.regenerate(request.user!.id, body.password, body.code) }; }
 
   @Public()
   @Post("logout")

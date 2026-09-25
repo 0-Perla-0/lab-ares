@@ -46,6 +46,7 @@ export class AuthService {
       await tx.usuario.update({ where: { id: token.userId }, data: { passwordHash: await hashPassword(password) } });
       await tx.session.deleteMany({ where: { userId: token.userId } });
       if (this.audit) await this.audit.append({ subjectId: token.userId, action: "PASSWORD_RECOVERY_RESET", resource: "identity", metadata: { completed: true } }, tx);
+      if (tx.notification) await tx.notification.create({ data: { userId: token.userId, type: "PASSWORD_RECOVERED", payload: { completed: true } } });
       if (this.outbox) await this.outbox.enqueue({ type: "PASSWORD_RECOVERY_RESET", aggregateId: String(token.userId), payload: { completed: true } }, tx);
       return { reset: true };
     });
@@ -61,13 +62,14 @@ export class AuthService {
       await tx.usuario.update({ where: { id: userId }, data: { passwordHash } });
       await tx.session.updateMany({ where: { userId, ...(currentSessionId ? { id: { not: currentSessionId } } : {}) }, data: { revokedAt: new Date() } });
       if (this.audit) await this.audit.append({ actorId: userId, subjectId: userId, action: "PASSWORD_CHANGED", resource: "identity", metadata: { sessionsRevoked: true } }, tx);
+      if (tx.notification) await tx.notification.create({ data: { userId, type: "PASSWORD_CHANGED", payload: { sessionsRevoked: true } } });
       if (this.outbox) await this.outbox.enqueue({ type: "PASSWORD_CHANGED", aggregateId: String(userId), payload: { userId } }, tx);
     });
     return { changed: true };
   }
 
   listSessions(userId: number) { if (!this.prisma) throw new Error("Identity dependencies unavailable"); return this.prisma.session.findMany({ where: { userId, revokedAt: null }, select: { id:true, createdAt:true, lastActivityAt:true, expiresAt:true, absoluteExpiresAt:true, userAgentSummary:true } }); }
-  async revokeSession(userId: number, id: string) { if (!this.prisma) throw new Error("Identity dependencies unavailable"); return this.prisma.$transaction(async (tx) => { const result = await tx.session.updateMany({ where: { id, userId, revokedAt: null }, data: { revokedAt: new Date() } }); if (!result.count) throw new InvalidCredentialsError(); if (this.audit) await this.audit.append({ actorId: userId, subjectId: userId, action: "SESSION_REVOKED", resource: "session", correlationId: id }, tx); if (this.outbox) await this.outbox.enqueue({ type: "SESSION_REVOKED", aggregateId: id, payload: { actorId: userId } }, tx); return result; }); }
+  async revokeSession(userId: number, id: string) { if (!this.prisma) throw new Error("Identity dependencies unavailable"); return this.prisma.$transaction(async (tx) => { const result = await tx.session.updateMany({ where: { id, userId, revokedAt: null }, data: { revokedAt: new Date() } }); if (!result.count) throw new InvalidCredentialsError(); if (this.audit) await this.audit.append({ actorId: userId, subjectId: userId, action: "SESSION_REVOKED", resource: "session", correlationId: id }, tx); if (tx.notification) await tx.notification.create({ data: { userId, type: "SESSION_REVOKED", payload: { sessionId: id } } }); if (this.outbox) await this.outbox.enqueue({ type: "SESSION_REVOKED", aggregateId: id, payload: { actorId: userId } }, tx); return result; }); }
   async revokeOtherSessions(userId: number, currentId: string) { if (!this.prisma) throw new Error("Identity dependencies unavailable"); return this.prisma.$transaction(async (tx) => { const result = await tx.session.updateMany({ where: { userId, id: { not: currentId }, revokedAt: null }, data: { revokedAt: new Date() } }); if (this.audit) await this.audit.append({ actorId: userId, subjectId: userId, action: "OTHER_SESSIONS_REVOKED", resource: "session", metadata: { count: result.count } }, tx); if (this.outbox) await this.outbox.enqueue({ type: "OTHER_SESSIONS_REVOKED", aggregateId: String(userId), payload: { actorId: userId, count: result.count } }, tx); return result; }); }
 
   async authenticate(email: string, password: string): Promise<AuthUser> {

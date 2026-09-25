@@ -16,6 +16,9 @@ export class IdentityCleanupService implements OnApplicationBootstrap, OnModuleD
       await this.prisma.$transaction([
         this.prisma.recoveryToken.deleteMany({ where: { OR: [{ expiresAt: { lt: now } }, { usedAt: { not: null } }] } }),
         this.prisma.session.deleteMany({ where: { OR: [{ expiresAt: { lt: now } }, { absoluteExpiresAt: { lt: now } }, { revokedAt: { not: null } }] } }),
+        ...(this.prisma.mfaChallenge ? [this.prisma.mfaChallenge.deleteMany({ where: { OR: [{ expiresAt: { lt: now } }, { consumedAt: { not: null } }] } })] : []),
+        ...(this.prisma.mfaRecoveryCode ? [this.prisma.mfaRecoveryCode.deleteMany({ where: { usedAt: { not: null, lt: cutoff } } })] : []),
+        ...(this.prisma.outboxEvent ? [this.prisma.outboxEvent.deleteMany({ where: { processedAt: { not: null, lt: cutoff } } })] : []),
         // Invitations are retained for audit/history. Only mark them archived;
         // never delete them as part of identity maintenance.
         this.prisma.invitation.updateMany({

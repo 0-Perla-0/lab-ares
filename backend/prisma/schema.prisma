@@ -123,6 +123,10 @@ model Usuario {
   invitationsCreated Invitation[] @relation("InvitationCreator")
   invitationsTarget Invitation[] @relation("InvitationTarget")
   recoveryTokens RecoveryToken[]
+  mfa UserMfa?
+  mfaChallenges MfaChallenge[]
+  recoveryCodes MfaRecoveryCode[]
+  notifications Notification[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -187,6 +191,49 @@ model RecoveryToken {
   @@index([userId, expiresAt])
 }
 
+model UserMfa {
+  userId Int @id
+  user Usuario @relation(fields: [userId], references: [id], onDelete: Cascade)
+  secretCiphertext String @db.Text
+  enabledAt DateTime?
+  lastAcceptedStep BigInt?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model MfaChallenge {
+  id String @id @default(cuid()) @db.VarChar(30)
+  userId Int
+  user Usuario @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String @unique @db.Char(64)
+  expiresAt DateTime
+  attempts Int @default(0)
+  consumedAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([userId, expiresAt])
+}
+
+model MfaRecoveryCode {
+  id String @id @default(cuid()) @db.VarChar(30)
+  userId Int
+  user Usuario @relation(fields: [userId], references: [id], onDelete: Cascade)
+  codeHash String @unique @db.Char(64)
+  usedAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([userId, usedAt])
+}
+
+model Notification {
+  id String @id @default(cuid()) @db.VarChar(30)
+  userId Int
+  user Usuario @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type String @db.VarChar(100)
+  payload Json
+  readAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([userId, readAt, createdAt])
+}
+
 model OutboxEvent {
   id String @id @default(cuid()) @db.VarChar(30)
   type String @db.VarChar(100)
@@ -195,7 +242,29 @@ model OutboxEvent {
   occurredAt DateTime @default(now())
   processedAt DateTime?
   attempts Int @default(0)
+  state String @default("PENDING") @db.VarChar(20)
+  nextAttemptAt DateTime @default(now())
+  leaseUntil DateTime?
+  leaseOwner String? @db.VarChar(80)
+  lastError String? @db.VarChar(500)
+  failedAt DateTime?
+  emailDeliveries EmailDelivery[]
   @@index([processedAt, occurredAt])
+}
+
+model EmailDelivery {
+  id String @id @default(cuid()) @db.VarChar(30)
+  outboxEventId String @unique
+  event OutboxEvent @relation(fields: [outboxEventId], references: [id], onDelete: Cascade)
+  status String @db.VarChar(20)
+  attempts Int @default(0)
+  errorRedacted String? @db.VarChar(500)
+  sentAt DateTime?
+  messageId String @unique @db.VarChar(180)
+  leaseUntil DateTime?
+  leaseOwner String? @db.VarChar(80)
+  createdAt DateTime @default(now())
+  @@index([status, leaseUntil])
 }
 
 model AuditEvent {
