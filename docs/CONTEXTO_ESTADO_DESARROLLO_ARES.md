@@ -25,7 +25,7 @@ Las instrucciones o recomendaciones contenidas en los PDF se trataron como mater
 
 ## 2. Resumen ejecutivo
 
-Ares ya cuenta con una base administrativa sólida y verificable, pero todavía no es funcionalmente equivalente al sistema documentado. El desarrollo actual cubre infraestructura, autenticación con sesiones, autorización centralizada, usuarios, catálogos de organización y el incremento 1 de asistencia en backend y frontend: check-in/check-out, historial propio, bolsa de horas por estado, cola jerárquica de sesiones abiertas y cierre manual con motivo. Backend 2 ya implementó la base técnica de almacenamiento seguro y análisis asíncrono de archivos; los documentos, su flujo funcional y **Kairos** siguen pendientes.
+Ares ya cuenta con una base administrativa sólida y verificable, pero todavía no es funcionalmente equivalente al sistema documentado. El desarrollo actual cubre infraestructura, identidad core Backend 2, autenticación con sesiones, autorización centralizada, usuarios, catálogos de organización y el incremento 1 de asistencia en backend y frontend: check-in/check-out, historial propio, bolsa de horas por estado, cola jerárquica de sesiones abiertas y cierre manual con motivo. Los documentos, su flujo funcional y **Kairos** siguen pendientes.
 
 El siguiente objetivo no debería ser migrar pantallas aisladas. Debe construirse primero un recorrido vertical completo de Servicio Social:
 
@@ -85,12 +85,26 @@ Ante estas contradicciones, el manual se usa para proponer contratos funcionales
 - Login, logout y consulta de sesión actual.
 - Cookie de sesión HTTP-only con sesiones persistidas en MariaDB.
 - Regeneración de sesión al iniciar sesión y destrucción al salir.
-- Contraseñas con `bcryptjs` y validaciones de longitud.
+- Contraseñas nuevas con Argon2id; verificación compatible con bcrypt heredado y migración CAS a Argon2id después de un login válido.
 - Límite de intentos de login.
 - Guards globales de autenticación y permisos en NestJS.
 - Matriz RBAC centralizada con alcances `self`, `area`, `sede` y `global`.
 - Seis roles coherentes entre Prisma, backend y frontend: prestador, coordinador, jefe de área, jefe de sede, jefe de coordinadores y administrador.
 - El backend conserva la autoridad final; la visibilidad de controles en frontend es sólo una ayuda de interfaz.
+
+#### 3.2.1 Identidad core de Backend 2
+
+Esta entrega queda implementada y verificada en backend, con 241 pruebas aprobadas. La evidencia cubre:
+
+- Estados de usuario `INVITADA`, `ACTIVA`, `SUSPENDIDA`, `DESACTIVADA` y `BLOQUEADA`.
+- Invitaciones con expiración máxima de 72 horas, token de un solo uso, hash persistido, revocación y validación de alcance; aceptación y efectos asociados dentro de transacción.
+- Recuperación de acceso con respuesta genérica, token hash de 30 minutos y consumo atómico de un solo uso.
+- Cambio de contraseña con política vigente, auditoría, outbox transaccional y revocación de sesiones según el flujo.
+- Sesiones con límite de inactividad de 30 minutos, límite absoluto de 8 horas y revocación individual o masiva.
+- `AuditEvent` append-only para acciones críticas y outbox transaccional con payload cifrado; el dispatcher/correo real aún no está implementado.
+- Limpieza de tokens/sesiones expirados y archivado no destructivo de invitaciones, conservando historial.
+
+Quedan explícitamente pendientes en esta área MFA/TOTP y códigos de recuperación, el dispatcher y correo transaccional real, el centro de notificaciones, la actualización formal de OpenAPI/Postman y toda integración de frontend para estos recorridos.
 
 ### 3.3 Usuarios y organización
 
@@ -141,11 +155,10 @@ El backend expone 32 operaciones HTTP si se cuentan salud, autenticación, OpenA
 
 En esta revisión se ejecutó la suite no integrada del backend:
 
-- 23 archivos de prueba aprobados.
-- 162 pruebas aprobadas.
+- 241 pruebas aprobadas, incluyendo identidad core, invitaciones, recuperación, sesiones, auditoría, outbox y limpieza.
 - Cobertura funcional de autenticación, permisos, sesiones, usuarios, organización, asistencia, OpenAPI, configuración, salud y bootstrap.
 
-La validación actual suma 200 pruebas aprobadas entre backend y frontend. La verificación local completó formato, validación y generación de Prisma, pruebas, tipos y builds de producción.
+La verificación local completó formato, validación y generación de Prisma, pruebas, tipos y builds de producción; la cifra de esta entrega es la suite backend de 241 pruebas aprobadas. La cobertura frontend previa no se presenta como evidencia de esta identidad core.
 
 ### 3.7 Diferencia entre el sitio viejo y la reconstrucción
 

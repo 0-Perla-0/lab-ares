@@ -13,7 +13,7 @@ const userRoles = [
 
 const userStates = [
   "ACTIVO",
-  "PENDIENTE",
+  "INVITADA",
   "INACTIVO",
   "LIBERADO",
   "BAJA",
@@ -291,7 +291,7 @@ export function createOpenApiDocument() {
             rol: { enum: userRoles, default: "PRESTADOR" },
             estado: {
               enum: userStates.filter((state) => state !== "BAJA"),
-              default: "PENDIENTE",
+              default: "INVITADA",
             },
             sedeId: nullableIdSchema(true),
             areaId: nullableIdSchema(true),

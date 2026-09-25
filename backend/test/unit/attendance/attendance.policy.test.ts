@@ -57,7 +57,7 @@ function user(rol: RolUsuario, overrides: Partial<AuthUser> = {}): AuthUser {
     codigo: "USER001",
     email: "user@ares.local",
     rol,
-    estado: EstadoUsuario.ACTIVO,
+    estado: EstadoUsuario.ACTIVA,
     sedeId: null,
     areaId: null,
     turnoId: null,

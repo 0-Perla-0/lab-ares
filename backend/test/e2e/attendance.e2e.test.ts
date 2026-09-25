@@ -169,7 +169,7 @@ function user(id: number, rol: RolUsuario, email: string) {
     codigo: `USER${id}`,
     email,
     rol,
-    estado: EstadoUsuario.ACTIVO,
+    estado: EstadoUsuario.ACTIVA,
     sedeId: 1,
     areaId: 2,
     turnoId: 3,

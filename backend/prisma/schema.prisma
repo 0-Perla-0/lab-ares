@@ -18,11 +18,11 @@ enum RolUsuario {
 }
 
 enum EstadoUsuario {
-  ACTIVO
-  PENDIENTE
-  INACTIVO
-  LIBERADO
-  BAJA
+  INVITADA
+  ACTIVA
+  SUSPENDIDA
+  DESACTIVADA
+  BLOQUEADA
 }
 
 enum DiaSemana {
@@ -108,7 +108,7 @@ model Usuario {
   passwordHash String @db.VarChar(255)
 
   rol    RolUsuario    @default(PRESTADOR)
-  estado EstadoUsuario @default(PENDIENTE)
+  estado EstadoUsuario @default(INVITADA)
 
   sedeId  Int?
   areaId  Int?
@@ -119,6 +119,10 @@ model Usuario {
   turno Turno? @relation(fields: [turnoId], references: [id], onDelete: SetNull)
 
   asistencias Asistencia[]
+  sessions Session[]
+  invitationsCreated Invitation[] @relation("InvitationCreator")
+  invitationsTarget Invitation[] @relation("InvitationTarget")
+  recoveryTokens RecoveryToken[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -134,10 +138,77 @@ model Session {
   id        String   @id @db.VarChar(191)
   data      Json
   expiresAt DateTime
+  userId Int?
+  user Usuario? @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastActivityAt DateTime @default(now())
+  absoluteExpiresAt DateTime
+  revokedAt DateTime?
+  ipHash String? @db.Char(64)
+  userAgentSummary String? @db.VarChar(255)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([expiresAt])
+  @@index([userId, revokedAt])
+}
+
+model Invitation {
+  id String @id @default(cuid()) @db.VarChar(30)
+  tokenHash String @unique @db.Char(64)
+  targetEmail String @db.VarChar(191)
+  targetUserId Int?
+  targetUser Usuario? @relation("InvitationTarget", fields: [targetUserId], references: [id], onDelete: SetNull)
+  role RolUsuario
+  sedeId Int?
+  areaId Int?
+  turnoId Int?
+  expiresAt DateTime
+  usedAt DateTime?
+  revokedAt DateTime?
+  createdById Int
+  createdBy Usuario @relation("InvitationCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  acceptedById Int?
+  archivedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([targetEmail, expiresAt])
+  @@index([createdById])
+  @@index([archivedAt])
+}
+
+model RecoveryToken {
+  id String @id @default(cuid()) @db.VarChar(30)
+  tokenHash String @unique @db.Char(64)
+  userId Int
+  user Usuario @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  usedAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([userId, expiresAt])
+}
+
+model OutboxEvent {
+  id String @id @default(cuid()) @db.VarChar(30)
+  type String @db.VarChar(100)
+  aggregateId String @db.VarChar(100)
+  payload Json
+  occurredAt DateTime @default(now())
+  processedAt DateTime?
+  attempts Int @default(0)
+  @@index([processedAt, occurredAt])
+}
+
+model AuditEvent {
+  id String @id @default(cuid()) @db.VarChar(30)
+  actorId Int?
+  subjectId Int?
+  action String @db.VarChar(100)
+  resource String @db.VarChar(100)
+  correlationId String? @db.VarChar(100)
+  metadata Json?
+  occurredAt DateTime @default(now())
+  @@index([resource, subjectId, occurredAt])
+  @@index([actorId, occurredAt])
 }
 
 enum EstadoArchivo {

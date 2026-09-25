@@ -1,22 +1,36 @@
-import { compare, hash, truncates } from "bcryptjs";
+import argon2 from "argon2";
+import { compare as bcryptCompare, truncates } from "bcryptjs";
 
-const SALT_ROUNDS = 12;
+export const PASSWORD_MIN_LENGTH = 15;
+export const PASSWORD_MAX_LENGTH = 128;
+const ARGON_OPTIONS: argon2.Options = {
+  type: argon2.argon2id,
+  memoryCost: 19_456,
+  timeCost: 2,
+  parallelism: 1,
+};
+
+export function validatePasswordPolicy(password: string): void {
+  const length = [...password].length;
+  if (length < PASSWORD_MIN_LENGTH || length > PASSWORD_MAX_LENGTH) {
+    throw new RangeError(`Password must be ${PASSWORD_MIN_LENGTH}-${PASSWORD_MAX_LENGTH} characters.`);
+  }
+}
 
 export async function hashPassword(password: string): Promise<string> {
-  if (truncates(password)) {
-    throw new RangeError("Password exceeds bcrypt's 72-byte limit.");
-  }
-
-  return hash(password, SALT_ROUNDS);
+  validatePasswordPolicy(password);
+  return argon2.hash(password, ARGON_OPTIONS);
 }
 
 export async function verifyPassword(
   password: string,
   passwordHash: string,
 ): Promise<boolean> {
-  if (truncates(password)) {
-    return false;
-  }
+  if (truncates(password) && passwordHash.startsWith("$2")) return false;
+  try { return passwordHash.startsWith("$argon2") ? await argon2.verify(passwordHash, password) : await bcryptCompare(password, passwordHash); }
+  catch { return false; }
+}
 
-  return compare(password, passwordHash);
+export function needsArgon2Rehash(passwordHash: string): boolean {
+  return !passwordHash.startsWith("$argon2id$");
 }

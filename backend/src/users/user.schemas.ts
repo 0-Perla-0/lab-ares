@@ -4,9 +4,8 @@ import { EstadoUsuario, RolUsuario } from "../generated/prisma/enums";
 
 const CODIGO_MAX_LENGTH = 50; // Usuario.codigo @db.VarChar(50)
 const EMAIL_MAX_LENGTH = 191; // Usuario.email @db.VarChar(191)
-const PASSWORD_MIN_LENGTH = 12;
+const PASSWORD_MIN_LENGTH = 15;
 const PASSWORD_MAX_LENGTH = 128;
-const BCRYPT_MAX_BYTES = 72;
 
 const codigo = z.string().trim().min(1).max(CODIGO_MAX_LENGTH);
 
@@ -21,18 +20,12 @@ const password = z
   .string()
   .min(PASSWORD_MIN_LENGTH)
   .max(PASSWORD_MAX_LENGTH)
-  .refine(
-    (value) => Buffer.byteLength(value, "utf8") <= BCRYPT_MAX_BYTES,
-    "La contraseña excede el límite de 72 bytes de bcrypt",
-  );
 
 const referenciaIdNullable = z.number().int().positive().nullable();
 
 const estadoInicial = z.enum([
-  EstadoUsuario.ACTIVO,
-  EstadoUsuario.PENDIENTE,
-  EstadoUsuario.INACTIVO,
-  EstadoUsuario.LIBERADO,
+  EstadoUsuario.ACTIVA,
+  EstadoUsuario.INVITADA,
 ]);
 
 export const crearUsuarioSchema = z.object({
@@ -40,7 +33,7 @@ export const crearUsuarioSchema = z.object({
   email,
   password,
   rol: z.enum(RolUsuario).default(RolUsuario.PRESTADOR),
-  estado: estadoInicial.default(EstadoUsuario.PENDIENTE),
+  estado: estadoInicial.default(EstadoUsuario.INVITADA),
   sedeId: referenciaIdNullable.default(null),
   areaId: referenciaIdNullable.default(null),
   turnoId: referenciaIdNullable.default(null),

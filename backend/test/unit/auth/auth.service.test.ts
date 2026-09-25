@@ -8,7 +8,7 @@ import { verifyPassword } from "../../../src/auth/password";
 import type { UserRepository } from "../../../src/auth/user.repository";
 import { EstadoUsuario, RolUsuario } from "../../../src/generated/prisma/enums";
 
-vi.mock("../../../src/auth/password", () => ({ verifyPassword: vi.fn() }));
+vi.mock("../../../src/auth/password", () => ({ verifyPassword: vi.fn(), needsArgon2Rehash: vi.fn(() => false) }));
 
 const findByEmailForAuth = vi.fn();
 const repository = { findByEmailForAuth } as unknown as UserRepository;
@@ -21,7 +21,7 @@ const activeUser = {
   email: "admin@ares.local",
   passwordHash: "stored-hash",
   rol: RolUsuario.ADMIN,
-  estado: EstadoUsuario.ACTIVO,
+  estado: EstadoUsuario.ACTIVA,
   sedeId: null,
   areaId: null,
   turnoId: null,
@@ -66,10 +66,10 @@ describe("AuthService", () => {
   });
 
   it.each([
-    EstadoUsuario.PENDIENTE,
-    EstadoUsuario.INACTIVO,
-    EstadoUsuario.LIBERADO,
-    EstadoUsuario.BAJA,
+    EstadoUsuario.INVITADA,
+    EstadoUsuario.SUSPENDIDA,
+    EstadoUsuario.BLOQUEADA,
+    EstadoUsuario.DESACTIVADA,
   ])("rejects a user in the %s state", async (estado) => {
     findByEmailForAuth.mockResolvedValue({ ...activeUser, estado });
     mockedVerifyPassword.mockResolvedValue(true);

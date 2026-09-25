@@ -31,4 +31,9 @@ export class UserRepository {
       select: authUserSelect,
     });
   }
+
+  async updatePasswordHash(id: number, passwordHash: string, previousHash?: string) {
+    if (previousHash) { await this.prisma.usuario.updateMany({ where: { id, passwordHash: previousHash }, data: { passwordHash } }); return; }
+    await this.prisma.usuario.update({ where: { id }, data: { passwordHash } });
+  }
 }

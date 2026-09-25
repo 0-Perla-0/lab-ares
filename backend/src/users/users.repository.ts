@@ -50,7 +50,7 @@ export class UsersRepository {
   findAll(scope: UserListScope) {
     return this.prisma.usuario.findMany({
       where: {
-        estado: { not: EstadoUsuario.BAJA },
+        estado: { not: EstadoUsuario.DESACTIVADA },
         sedeId: scope.type === "sede" ? scope.sedeId : undefined,
         areaId: scope.type === "area" ? scope.areaId : undefined,
       },

@@ -138,7 +138,7 @@ export class AttendanceService {
                 where: { id: user.id },
                 include: { sede: true, area: true, turno: true },
               });
-              if (!owner || owner.estado !== "ACTIVO")
+              if (!owner || owner.estado !== "ACTIVA")
                 throw new ApiException("UNAUTHORIZED", 401);
               if (
                 !owner.sede?.activa ||

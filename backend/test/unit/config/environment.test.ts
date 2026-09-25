@@ -40,7 +40,16 @@ describe("validateEnvironment", () => {
         ...base,
         NODE_ENV: "production",
         SESSION_SECRET: "a-unique-production-secret-with-32-characters",
+        OUTBOX_ENCRYPTION_KEY: "a-unique-production-outbox-key-32chars",
       }),
     ).toMatchObject({ NODE_ENV: "production" });
+  });
+
+  it("rejects a short production outbox key", () => {
+    expect(() => validateEnvironment({ ...base, NODE_ENV: "production", SESSION_SECRET: "a-unique-production-secret-with-32-characters", OUTBOX_ENCRYPTION_KEY: "short" })).toThrow();
+  });
+
+  it("rejects the development outbox placeholder in production", () => {
+    expect(() => validateEnvironment({ ...base, NODE_ENV: "production", SESSION_SECRET: "a-unique-production-secret-with-32-characters", OUTBOX_ENCRYPTION_KEY: "development-only-outbox-key-change-me-32chars" })).toThrow();
   });
 });

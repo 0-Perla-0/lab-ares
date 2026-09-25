@@ -78,7 +78,7 @@ describe("Attendance on real MariaDB", () => {
             codigo: `${prefix}-${index}-${role}`,
             email: `${prefix}-${index}-${role}@example.test`,
             passwordHash: "not-a-login-fixture",
-            estado: "ACTIVO",
+            estado: "ACTIVA",
             rol: role,
             sedeId: sede.id,
             areaId: area.id,

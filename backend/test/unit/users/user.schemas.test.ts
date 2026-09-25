@@ -19,22 +19,19 @@ describe("user schemas", () => {
       email: "user@ares.local",
       password: "A-secure-password-123!",
       rol: RolUsuario.PRESTADOR,
-      estado: EstadoUsuario.PENDIENTE,
+      estado: EstadoUsuario.INVITADA,
       sedeId: null,
       areaId: null,
       turnoId: null,
     });
   });
 
-  it("rejects weak passwords and bcrypt-truncated passwords", () => {
+  it("rejects weak passwords and accepts Unicode passwords", () => {
     const base = { codigo: "USER001", email: "user@ares.local" };
     expect(
       crearUsuarioSchema.safeParse({ ...base, password: "short" }).success,
     ).toBe(false);
-    expect(
-      crearUsuarioSchema.safeParse({ ...base, password: "á".repeat(37) })
-        .success,
-    ).toBe(false);
+    expect(crearUsuarioSchema.safeParse({ ...base, password: "á".repeat(37) }).success).toBe(true);
   });
 
   it("does not create users already in BAJA", () => {
@@ -43,7 +40,7 @@ describe("user schemas", () => {
         codigo: "USER001",
         email: "user@ares.local",
         password: "A-secure-password-123!",
-        estado: EstadoUsuario.BAJA,
+        estado: EstadoUsuario.DESACTIVADA,
       }).success,
     ).toBe(false);
   });

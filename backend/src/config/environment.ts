@@ -30,6 +30,7 @@ const environmentSchema = z
     APP_TIME_ZONE: timeZone.default("America/Mexico_City"),
     ATTENDANCE_ALERT_HOURS: z.coerce.number().int().min(1).max(168).default(12),
     SESSION_SECRET: z.string().min(32).default(DEVELOPMENT_SESSION_SECRET),
+    OUTBOX_ENCRYPTION_KEY: z.string().min(32).default("development-only-outbox-key-change-me-32chars"),
     S3_ENDPOINT: z.string().url().default("http://localhost:9000"),
     S3_REGION: z.string().min(1).default("us-east-1"),
     S3_ACCESS_KEY: z.string().min(1).default("ares-local"),
@@ -47,7 +48,7 @@ const environmentSchema = z
       STORAGE_RECONCILER_ENABLED: z.coerce.boolean().default(false),
       STORAGE_ORPHAN_MIN_AGE_MS: z.coerce.number().int().min(0).default(3600000),
   })
-  .superRefine(({ NODE_ENV, SESSION_SECRET }, context) => {
+  .superRefine(({ NODE_ENV, SESSION_SECRET, OUTBOX_ENCRYPTION_KEY }, context) => {
     if (
       NODE_ENV === "production" &&
       insecureProductionSecrets.has(SESSION_SECRET)
@@ -57,6 +58,9 @@ const environmentSchema = z
         path: ["SESSION_SECRET"],
         message: "SESSION_SECRET must be replaced in production",
       });
+    }
+    if (NODE_ENV === "production" && OUTBOX_ENCRYPTION_KEY.includes("development-only")) {
+      context.addIssue({ code: "custom", path: ["OUTBOX_ENCRYPTION_KEY"], message: "OUTBOX_ENCRYPTION_KEY must be replaced in production" });
     }
   });
 
