@@ -1,6 +1,47 @@
 name: ares
 
 services:
+  storage:
+    image: minio/minio:RELEASE.2025-10-15T17-29-55Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-ares-local}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-ares-local-secret}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - ares-storage:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  storage-init:
+    image: minio/mc:latest
+    depends_on:
+      storage:
+        condition: service_healthy
+    entrypoint: /bin/sh
+    command: -c "mc alias set local http://storage:9000 $${MINIO_ROOT_USER:-ares-local} $${MINIO_ROOT_PASSWORD:-ares-local-secret} && mc mb --ignore-existing local/ares-quarantine && mc mb --ignore-existing local/ares-available && mc anonymous set none local/ares-quarantine && mc anonymous set none local/ares-available"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-ares-local}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-ares-local-secret}
+    restart: "no"
+
+  clamav:
+    image: clamav/clamav:1.4
+    ports:
+      - "3310:3310"
+    healthcheck:
+      test: ["CMD-SHELL", "printf 'PING\\0' | nc -w 2 127.0.0.1 3310 | grep -q PONG"]
+      interval: 30s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
   database:
     image: mariadb:11.8
     environment:
@@ -46,11 +87,25 @@ services:
       APP_TIME_ZONE: ${APP_TIME_ZONE:-America/Mexico_City}
       ATTENDANCE_ALERT_HOURS: ${ATTENDANCE_ALERT_HOURS:-12}
       SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET in .env before starting the backend}
+      S3_ENDPOINT: http://storage:9000
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-ares-local}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-ares-local-secret}
+      S3_FORCE_PATH_STYLE: "true"
+      S3_QUARANTINE_BUCKET: ares-quarantine
+      S3_AVAILABLE_BUCKET: ares-available
+      CLAMAV_HOST: clamav
+      CLAMAV_PORT: 3310
+      STORAGE_SCANNER_ENABLED: "true"
     ports:
       - "3000:3000"
     depends_on:
       migrate:
         condition: service_completed_successfully
+      storage-init:
+        condition: service_completed_successfully
+      clamav:
+        condition: service_healthy
     healthcheck:
       test:
         [
@@ -96,3 +151,4 @@ services:
 
 volumes:
   ares-database:
+  ares-storage:

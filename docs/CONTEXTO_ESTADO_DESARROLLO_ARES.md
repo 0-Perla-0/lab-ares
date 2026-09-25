@@ -25,7 +25,7 @@ Las instrucciones o recomendaciones contenidas en los PDF se trataron como mater
 
 ## 2. Resumen ejecutivo
 
-Ares ya cuenta con una base administrativa sólida y verificable, pero todavía no es funcionalmente equivalente al sistema documentado. El desarrollo actual cubre infraestructura, autenticación con sesiones, autorización centralizada, usuarios, catálogos de organización y el incremento 1 de asistencia en backend y frontend: check-in/check-out, historial propio, bolsa de horas por estado, cola jerárquica de sesiones abiertas y cierre manual con motivo. Servicio Social sigue incompleto porque faltan validación, ausencias, calendario y documentos; **Kairos** aún no inicia.
+Ares ya cuenta con una base administrativa sólida y verificable, pero todavía no es funcionalmente equivalente al sistema documentado. El desarrollo actual cubre infraestructura, autenticación con sesiones, autorización centralizada, usuarios, catálogos de organización y el incremento 1 de asistencia en backend y frontend: check-in/check-out, historial propio, bolsa de horas por estado, cola jerárquica de sesiones abiertas y cierre manual con motivo. Backend 2 ya implementó la base técnica de almacenamiento seguro y análisis asíncrono de archivos; los documentos, su flujo funcional y **Kairos** siguen pendientes.
 
 El siguiente objetivo no debería ser migrar pantallas aisladas. Debe construirse primero un recorrido vertical completo de Servicio Social:
 
@@ -145,7 +145,7 @@ En esta revisión se ejecutó la suite no integrada del backend:
 - 162 pruebas aprobadas.
 - Cobertura funcional de autenticación, permisos, sesiones, usuarios, organización, asistencia, OpenAPI, configuración, salud y bootstrap.
 
-El frontend ejecuta cuatro pruebas automatizadas del flujo de asistencia. La suite de integración con MariaDB contiene nueve pruebas aisladas, incluidas concurrencia, idempotencia, alcance y cierre manual; no se volvió a ejecutar durante este merge porque no se configuró una base temporal `_test` o `_ci`. La verificación local sí completó formato, validación y generación de Prisma, pruebas no integradas, tipos y builds de producción.
+La validación actual suma 200 pruebas aprobadas entre backend y frontend. La verificación local completó formato, validación y generación de Prisma, pruebas, tipos y builds de producción.
 
 ### 3.7 Diferencia entre el sitio viejo y la reconstrucción
 
@@ -432,8 +432,10 @@ Como no se proporcionaron nombres, se usan identificadores de rol. El reparto si
 
 **Propiedad principal:** colaboración y archivos.
 
-- Crear la abstracción de almacenamiento S3-compatible y configuración local de MinIO.
-- Implementar el pipeline compartido de cuarentena, validación de tipo/firma/tamaño, huella, scanner, reintentos, promoción privada y eliminación de archivos rechazados.
+- **Implementado — almacenamiento seguro:** la abstracción S3-compatible usa dos buckets privados (`quarantine` y `available`), con configuración local de MinIO y readiness que comprueba almacenamiento y scanner cuando están habilitados. Compose provisiona ambos buckets sin acceso anónimo.
+- **Implementado — pipeline técnico de archivos:** la recepción aplica límite de tamaño, streaming acotado a spool temporal con permisos restringidos, SHA-256 y validación de PDF, JPEG, texto UTF-8 y STL ASCII/binario; rechaza ZIP, firmas incompatibles, archivos truncados y dobles extensiones. El objeto entra primero en cuarentena y sólo se promueve a `available` después del análisis.
+- **Implementado — análisis asíncrono:** ClamAV analiza desde cuarentena; los estados persistidos incluyen pendiente, análisis, disponible, rechazado y error. El worker reclama trabajos con lease, reintenta errores y marca el agotamiento del máximo de intentos; un reconciliador programado repara promociones incompletas, residuos y objetos huérfanos.
+- **Implementado — descarga autorizada:** la URL firmada sólo se emite para archivos disponibles y exige una capacidad de descarga ligada al recurso, sujeto y propósito, con expiración corta.
 - Diseñar requisitos y versiones documentales inmutables, retroalimentación, estados aprobados y autorización de descarga.
 - Diseñar proyectos Kairos y miembros con relaciones canónicas y roles internos distintos al rol global.
 - Implementar actividades, participantes, entregas/evidencias inmutables, comentarios, revisión independiente y transiciones de estado.

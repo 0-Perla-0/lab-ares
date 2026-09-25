@@ -140,6 +140,60 @@ model Session {
   @@index([expiresAt])
 }
 
+enum EstadoArchivo {
+  RECIBIDO
+  PENDIENTE_ANALISIS
+  ANALIZANDO
+  DISPONIBLE
+  RECHAZADO
+  ERROR_ANALISIS
+  ELIMINADO
+}
+
+enum ResultadoAnalisisArchivo {
+  LIMPIO
+  INFECTADO
+  ERROR
+}
+
+model Archivo {
+  id              String       @id @default(cuid()) @db.VarChar(30)
+  objectKey       String       @unique @db.VarChar(500)
+  quarantineKey   String       @unique @db.VarChar(500)
+  originalName    String       @db.VarChar(255)
+  detectedMime    String?      @db.VarChar(150)
+  extension       String?      @db.VarChar(20)
+  sizeBytes       BigInt
+  sha256          String?      @db.Char(64)
+  status          EstadoArchivo @default(RECIBIDO)
+  analysisAttempts Int         @default(0)
+  analysisExhaustedAt DateTime?
+  nextAttemptAt   DateTime?
+  leaseUntil      DateTime?
+  leaseOwner      String?       @db.VarChar(80)
+  lastError       String?      @db.VarChar(1000)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  analyses        AnalisisArchivo[]
+
+  @@index([status, nextAttemptAt])
+  @@index([leaseUntil])
+}
+
+model AnalisisArchivo {
+  id        String                    @id @default(cuid()) @db.VarChar(30)
+  archivoId String
+  archivo   Archivo                   @relation(fields: [archivoId], references: [id], onDelete: Cascade)
+  scanner   String                    @db.VarChar(50)
+  resultado ResultadoAnalisisArchivo
+  signature String?                   @db.VarChar(255)
+  error     String?                   @db.VarChar(1000)
+  startedAt DateTime                  @default(now())
+  finishedAt DateTime?
+
+  @@index([archivoId, startedAt])
+}
+
 enum EstadoAsistencia {
   ABIERTA
   PENDIENTE
