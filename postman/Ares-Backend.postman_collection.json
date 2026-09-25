@@ -66,6 +66,11 @@
       "key": "attendanceId",
       "value": "",
       "type": "string"
+    },
+    {
+      "key": "academicRequestId",
+      "value": "",
+      "type": "string"
     }
   ],
   "item": [
@@ -1380,6 +1385,397 @@
                   "    pm.response.to.have.status(401);",
                   "    pm.expect(pm.response.json()).to.eql({ error: \"UNAUTHORIZED\" });",
                   "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "08 - Perfil académico",
+      "item": [
+        {
+          "name": "Catálogos académicos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/academic/catalogs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "academic",
+                "catalogs"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text",
+                "exec": [
+                  "pm.response.to.have.status(200);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Consultar mi perfil académico",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/academic/profile/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "academic",
+                "profile",
+                "me"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text",
+                "exec": [
+                  "pm.response.to.have.status(200);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Solicitar cambio de adscripción",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/academic/profile/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "academic",
+                "profile",
+                "me"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"institucionId\":1,\"unidadAcademicaId\":1,\"programaAcademicoId\":1,\"cohorteId\":1,\"inicio\":\"2026-01-01\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text",
+                "exec": [
+                  "pm.response.to.have.status(200);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear institución",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/academic/catalogs/institucion",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "academic",
+                "catalogs",
+                "institucion"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nombre\":\"Institución de prueba\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text",
+                "exec": [
+                  "pm.response.to.have.status(201);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Confirmar solicitud",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/academic/profile/requests/1/confirm",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "academic",
+                "profile",
+                "requests",
+                "1",
+                "confirm"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"accept\":true}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text",
+                "exec": [
+                  "pm.response.to.have.status(200);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Solicitudes pendientes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/academic/requests/pending?page=1&pageSize=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "academic",
+                "requests",
+                "pending?page=1&pageSize=50"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text",
+                "exec": [
+                  "pm.response.to.have.status(200);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Historial académico propio",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/academic/profile/me/history?page=1&pageSize=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "academic",
+                "profile",
+                "me",
+                "history?page=1&pageSize=50"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text",
+                "exec": [
+                  "pm.response.to.have.status(200);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Rechazar solicitud capturada",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/academic/profile/requests/{{academicRequestId}}/confirm",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "academic",
+                "profile",
+                "requests",
+                "{{academicRequestId}}",
+                "confirm"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"accept\":false,\"motivo\":\"Datos por corregir\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text",
+                "exec": [
+                  "pm.response.to.have.status(200);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear unidad",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/academic/catalogs/unidad",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "academic",
+                "catalogs",
+                "unidad"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nombre\":\"Prueba\",\"parentId\":1}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text",
+                "exec": [
+                  "pm.response.to.have.status(201);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear programa",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/academic/catalogs/programa",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "academic",
+                "catalogs",
+                "programa"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nombre\":\"Prueba\",\"parentId\":1}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text",
+                "exec": [
+                  "pm.response.to.have.status(201);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear cohorte",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/academic/catalogs/cohorte",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "academic",
+                "catalogs",
+                "cohorte"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nombre\":\"Prueba\",\"parentId\":1}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text",
+                "exec": [
+                  "pm.response.to.have.status(201);"
                 ]
               }
             }

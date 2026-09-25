@@ -1,42 +1,1013 @@
 {
-  "info": { "name": "Ares Backend 2", "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json" },
-  "variable": [{ "key": "baseUrl", "value": "http://localhost:3000/api" }, { "key": "userId", "value": "" }, { "key": "sessionId", "value": "" }, { "key": "invitationId", "value": "" }, { "key": "notificationId", "value": "" }, { "key": "invitationToken", "value": "" }, { "key": "recoveryToken", "value": "" }, { "key": "mfaChallenge", "value": "" }],
+  "info": {
+    "name": "Ares Backend 2",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api"
+    },
+    {
+      "key": "userId",
+      "value": ""
+    },
+    {
+      "key": "sessionId",
+      "value": ""
+    },
+    {
+      "key": "invitationId",
+      "value": ""
+    },
+    {
+      "key": "notificationId",
+      "value": ""
+    },
+    {
+      "key": "invitationToken",
+      "value": ""
+    },
+    {
+      "key": "recoveryToken",
+      "value": ""
+    },
+    {
+      "key": "mfaChallenge",
+      "value": ""
+    }
+  ],
   "event": [
-    { "listen": "prerequest", "script": { "type": "text/javascript", "exec": ["pm.request.headers.upsert({key:'Accept', value:'application/json'});"] } },
-    { "listen": "test", "script": { "type": "text/javascript", "exec": ["const success=[200,201,204]; const negative=[400,401,403,404,409,422,429,500,503]; pm.test('status is documented',()=>pm.expect([...success,...negative]).to.include(pm.response.code));", "const j=(()=>{try{return pm.response.json()}catch{return null}})(); if(success.includes(pm.response.code)&&pm.response.code!==204){pm.test('success envelope',()=>pm.expect(j).to.have.property('data'));} if(negative.includes(pm.response.code)){pm.test('structured error',()=>pm.expect(j).to.be.an('object'));}"] } }
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "pm.request.headers.upsert({key:'Accept', value:'application/json'});"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const success=[200,201,204]; const negative=[400,401,403,404,409,422,429,500,503]; pm.test('status is documented',()=>pm.expect([...success,...negative]).to.include(pm.response.code));",
+          "const j=(()=>{try{return pm.response.json()}catch{return null}})(); if(success.includes(pm.response.code)&&pm.response.code!==204){pm.test('success envelope',()=>pm.expect(j).to.have.property('data'));} if(negative.includes(pm.response.code)){pm.test('structured error',()=>pm.expect(j).to.be.an('object'));}"
+        ]
+      }
+    }
   ],
   "item": [
-    { "name": "Authentication", "item": [
-      { "name": "Login", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"email\":\"{{email}}\",\"password\":\"{{password}}\"}" }, "url": "{{baseUrl}}/auth/login" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('HTTP 200',()=>pm.response.to.have.status(200));", "const j=pm.response.json(); pm.expect(j).to.have.property('data'); if(j.data?.challenge) pm.collectionVariables.set('mfaChallenge',j.data.challenge);"] } }] },
-      { "name": "Current user", "request": { "method": "GET", "url": "{{baseUrl}}/auth/me" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('HTTP 200',()=>pm.response.to.have.status(200));", "pm.expect(pm.response.json()).to.have.property('data');"] } }] },
-      { "name": "Logout", "request": { "method": "POST", "url": "{{baseUrl}}/auth/logout" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('HTTP 204',()=>pm.response.to.have.status(204));"] } }] },
-      { "name": "Request recovery", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"email\":\"{{email}}\"}" }, "url": "{{baseUrl}}/auth/recovery/request" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('HTTP 200',()=>pm.response.to.have.status(200));", "pm.expect(pm.response.json()).to.have.property('data');"] } }] },
-      { "name": "Reset recovery (token from Mailpit)", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"token\":\"{{recoveryToken}}\",\"password\":\"{{newPassword}}\"}" }, "url": "{{baseUrl}}/auth/recovery/reset" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('HTTP 200',()=>pm.response.to.have.status(200));", "pm.expect(pm.response.json()).to.have.property('data');"] } }] },
-      { "name": "Change password", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"currentPassword\":\"{{password}}\",\"newPassword\":\"{{newPassword}}\"}" }, "url": "{{baseUrl}}/auth/password/change" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('HTTP 200',()=>pm.response.to.have.status(200));", "pm.expect(pm.response.json()).to.have.property('data');"] } }] },
-      { "name": "List sessions", "request": { "method": "GET", "url": "{{baseUrl}}/auth/sessions" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('HTTP 200',()=>pm.response.to.have.status(200));", "const j=pm.response.json(); pm.expect(j).to.have.property('data'); if(j.data?.[0]?.id) pm.environment.set('sessionId',j.data[0].id);"] } }] },
-      { "name": "Revoke session", "request": { "method": "DELETE", "url": "{{baseUrl}}/auth/sessions/{{sessionId}}" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('HTTP 204',()=>pm.response.to.have.status(204));"] } }] },
-      { "name": "Revoke other sessions", "request": { "method": "DELETE", "url": "{{baseUrl}}/auth/sessions/others" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('HTTP 204',()=>pm.response.to.have.status(204));"] } }] }
-    ] },
-    { "name": "MFA", "item": [
-      { "name": "MFA status", "request": { "method": "GET", "url": "{{baseUrl}}/auth/mfa" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('HTTP 200',()=>pm.response.to.have.status(200));", "pm.expect(pm.response.json()).to.have.property('data');"] } }] },
-      { "name": "MFA setup", "request": { "method": "POST", "url": "{{baseUrl}}/auth/mfa/setup" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('HTTP 200',()=>pm.response.to.have.status(200));", "pm.expect(pm.response.json()).to.have.property('data');"] } }] },
-      { "name": "MFA enable", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"code\":\"{{otpCode}}\"}" }, "url": "{{baseUrl}}/auth/mfa/enable" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('HTTP 200',()=>pm.response.to.have.status(200));", "pm.expect(pm.response.json()).to.have.property('data');"] } }] },
-      { "name": "MFA verify challenge", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"challenge\":\"{{mfaChallenge}}\",\"code\":\"{{otpCode}}\"}" }, "url": "{{baseUrl}}/auth/mfa/verify" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('HTTP 200',()=>pm.response.to.have.status(200));", "pm.expect(pm.response.json()).to.have.property('data');"] } }] },
-      { "name": "MFA recovery challenge", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"challenge\":\"{{mfaChallenge}}\",\"code\":\"{{recoveryCode}}\"}" }, "url": "{{baseUrl}}/auth/mfa/recovery" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('HTTP 200',()=>pm.response.to.have.status(200));", "pm.expect(pm.response.json()).to.have.property('data');"] } }] },
-      { "name": "MFA disable", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"password\":\"{{password}}\",\"code\":\"{{otpCode}}\"}" }, "url": "{{baseUrl}}/auth/mfa/disable" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('HTTP 200',()=>pm.response.to.have.status(200));", "pm.expect(pm.response.json()).to.have.property('data');"] } }] },
-      { "name": "Regenerate recovery codes", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"password\":\"{{password}}\",\"code\":\"{{otpCode}}\"}" }, "url": "{{baseUrl}}/auth/mfa/recovery-codes/regenerate" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('HTTP 200',()=>pm.response.to.have.status(200));", "pm.expect(pm.response.json()).to.have.property('data');"] } }] }
-    ] },
-    { "name": "Invitations", "item": [
-      { "name": "Create invitation", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"targetEmail\":\"{{inviteEmail}}\",\"role\":\"{{inviteRole}}\"}" }, "url": "{{baseUrl}}/invitations" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('HTTP 201',()=>pm.response.to.have.status(201));", "const j=pm.response.json(); pm.expect(j).to.have.property('data'); pm.expect(j.data).not.to.have.property('token'); if(j.data?.id) pm.environment.set('invitationId',j.data.id);"] } }] },
-      { "name": "List invitations", "request": { "method": "GET", "url": "{{baseUrl}}/invitations" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('HTTP 200',()=>pm.response.to.have.status(200));", "const j=pm.response.json(); pm.expect(j).to.have.property('data'); if(j.data?.[0]?.id) pm.environment.set('invitationId',j.data[0].id);"] } }] },
-      { "name": "Get invitation", "request": { "method": "GET", "url": "{{baseUrl}}/invitations/{{invitationToken}}" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('HTTP 200',()=>pm.response.to.have.status(200));", "pm.expect(pm.response.json()).to.have.property('data');"] } }] },
-      { "name": "Accept invitation", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"codigo\":\"{{inviteCode}}\",\"password\":\"{{newPassword}}\"}" }, "url": "{{baseUrl}}/invitations/{{invitationToken}}/accept" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('HTTP 201',()=>pm.response.to.have.status(201));", "pm.expect(pm.response.json()).to.have.property('data');"] } }] },
-      { "name": "Revoke invitation", "request": { "method": "POST", "url": "{{baseUrl}}/invitations/{{invitationId}}/revoke" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('HTTP 200',()=>pm.response.to.have.status(200));", "pm.expect(pm.response.json()).to.have.property('data');"] } }] }
-    ] },
-    { "name": "Notifications", "item": [
-      { "name": "List notifications", "request": { "method": "GET", "url": "{{baseUrl}}/notifications?page=1&limit=20" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('HTTP 200',()=>pm.response.to.have.status(200));", "const j=pm.response.json(); pm.expect(j).to.have.property('data'); if(j.data?.[0]?.id) pm.environment.set('notificationId',j.data[0].id);"] } }] },
-      { "name": "Mark notification read", "request": { "method": "PATCH", "url": "{{baseUrl}}/notifications/{{notificationId}}/read" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('HTTP 200',()=>pm.response.to.have.status(200));", "pm.expect(pm.response.json()).to.have.property('data');"] } }] },
-      { "name": "Mark all notifications read", "request": { "method": "POST", "url": "{{baseUrl}}/notifications/read-all" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('HTTP 200',()=>pm.response.to.have.status(200));", "pm.expect(pm.response.json()).to.have.property('data');"] } }] }
-    ] }
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"{{email}}\",\"password\":\"{{password}}\"}"
+            },
+            "url": "{{baseUrl}}/auth/login"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                  "const j=pm.response.json(); pm.expect(j).to.have.property('data'); if(j.data?.challenge) pm.collectionVariables.set('mfaChallenge',j.data.challenge);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Current user",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/auth/me"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                  "pm.expect(pm.response.json()).to.have.property('data');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/auth/logout"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 204',()=>pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Request recovery",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"{{email}}\"}"
+            },
+            "url": "{{baseUrl}}/auth/recovery/request"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                  "pm.expect(pm.response.json()).to.have.property('data');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reset recovery (token from Mailpit)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"token\":\"{{recoveryToken}}\",\"password\":\"{{newPassword}}\"}"
+            },
+            "url": "{{baseUrl}}/auth/recovery/reset"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                  "pm.expect(pm.response.json()).to.have.property('data');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Change password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"currentPassword\":\"{{password}}\",\"newPassword\":\"{{newPassword}}\"}"
+            },
+            "url": "{{baseUrl}}/auth/password/change"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                  "pm.expect(pm.response.json()).to.have.property('data');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List sessions",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/auth/sessions"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                  "const j=pm.response.json(); pm.expect(j).to.have.property('data'); if(j.data?.[0]?.id) pm.environment.set('sessionId',j.data[0].id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Revoke session",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/auth/sessions/{{sessionId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 204',()=>pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Revoke other sessions",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/auth/sessions/others"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 204',()=>pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "MFA",
+      "item": [
+        {
+          "name": "MFA status",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/auth/mfa"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                  "pm.expect(pm.response.json()).to.have.property('data');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "MFA setup",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/auth/mfa/setup"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                  "pm.expect(pm.response.json()).to.have.property('data');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "MFA enable",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"code\":\"{{otpCode}}\"}"
+            },
+            "url": "{{baseUrl}}/auth/mfa/enable"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                  "pm.expect(pm.response.json()).to.have.property('data');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "MFA verify challenge",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"challenge\":\"{{mfaChallenge}}\",\"code\":\"{{otpCode}}\"}"
+            },
+            "url": "{{baseUrl}}/auth/mfa/verify"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                  "pm.expect(pm.response.json()).to.have.property('data');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "MFA recovery challenge",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"challenge\":\"{{mfaChallenge}}\",\"code\":\"{{recoveryCode}}\"}"
+            },
+            "url": "{{baseUrl}}/auth/mfa/recovery"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                  "pm.expect(pm.response.json()).to.have.property('data');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "MFA disable",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"password\":\"{{password}}\",\"code\":\"{{otpCode}}\"}"
+            },
+            "url": "{{baseUrl}}/auth/mfa/disable"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                  "pm.expect(pm.response.json()).to.have.property('data');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Regenerate recovery codes",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"password\":\"{{password}}\",\"code\":\"{{otpCode}}\"}"
+            },
+            "url": "{{baseUrl}}/auth/mfa/recovery-codes/regenerate"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                  "pm.expect(pm.response.json()).to.have.property('data');"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Invitations",
+      "item": [
+        {
+          "name": "Create invitation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"targetEmail\":\"{{inviteEmail}}\",\"role\":\"{{inviteRole}}\"}"
+            },
+            "url": "{{baseUrl}}/invitations"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 201',()=>pm.response.to.have.status(201));",
+                  "const j=pm.response.json(); pm.expect(j).to.have.property('data'); pm.expect(j.data).not.to.have.property('token'); if(j.data?.id) pm.environment.set('invitationId',j.data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List invitations",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/invitations"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                  "const j=pm.response.json(); pm.expect(j).to.have.property('data'); if(j.data?.[0]?.id) pm.environment.set('invitationId',j.data[0].id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get invitation",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/invitations/{{invitationToken}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                  "pm.expect(pm.response.json()).to.have.property('data');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Accept invitation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"codigo\":\"{{inviteCode}}\",\"password\":\"{{newPassword}}\"}"
+            },
+            "url": "{{baseUrl}}/invitations/{{invitationToken}}/accept"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 201',()=>pm.response.to.have.status(201));",
+                  "pm.expect(pm.response.json()).to.have.property('data');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Revoke invitation",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/invitations/{{invitationId}}/revoke"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                  "pm.expect(pm.response.json()).to.have.property('data');"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "List notifications",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/notifications?page=1&limit=20"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                  "const j=pm.response.json(); pm.expect(j).to.have.property('data'); if(j.data?.[0]?.id) pm.environment.set('notificationId',j.data[0].id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mark notification read",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/notifications/{{notificationId}}/read"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                  "pm.expect(pm.response.json()).to.have.property('data');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mark all notifications read",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/notifications/read-all"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                  "pm.expect(pm.response.json()).to.have.property('data');"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "08 - Perfil académico",
+      "item": [
+        {
+          "name": "Catálogos académicos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/academic/catalogs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "academic",
+                "catalogs"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text",
+                "exec": [
+                  "pm.response.to.have.status(200);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Consultar mi perfil académico",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/academic/profile/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "academic",
+                "profile",
+                "me"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text",
+                "exec": [
+                  "pm.response.to.have.status(200);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Solicitar cambio de adscripción",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/academic/profile/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "academic",
+                "profile",
+                "me"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"institucionId\":1,\"unidadAcademicaId\":1,\"programaAcademicoId\":1,\"cohorteId\":1,\"inicio\":\"2026-01-01\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text",
+                "exec": [
+                  "pm.response.to.have.status(200);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear institución",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/academic/catalogs/institucion",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "academic",
+                "catalogs",
+                "institucion"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nombre\":\"Institución de prueba\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text",
+                "exec": [
+                  "pm.response.to.have.status(201);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Confirmar solicitud",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/academic/profile/requests/1/confirm",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "academic",
+                "profile",
+                "requests",
+                "1",
+                "confirm"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"accept\":true}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text",
+                "exec": [
+                  "pm.response.to.have.status(200);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Solicitudes pendientes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/academic/requests/pending?page=1&pageSize=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "academic",
+                "requests",
+                "pending?page=1&pageSize=50"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text",
+                "exec": [
+                  "pm.response.to.have.status(200);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Historial académico propio",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/academic/profile/me/history?page=1&pageSize=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "academic",
+                "profile",
+                "me",
+                "history?page=1&pageSize=50"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text",
+                "exec": [
+                  "pm.response.to.have.status(200);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Rechazar solicitud capturada",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/academic/profile/requests/{{academicRequestId}}/confirm",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "academic",
+                "profile",
+                "requests",
+                "{{academicRequestId}}",
+                "confirm"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"accept\":false,\"motivo\":\"Datos por corregir\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text",
+                "exec": [
+                  "pm.response.to.have.status(200);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear unidad",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/academic/catalogs/unidad",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "academic",
+                "catalogs",
+                "unidad"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nombre\":\"Prueba\",\"parentId\":1}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text",
+                "exec": [
+                  "pm.response.to.have.status(201);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear programa",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/academic/catalogs/programa",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "academic",
+                "catalogs",
+                "programa"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nombre\":\"Prueba\",\"parentId\":1}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text",
+                "exec": [
+                  "pm.response.to.have.status(201);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear cohorte",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/academic/catalogs/cohorte",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "academic",
+                "catalogs",
+                "cohorte"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nombre\":\"Prueba\",\"parentId\":1}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text",
+                "exec": [
+                  "pm.response.to.have.status(201);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
   ]
 }

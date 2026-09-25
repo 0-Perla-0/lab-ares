@@ -24,8 +24,11 @@ const errorResponses = {
   400: { description: "Invalid request" },
   401: { description: "Authentication required" },
   403: { description: "Insufficient permissions" },
+  404: { description: "Resource not found" },
+  409: { description: "Conflict" },
   500: { description: "Unexpected server error" },
 };
+const academicErrorResponses = { ...errorResponses, 404: { description: "Academic resource not found" }, 409: { description: "Academic conflict" } };
 
 function jsonBody(schema: object) {
   return {
@@ -192,6 +195,7 @@ export function createOpenApiDocument() {
       { name: "Attendance" },
       { name: "Organization" },
       { name: "Users" },
+      { name: "Academic" },
     ],
     paths: {
       "/api/health": {
@@ -257,6 +261,28 @@ export function createOpenApiDocument() {
       ...userPaths(),
       ...identityPaths,
       ...attendancePaths,
+      "/api/academic/catalogs": {
+        get: { tags: ["Academic"], security: cookieSecurity, parameters: [{ name: "page", in: "query", schema: { type: "integer", minimum: 1 } }, { name: "pageSize", in: "query", schema: { type: "integer", minimum: 1, maximum: 100 } }, { name: "search", in: "query", schema: { type: "string" } }], responses: { 200: { description: "Active academic catalogues with pagination", content: { "application/json": { schema: { $ref: "#/components/schemas/AcademicCatalogsResponse" } } } }, ...academicErrorResponses } },
+      },
+      "/api/academic/profile/me": {
+        get: { tags: ["Academic"], security: cookieSecurity, responses: { 200: { description: "Current academic profile", content: { "application/json": { schema: { $ref: "#/components/schemas/AcademicProfileResponse" } } } }, ...errorResponses } },
+        put: { tags: ["Academic"], security: cookieSecurity, requestBody: jsonBody({ $ref: "#/components/schemas/AcademicProfileInput" }), responses: { 200: { description: "Historical academic affiliation created", content: { "application/json": { schema: { $ref: "#/components/schemas/AcademicProfileResponse" } } } }, ...errorResponses } },
+      },
+      "/api/academic/profile/{id}": {
+        get: { tags: ["Academic"], security: cookieSecurity, parameters: idParameter(), responses: { 200: { description: "Academic profile", content: { "application/json": { schema: { $ref: "#/components/schemas/AcademicProfileResponse" } } } }, ...errorResponses } },
+      },
+      "/api/academic/profile/{id}/history": {
+        get: { tags: ["Academic"], security: cookieSecurity, parameters: idParameter(), responses: { 200: { description: "Academic affiliation history with pagination", content: { "application/json": { schema: { $ref: "#/components/schemas/AcademicHistoryResponse" } } } }, ...errorResponses } },
+      },
+      "/api/academic/requests/pending": {
+        get: { tags: ["Academic"], security: cookieSecurity, responses: { 200: { description: "Pending requests accessible by reviewer scope", content: { "application/json": { schema: { $ref: "#/components/schemas/AcademicPendingResponse" } } } }, ...errorResponses } },
+      },
+      "/api/academic/catalogs/{kind}": {
+        post: { tags: ["Academic"], security: cookieSecurity, parameters: [{ name: "kind", in: "path", required: true, schema: { type: "string", enum: ["institucion", "unidad", "programa", "cohorte"] } }], requestBody: jsonBody({ $ref: "#/components/schemas/AcademicCatalogInput" }), responses: { 201: { description: "Catalog entry created", content: { "application/json": { schema: { $ref: "#/components/schemas/AcademicCatalogCreatedResponse" } } } }, ...errorResponses } },
+      },
+      "/api/academic/profile/requests/{id}/confirm": {
+        post: { tags: ["Academic"], security: cookieSecurity, parameters: idParameter(), requestBody: jsonBody({ $ref: "#/components/schemas/AcademicConfirmationInput" }), responses: { 200: { description: "Request confirmed or rejected", content: { "application/json": { schema: { $ref: "#/components/schemas/AcademicConfirmationResponse" } } } }, 409: { description: "Already resolved" }, ...errorResponses } },
+      },
     },
     components: {
       securitySchemes: {
@@ -268,6 +294,22 @@ export function createOpenApiDocument() {
       },
       schemas: {
         ...attendanceSchemas,
+        AcademicProfileInput: {
+          type: "object", required: ["institucionId", "programaAcademicoId", "inicio"], additionalProperties: false,
+          properties: { institucionId: { type: "integer", minimum: 1 }, unidadAcademicaId: nullableIdSchema(true), programaAcademicoId: { type: "integer", minimum: 1 }, cohorteId: nullableIdSchema(true), inicio: { type: "string", format: "date" }, fin: { anyOf: [{ type: "string", format: "date" }, { type: "null" }] } },
+        },
+        AcademicCatalogInput: { type: "object", required: ["nombre"], properties: { nombre: { type: "string", minLength: 1, maxLength: 191 }, parentId: { type: ["integer", "null"], minimum: 1 } } },
+        AcademicConfirmationInput: { oneOf: [{ type: "object", required: ["accept"], properties: { accept: { const: true }, motivo: { type: "string", maxLength: 500 } }, additionalProperties: false }, { type: "object", required: ["accept", "motivo"], properties: { accept: { const: false }, motivo: { type: "string", minLength: 1, maxLength: 500 } }, additionalProperties: false }], description: "When accept is false, motivo is required and non-empty." },
+        AcademicCatalogItem: { type: "object", properties: { id: { type: "integer" }, nombre: { type: "string" }, activa: { type: "boolean" } } },
+        AcademicPage: { type: "object", required: ["items", "page", "pageSize", "total"], properties: { items: { type: "array", items: { $ref: "#/components/schemas/AcademicCatalogItem" } }, page: { type: "integer" }, pageSize: { type: "integer" }, total: { type: "integer" } } },
+        AcademicCatalogsResponse: { type: "object", properties: { data: { type: "object", properties: { page: { type: "integer" }, pageSize: { type: "integer" }, instituciones: { $ref: "#/components/schemas/AcademicPage" }, unidades: { $ref: "#/components/schemas/AcademicPage" }, programas: { $ref: "#/components/schemas/AcademicPage" }, cohortes: { $ref: "#/components/schemas/AcademicPage" } } } } },
+        AcademicProfileResponse: { type: "object", properties: { data: { anyOf: [{ $ref: "#/components/schemas/AcademicAffiliation" }, { type: "null" }] } } },
+        AcademicAffiliation: { type: "object", properties: { id: { type: "integer" }, usuarioId: { type: "integer" }, estado: { type: "string" }, vigente: { type: "boolean" }, inicio: { type: "string", format: "date-time" }, fin: { anyOf: [{ type: "string", format: "date-time" }, { type: "null" }] } } },
+        AcademicPendingResponse: { type: "object", properties: { data: { $ref: "#/components/schemas/AcademicHistoryPage" } } },
+        AcademicHistoryResponse: { type: "object", properties: { data: { $ref: "#/components/schemas/AcademicHistoryPage" } } },
+        AcademicHistoryPage: { type: "object", properties: { items: { type: "array", items: { $ref: "#/components/schemas/AcademicAffiliation" } }, page: { type: "integer" }, pageSize: { type: "integer" }, total: { type: "integer" } } },
+        AcademicConfirmationResponse: { type: "object", properties: { data: { $ref: "#/components/schemas/AcademicAffiliation" } } },
+        AcademicCatalogCreatedResponse: { type: "object", properties: { data: { $ref: "#/components/schemas/AcademicCatalogItem" } } },
         LoginInput: {
           type: "object",
           required: ["email", "password"],

@@ -15,8 +15,18 @@
 
 - Docker local quedó reparado y verificado con MinIO compatible, MariaDB en el host `3307`, 11/11 migraciones y respuestas HTTP 200 de backend, frontend, MinIO y Mailpit.
 - La implementación está pausada por petición del usuario.
-- El siguiente bloque pendiente es el perfil académico de Backend 2; después siguen frontend, integración y E2E.
+- El perfil académico/adscripción histórica de Backend 2 queda cerrado y verificado; el siguiente bloque es el expediente documental funcional.
 - Los dominios de Backend 1 quedan excluidos de este bloque.
+
+### Cierre verificado: perfil académico y adscripción histórica
+
+- Se implementaron los modelos `InstitucionAcademica`, `UnidadAcademica`, `ProgramaAcademico`, `CohorteAcademica` y `AdscripcionAcademica`.
+- Se cubren los flujos de solicitud pendiente y `confirm`/`reject` autorizados, con historial y scopes `SELF`/`AREA`/`SEDE`/`GLOBAL`; estos scopes no influyen en el RBAC operativo.
+- Endpoints verificados: catálogo académico, perfil, pendientes, historial y confirmación.
+- Migraciones aplicadas: `20260925180000_academic_profile` y `20260925190000_academic_audit_fks`.
+- OpenAPI y ambas colecciones/entornos de Postman quedaron actualizados.
+- Gate verde: 310 pruebas backend, incluidos 22 casos del servicio académico y 6 schemas, además de build, check, Prisma y Compose.
+- El expediente documental funcional aún **NO** está implementado y es el siguiente bloque.
 
 ## 1. Alcance y criterio de comparación
 
@@ -843,7 +853,7 @@ La migración 16B se ejecutará sólo si aparecen fuentes del sistema anterior, 
 
 ## 12. Próximo paso recomendado
 
-La implementación queda pausada por petición del usuario. Al reanudar, el siguiente bloque recomendado es el perfil académico de Backend 2; después deben abordarse frontend, integración y E2E. Los dominios de Backend 1 están fuera de este bloque.
+La implementación queda pausada por petición del usuario. Al reanudar, el perfil académico/adscripción histórica ya está cerrado; el siguiente bloque recomendado es el expediente documental funcional, seguido de frontend, integración y E2E. Los dominios de Backend 1 están fuera de este bloque.
 
 El contrato funcional principal ya produjo el primer recorrido backend implementable. El orden recomendado desde este corte es:
 

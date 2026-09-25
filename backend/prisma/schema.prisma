@@ -35,6 +35,12 @@ enum DiaSemana {
   DOMINGO
 }
 
+enum EstadoAdscripcionAcademica {
+  PENDIENTE_CONFIRMACION
+  CONFIRMADA
+  RECHAZADA
+}
+
 model Sede {
   id        Int     @id @default(autoincrement())
   nombre    String  @unique @db.VarChar(150)
@@ -127,6 +133,9 @@ model Usuario {
   mfaChallenges MfaChallenge[]
   recoveryCodes MfaRecoveryCode[]
   notifications Notification[]
+  adscripcionesAcademicas AdscripcionAcademica[]
+  solicitudesAcademicas AdscripcionAcademica[] @relation("AcademicRequester")
+  confirmacionesAcademicas AdscripcionAcademica[] @relation("AcademicConfirmer")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -136,6 +145,81 @@ model Usuario {
   @@index([sedeId])
   @@index([areaId])
   @@index([turnoId])
+}
+
+model InstitucionAcademica {
+  id Int @id @default(autoincrement())
+  nombre String @unique @db.VarChar(191)
+  activa Boolean @default(true)
+  unidades UnidadAcademica[]
+  adscripciones AdscripcionAcademica[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([activa])
+}
+
+model UnidadAcademica {
+  id Int @id @default(autoincrement())
+  nombre String @db.VarChar(191)
+  activa Boolean @default(true)
+  institucionId Int
+  institucion InstitucionAcademica @relation(fields: [institucionId], references: [id], onDelete: Restrict)
+  programas ProgramaAcademico[]
+  adscripciones AdscripcionAcademica[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([institucionId, nombre])
+  @@index([institucionId, activa])
+}
+
+model ProgramaAcademico {
+  id Int @id @default(autoincrement())
+  nombre String @db.VarChar(191)
+  activa Boolean @default(true)
+  unidadAcademicaId Int
+  unidadAcademica UnidadAcademica @relation(fields: [unidadAcademicaId], references: [id], onDelete: Restrict)
+  adscripciones AdscripcionAcademica[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([unidadAcademicaId, nombre])
+  @@index([unidadAcademicaId, activa])
+}
+
+model CohorteAcademica {
+  id Int @id @default(autoincrement())
+  nombre String @unique @db.VarChar(100)
+  activa Boolean @default(true)
+  adscripciones AdscripcionAcademica[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([activa])
+}
+
+model AdscripcionAcademica {
+  id Int @id @default(autoincrement())
+  usuarioId Int
+  institucionId Int
+  unidadAcademicaId Int?
+  programaAcademicoId Int
+  cohorteId Int?
+  inicio DateTime @db.Date
+  fin DateTime? @db.Date
+  vigente Boolean @default(true)
+  estado EstadoAdscripcionAcademica @default(PENDIENTE_CONFIRMACION)
+  motivoRechazo String? @db.VarChar(500)
+  solicitadoPorId Int?
+  confirmadoPorId Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+  institucion InstitucionAcademica @relation(fields: [institucionId], references: [id], onDelete: Restrict)
+  unidadAcademica UnidadAcademica? @relation(fields: [unidadAcademicaId], references: [id], onDelete: Restrict)
+  programaAcademico ProgramaAcademico @relation(fields: [programaAcademicoId], references: [id], onDelete: Restrict)
+  cohorte CohorteAcademica? @relation(fields: [cohorteId], references: [id], onDelete: Restrict)
+  solicitadoPor Usuario? @relation("AcademicRequester", fields: [solicitadoPorId], references: [id], onDelete: SetNull)
+  confirmadoPor Usuario? @relation("AcademicConfirmer", fields: [confirmadoPorId], references: [id], onDelete: SetNull)
+  @@index([usuarioId, vigente, inicio])
+  @@index([institucionId, programaAcademicoId])
 }
 
 model Session {

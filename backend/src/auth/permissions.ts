@@ -11,6 +11,9 @@ export enum Permission {
   USERS_READ = "users:read",
   USERS_MANAGE = "users:manage",
   KAIROS_PROJECT_CREATE = "kairos:project:create",
+  ACADEMIC_PROFILE_READ = "academic:profile:read",
+  ACADEMIC_PROFILE_UPDATE = "academic:profile:update",
+  ACADEMIC_CATALOG_MANAGE = "academic:catalog:manage",
 }
 
 export enum AccessScope {
@@ -25,6 +28,8 @@ type RoleGrants = Readonly<Partial<Record<Permission, AccessScope>>>;
 const commonUserGrants: RoleGrants = {
   [Permission.ATTENDANCE_SELF_READ]: AccessScope.SELF,
   [Permission.ATTENDANCE_CHECK_IN]: AccessScope.SELF,
+  [Permission.ACADEMIC_PROFILE_READ]: AccessScope.SELF,
+  [Permission.ACADEMIC_PROFILE_UPDATE]: AccessScope.SELF,
   // Organization data is a shared catalogue needed by authenticated flows.
   [Permission.ORGANIZATION_READ]: AccessScope.GLOBAL,
 };
@@ -35,6 +40,7 @@ const areaManagerGrants: RoleGrants = {
   [Permission.USERS_READ]: AccessScope.AREA,
   [Permission.USERS_MANAGE]: AccessScope.AREA,
   [Permission.KAIROS_PROJECT_CREATE]: AccessScope.AREA,
+  [Permission.ACADEMIC_PROFILE_READ]: AccessScope.AREA,
 };
 
 const permissionsByRole: Record<RolUsuario, RoleGrants> = {
@@ -52,6 +58,7 @@ const permissionsByRole: Record<RolUsuario, RoleGrants> = {
     [Permission.USERS_READ]: AccessScope.SEDE,
     [Permission.USERS_MANAGE]: AccessScope.SEDE,
     [Permission.KAIROS_PROJECT_CREATE]: AccessScope.SEDE,
+    [Permission.ACADEMIC_PROFILE_READ]: AccessScope.SEDE,
   },
   [RolUsuario.JEFE_COORDINADORES]: {
     ...areaManagerGrants,
@@ -60,6 +67,8 @@ const permissionsByRole: Record<RolUsuario, RoleGrants> = {
     [Permission.USERS_READ]: AccessScope.GLOBAL,
     [Permission.USERS_MANAGE]: AccessScope.GLOBAL,
     [Permission.KAIROS_PROJECT_CREATE]: AccessScope.GLOBAL,
+    [Permission.ACADEMIC_PROFILE_READ]: AccessScope.GLOBAL,
+    [Permission.ACADEMIC_CATALOG_MANAGE]: AccessScope.GLOBAL,
   },
   [RolUsuario.ADMIN]: Object.fromEntries(
     Object.values(Permission).map((permission) => [
