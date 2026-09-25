@@ -5,11 +5,18 @@
 | Dato                        | Valor                                                                                                             |
 | --------------------------- | ----------------------------------------------------------------------------------------------------------------- |
 | Fecha de revisión           | 25 de septiembre de 2026                                                                                          |
-| Rama de trabajo             | `develop`                                                                                                         |
-| Commit base revisado        | Merge de `7602eb3` sobre `542d2ed`                                                                                |
+| Rama de trabajo             | `feature/backend/backend2-full-scope`                                                                             |
+| Commit base revisado        | `cae5a0d` (storage seguro), `1fb0a27` (identidad e invitaciones), `60dcfc0` (MFA/notificaciones/outbox-SMTP/OpenAPI-Postman) |
 | Sistema actual              | Monorepo con Next.js App Router, NestJS, Prisma y MariaDB                                                         |
 | Fuentes funcionales         | Cinco PDF del sistema heredado: plan, análisis integral, reporte de estado, documento técnico y manual de usuario |
 | Evidencia de implementación | Código, esquema Prisma, migraciones, OpenAPI, pruebas, CI, Docker y Postman del repositorio actual                |
+
+### Checkpoint del 25 de septiembre de 2026
+
+- Docker local quedó reparado y verificado con MinIO compatible, MariaDB en el host `3307`, 11/11 migraciones y respuestas HTTP 200 de backend, frontend, MinIO y Mailpit.
+- La implementación está pausada por petición del usuario.
+- El siguiente bloque pendiente es el perfil académico de Backend 2; después siguen frontend, integración y E2E.
+- Los dominios de Backend 1 quedan excluidos de este bloque.
 
 ## 1. Alcance y criterio de comparación
 
@@ -835,6 +842,8 @@ La migración 16B se ejecutará sólo si aparecen fuentes del sistema anterior, 
 - 8B, 11B, 12B y 13B permanecen como historial. La decisión 31 sustituye únicamente su aplazamiento/condición y conserva sus límites de seguridad y simplificación.
 
 ## 12. Próximo paso recomendado
+
+La implementación queda pausada por petición del usuario. Al reanudar, el siguiente bloque recomendado es el perfil académico de Backend 2; después deben abordarse frontend, integración y E2E. Los dominios de Backend 1 están fuera de este bloque.
 
 El contrato funcional principal ya produjo el primer recorrido backend implementable. El orden recomendado desde este corte es:
 

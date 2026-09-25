@@ -2,34 +2,23 @@ name: ares
 
 services:
   storage:
-    image: minio/minio:RELEASE.2025-10-15T17-29-55Z
-    command: server /data --console-address ":9001"
+    image: bitnamilegacy/minio:2025.7.23-debian-12-r5@sha256:6dabb4a2088c9a79908de3bc05f4586c23ad2182c8908e7e3acbf61c1467fb20
     environment:
       MINIO_ROOT_USER: ${S3_ACCESS_KEY:-ares-local}
       MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-ares-local-secret}
+      MINIO_DEFAULT_BUCKETS: ares-quarantine,ares-available
+      MINIO_BROWSER: "on"
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
     volumes:
-      - ares-storage:/data
+      - ares-storage:/bitnami/minio/data
     healthcheck:
       test: ["CMD", "mc", "ready", "local"]
       interval: 5s
       timeout: 5s
       retries: 20
     restart: unless-stopped
-
-  storage-init:
-    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
-    depends_on:
-      storage:
-        condition: service_healthy
-    entrypoint: /bin/sh
-    command: -c "mc alias set local http://storage:9000 $${MINIO_ROOT_USER:-ares-local} $${MINIO_ROOT_PASSWORD:-ares-local-secret} && mc mb --ignore-existing local/ares-quarantine && mc mb --ignore-existing local/ares-available && mc anonymous set none local/ares-quarantine && mc anonymous set none local/ares-available"
-    environment:
-      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-ares-local}
-      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-ares-local-secret}
-    restart: "no"
 
   clamav:
     image: clamav/clamav:1.4
@@ -55,7 +44,8 @@ services:
       MARIADB_PASSWORD: ${MARIADB_PASSWORD:-ares-local-password}
       MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:-ares-local-root-password}
     ports:
-      - "127.0.0.1:3306:3306"
+      # 3307 avoids colliding with an existing local MySQL/MariaDB service.
+      - "127.0.0.1:${MARIADB_HOST_PORT:-3307}:3306"
     volumes:
       - ares-database:/var/lib/mysql
     healthcheck:
@@ -84,7 +74,9 @@ services:
       dockerfile: backend/Dockerfile
       target: runtime
     environment:
-      NODE_ENV: production
+      # This Compose file is the local development stack (Mailpit, local MinIO).
+      # Override NODE_ENV and all secrets explicitly for a real deployment.
+      NODE_ENV: ${NODE_ENV:-development}
       DATABASE_URL: mysql://ares_app:${MARIADB_PASSWORD:-ares-local-password}@database:3306/ares_dev
       BACKEND_HOST: 0.0.0.0
       BACKEND_PORT: 3000
@@ -113,8 +105,8 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
-      storage-init:
-        condition: service_completed_successfully
+      storage:
+        condition: service_healthy
       clamav:
         condition: service_healthy
       mailpit:
