@@ -139,6 +139,9 @@ model Usuario {
   requisitosDocumentales RequisitoDocumento[]
   documentosCargados DocumentoVersion[] @relation("DocumentoUploader")
   documentosRevisados DocumentoVersion[] @relation("DocumentoReviewer")
+  kairosProjectsCreated ProyectoKairos[] @relation("KairosProjectCreator")
+  kairosMemberships MiembroProyectoKairos[]
+  kairosFavorites FavoritoProyectoKairos[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -471,6 +474,69 @@ enum EstadoAsistencia {
   PENDIENTE
   AUTORIZADA
   RECHAZADA
+}
+
+enum EstadoProyectoKairos {
+  BORRADOR
+  ACTIVO
+  ARCHIVADO
+}
+
+enum PrioridadProyectoKairos {
+  BAJA
+  MEDIA
+  ALTA
+  CRITICA
+}
+
+enum RolMiembroProyectoKairos {
+  PROPIETARIO
+  SUBLIDER
+  COLABORADOR
+  OBSERVADOR
+}
+
+model ProyectoKairos {
+  id          String @id @default(cuid()) @db.VarChar(30)
+  nombre      String @db.VarChar(191)
+  descripcion String? @db.VarChar(1000)
+  estado      EstadoProyectoKairos @default(BORRADOR)
+  prioridad   PrioridadProyectoKairos @default(MEDIA)
+  creadoPorId Int
+  creadoPor   Usuario @relation("KairosProjectCreator", fields: [creadoPorId], references: [id], onDelete: Restrict)
+  miembros    MiembroProyectoKairos[]
+  favoritos   FavoritoProyectoKairos[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([estado, prioridad, updatedAt])
+  @@index([creadoPorId, createdAt])
+}
+
+model MiembroProyectoKairos {
+  proyectoId String @db.VarChar(30)
+  usuarioId  Int
+  rol        RolMiembroProyectoKairos
+  proyecto   ProyectoKairos @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+  usuario    Usuario @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  removedAt  DateTime?
+
+  @@id([proyectoId, usuarioId])
+  @@index([usuarioId, rol])
+  @@index([proyectoId, rol])
+}
+
+model FavoritoProyectoKairos {
+  proyectoId String @db.VarChar(30)
+  usuarioId  Int
+  proyecto   ProyectoKairos @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+  usuario    Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@id([proyectoId, usuarioId])
+  @@index([usuarioId, createdAt])
 }
 
 model Asistencia {

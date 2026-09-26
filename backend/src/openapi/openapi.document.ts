@@ -30,6 +30,58 @@ const errorResponses: Record<string, any> = {
 };
 const academicErrorResponses = { ...errorResponses, 404: { description: "Academic resource not found" }, 409: { description: "Academic conflict" } };
 
+const kairosPaths = {
+  "/api/kairos/projects": {
+    get: { tags: ["Kairos"], security: cookieSecurity, parameters: [
+      { name: "page", in: "query", schema: { type: "integer", minimum: 1, maximum: 10000, default: 1 } },
+      { name: "pageSize", in: "query", schema: { type: "integer", minimum: 1, maximum: 100, default: 20 } },
+      { name: "search", in: "query", schema: { type: "string", maxLength: 191 } },
+      { name: "favorite", in: "query", schema: { type: "boolean", default: false } },
+    ], responses: { 200: { description: "Projects where the authenticated user is an active member", content: { "application/json": { schema: { $ref: "#/components/schemas/KairosProjectPageResponse" } } } }, ...errorResponses } },
+    post: { tags: ["Kairos"], security: cookieSecurity, description: "Creates a project and adds the creator as PROPIETARIO. Requires kairos:project:create (area, sede or global scope).", requestBody: jsonBody({ $ref: "#/components/schemas/KairosProjectInput" }), responses: { 201: { description: "Project created", content: { "application/json": { schema: { $ref: "#/components/schemas/KairosProjectResponse" } } } }, ...errorResponses } },
+  },
+  "/api/kairos/projects/{id}": {
+    get: { tags: ["Kairos"], security: cookieSecurity, parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", minLength: 1 } }], responses: { 200: { description: "Project and active members visible to the authenticated member", content: { "application/json": { schema: { $ref: "#/components/schemas/KairosProjectDetailResponse" } } } }, ...errorResponses } },
+    patch: { tags: ["Kairos"], security: cookieSecurity, parameters: [{ name: "id", in: "path", required: true, schema: { type: "integer", minimum: 1 } }], requestBody: jsonBody({ $ref: "#/components/schemas/KairosProjectUpdateInput" }), responses: { 200: { description: "Project updated by owner or subleader", content: { "application/json": { schema: { $ref: "#/components/schemas/KairosProjectResponse" } } } }, ...errorResponses } },
+  },
+  "/api/kairos/projects/{id}/archive": { post: { tags: ["Kairos"], security: cookieSecurity, parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }], responses: { 200: { description: "Project archived" }, ...errorResponses } } },
+  "/api/kairos/projects/{id}/members": { post: { tags: ["Kairos"], security: cookieSecurity, parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }], requestBody: jsonBody({ $ref: "#/components/schemas/KairosMemberInput" }), responses: { 201: { description: "Member added" }, 400: { description: "Member user is not active or payload is invalid" }, 403: { description: "Only owner or subleader can manage members" }, 404: { description: "Project not found in actor scope" }, 409: { description: "User is already a member" } } } },
+  "/api/kairos/projects/{id}/members/{userId}": {
+    patch: { tags: ["Kairos"], security: cookieSecurity, parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }, { name: "userId", in: "path", required: true, schema: { type: "integer", minimum: 1 } }], requestBody: jsonBody({ $ref: "#/components/schemas/KairosMemberRoleInput" }), responses: { 200: { description: "Member role changed" }, 403: { description: "Only owner or subleader can manage members" }, 404: { description: "Project or member not found" }, 409: { description: "The project requires at least one owner" } } },
+    delete: { tags: ["Kairos"], security: cookieSecurity, parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }, { name: "userId", in: "path", required: true, schema: { type: "integer", minimum: 1 } }], responses: { 200: { description: "Member removed (soft removal)" }, 403: { description: "Only owner or subleader can manage members" }, 404: { description: "Project or member not found" }, 409: { description: "The project requires at least one owner" } } },
+  },
+  "/api/kairos/projects/{id}/members/{userId}/transfer": {
+    post: { tags: ["Kairos"], security: cookieSecurity, description: "Transfers ownership atomically. Only the current PROPIETARIO may invoke it; the current owner becomes SUBLIDER and the destination becomes PROPIETARIO.", parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }, { name: "userId", in: "path", required: true, schema: { type: "integer", minimum: 1 } }], responses: { 200: { description: "Ownership transferred atomically" }, 403: { description: "Only the current owner may transfer ownership" }, 404: { description: "Project or member not found" }, 409: { description: "Destination is not an active member or transfer conflicts" }, ...errorResponses } },
+  },
+  "/api/kairos/projects/{id}/favorite": { put: { tags: ["Kairos"], security: cookieSecurity, parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }], requestBody: jsonBody({ $ref: "#/components/schemas/KairosFavoriteInput" }), responses: { 200: { description: "Favorite state updated", content: { "application/json": { schema: { $ref: "#/components/schemas/KairosFavoriteResponse" } } } }, ...errorResponses } } },
+};
+
+const kairosSchemas = {
+  KairosProjectInput: { type: "object", required: ["nombre"], additionalProperties: false, properties: { nombre: { type: "string", minLength: 1, maxLength: 191 }, descripcion: { anyOf: [{ type: "string", maxLength: 1000 }, { type: "null" }] }, prioridad: { type: "string", enum: ["BAJA", "MEDIA", "ALTA", "CRITICA"] } } },
+  KairosProjectUpdateInput: { type: "object", minProperties: 1, additionalProperties: false, description: "At least one property is required; all properties are optional in this partial update.", properties: { nombre: { type: "string", minLength: 1, maxLength: 191 }, descripcion: { anyOf: [{ type: "string", maxLength: 1000 }, { type: "null" }] }, prioridad: { type: "string", enum: ["BAJA", "MEDIA", "ALTA", "CRITICA"] }, estado: { type: "string", enum: ["BORRADOR", "ACTIVO", "ARCHIVADO"] } } },
+  KairosMemberInput: { type: "object", required: ["usuarioId", "rol"], additionalProperties: false, description: "PROPIETARIO is intentionally excluded; ownership is granted only by the transfer endpoint.", properties: { usuarioId: { type: "integer", minimum: 1 }, rol: { type: "string", enum: ["SUBLIDER", "COLABORADOR", "OBSERVADOR"] } } },
+  KairosMemberRoleInput: { type: "object", required: ["rol"], additionalProperties: false, description: "PROPIETARIO is intentionally excluded; ownership is granted only by the transfer endpoint.", properties: { rol: { type: "string", enum: ["SUBLIDER", "COLABORADOR", "OBSERVADOR"] } } },
+  KairosFavoriteInput: { type: "object", required: ["enabled"], additionalProperties: false, properties: { enabled: { type: "boolean" } } },
+  KairosProject: { type: "object", properties: { id: { type: "string" }, nombre: { type: "string" }, descripcion: { anyOf: [{ type: "string" }, { type: "null" }] }, estado: { type: "string", enum: ["BORRADOR", "ACTIVO", "ARCHIVADO"] }, prioridad: { type: "string", enum: ["BAJA", "MEDIA", "ALTA", "CRITICA"] }, creadoPorId: { type: "integer" }, rol: { type: "string", enum: ["PROPIETARIO", "SUBLIDER", "COLABORADOR", "OBSERVADOR"] }, favorito: { type: "boolean" }, createdAt: { type: "string", format: "date-time" }, updatedAt: { type: "string", format: "date-time" } } },
+  KairosMember: { type: "object", properties: { usuarioId: { type: "integer" }, rol: { type: "string", enum: ["PROPIETARIO", "SUBLIDER", "COLABORADOR", "OBSERVADOR"] }, createdAt: { type: "string", format: "date-time" }, usuario: { type: "object", properties: { id: { type: "integer" }, codigo: { type: "string" } } } } },
+  KairosProjectPageResponse: { type: "object", properties: { data: { type: "object", required: ["items", "page", "pageSize", "total"], properties: { items: { type: "array", items: { $ref: "#/components/schemas/KairosProject" } }, page: { type: "integer" }, pageSize: { type: "integer" }, total: { type: "integer" } } } } },
+  KairosProjectResponse: { type: "object", properties: { data: { $ref: "#/components/schemas/KairosProject" } } },
+  KairosProjectDetailResponse: { type: "object", properties: { data: { allOf: [{ $ref: "#/components/schemas/KairosProject" }, { type: "object", properties: { miembros: { type: "array", items: { $ref: "#/components/schemas/KairosMember" } } } }] } } },
+  KairosFavoriteResponse: { type: "object", properties: { data: { type: "object", required: ["id", "favorito"], properties: { id: { type: "string" }, favorito: { type: "boolean" } } } } },
+};
+
+function normalizeKairosPathParameters(paths: Record<string, any>) {
+  for (const [path, operations] of Object.entries(paths)) {
+    if (!path.startsWith("/api/kairos/")) continue;
+    for (const operation of Object.values(operations as Record<string, any>)) {
+      for (const parameter of operation.parameters ?? []) {
+        if (parameter.name === "userId") parameter.schema = { type: "integer", minimum: 1 };
+        if (parameter.name === "id") parameter.schema = { type: "string", minLength: 1, pattern: "^[a-z0-9]+$", description: "Project CUID" };
+      }
+    }
+  }
+}
+
 const documentPaths = {
   "/api/documents": {
     get: {
@@ -242,6 +294,7 @@ function userPaths() {
 }
 
 export function createOpenApiDocument() {
+  normalizeKairosPathParameters(kairosPaths);
   return {
     openapi: "3.1.0",
     info: {
@@ -258,6 +311,7 @@ export function createOpenApiDocument() {
       { name: "Users" },
       { name: "Academic" },
       { name: "Documents" },
+      { name: "Kairos", description: "Project collaboration, membership and favorites" },
     ],
     paths: {
       "/api/health": {
@@ -324,6 +378,7 @@ export function createOpenApiDocument() {
       ...identityPaths,
       ...attendancePaths,
       ...documentPaths,
+      ...kairosPaths,
       "/api/academic/catalogs": {
         get: { tags: ["Academic"], security: cookieSecurity, parameters: [{ name: "page", in: "query", schema: { type: "integer", minimum: 1 } }, { name: "pageSize", in: "query", schema: { type: "integer", minimum: 1, maximum: 100 } }, { name: "search", in: "query", schema: { type: "string" } }], responses: { 200: { description: "Active academic catalogues with pagination", content: { "application/json": { schema: { $ref: "#/components/schemas/AcademicCatalogsResponse" } } } }, ...academicErrorResponses } },
       },
@@ -358,6 +413,7 @@ export function createOpenApiDocument() {
       schemas: {
         ...attendanceSchemas,
         ...documentSchemas,
+        ...kairosSchemas,
         AcademicProfileInput: {
           type: "object", required: ["institucionId", "programaAcademicoId", "inicio"], additionalProperties: false,
           properties: { institucionId: { type: "integer", minimum: 1 }, unidadAcademicaId: nullableIdSchema(true), programaAcademicoId: { type: "integer", minimum: 1 }, cohorteId: nullableIdSchema(true), inicio: { type: "string", format: "date" }, fin: { anyOf: [{ type: "string", format: "date" }, { type: "null" }] } },

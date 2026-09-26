@@ -19,6 +19,7 @@ import { InvitationsModule } from "./invitations/invitations.module";
 import { NotificationsModule } from "./notifications/notifications.module";
 import { AcademicModule } from "./academic/academic.module";
 import { DocumentsModule } from "./documents/documents.module";
+import { KairosModule } from "./kairos/kairos.module";
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { DocumentsModule } from "./documents/documents.module";
     NotificationsModule,
     AcademicModule,
     DocumentsModule,
+    KairosModule,
     OpenApiModule,
   ],
   providers: [

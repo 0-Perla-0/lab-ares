@@ -38,7 +38,9 @@
     },
     { "key": "documentRequirementId", "value": "" },
     { "key": "documentVersionId", "value": "" },
-    { "key": "documentFileId", "value": "" }
+    { "key": "documentFileId", "value": "" },
+    { "key": "projectId", "value": "" },
+    { "key": "memberUserId", "value": "" }
   ],
   "event": [
     {
@@ -1020,6 +1022,22 @@
         { "name": "Upload available file for review", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"requisitoId\":{{documentRequirementId}},\"archivoId\":\"{{documentFileId}}\"}" }, "url": "{{baseUrl}}/documents/versions" }, "event": [{ "listen": "test", "script": { "exec": ["pm.response.to.have.status(201);", "pm.collectionVariables.set('documentVersionId', pm.response.json().data.id);"] } }] },
         { "name": "Review version", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"estado\":\"AUTORIZADO\"}" }, "url": "{{baseUrl}}/documents/versions/{{documentVersionId}}/review" }, "event": [{ "listen": "test", "script": { "exec": ["pm.response.to.have.status(200);"] } }] },
         { "name": "Download authorized version", "request": { "method": "GET", "url": "{{baseUrl}}/documents/versions/{{documentVersionId}}/download" }, "event": [{ "listen": "test", "script": { "exec": ["pm.response.to.have.status(200);", "pm.expect(pm.response.json().data).to.be.a('string');"] } }] }
+      ]
+    }
+    ,{
+      "name": "Kairos - proyectos, miembros y favoritos",
+      "description": "Flujo encadenable; requiere sesión activa y permisos de creación para crear proyecto.",
+      "item": [
+        { "name": "Crear proyecto", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"nombre\":\"Proyecto Kairos {{$timestamp}}\",\"prioridad\":\"MEDIA\"}" }, "url": "{{baseUrl}}/kairos/projects" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('Proyecto creado',()=>pm.response.to.have.status(201));", "if(pm.response.code===201) pm.collectionVariables.set('projectId',pm.response.json().data.id);"] } }] },
+        { "name": "Listar proyectos paginado/búsqueda/favoritos", "request": { "method": "GET", "url": "{{baseUrl}}/kairos/projects?page=1&pageSize=20&search=Proyecto&favorite=false" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('Listado Kairos',()=>pm.response.to.have.status(200));", "pm.expect(pm.response.json().data).to.have.property('items');"] } }] },
+        { "name": "Consultar proyecto y miembros", "request": { "method": "GET", "url": "{{baseUrl}}/kairos/projects/{{projectId}}" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('Detalle Kairos',()=>pm.response.to.have.status(200));", "pm.expect(pm.response.json().data).to.have.property('miembros');"] } }] },
+        { "name": "Agregar miembro", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"usuarioId\":{{memberUserId}},\"rol\":\"COLABORADOR\"}" }, "url": "{{baseUrl}}/kairos/projects/{{projectId}}/members" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('Miembro creado o conflicto',()=>pm.expect([201,409]).to.include(pm.response.code));"] } }] },
+        { "name": "Cambiar rol", "request": { "method": "PATCH", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"rol\":\"OBSERVADOR\"}" }, "url": "{{baseUrl}}/kairos/projects/{{projectId}}/members/{{memberUserId}}" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('Rol actualizado o conflicto documentado',()=>pm.expect([200,404,409]).to.include(pm.response.code));"] } }] },
+        { "name": "Marcar favorito", "request": { "method": "PUT", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"enabled\":true}" }, "url": "{{baseUrl}}/kairos/projects/{{projectId}}/favorite" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('Favorito actualizado',()=>pm.response.to.have.status(200));"] } }] },
+        { "name": "Actualizar proyecto", "request": { "method": "PATCH", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"estado\":\"ACTIVO\"}" }, "url": "{{baseUrl}}/kairos/projects/{{projectId}}" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('Proyecto actualizado',()=>pm.response.to.have.status(200));"] } }] },
+        { "name": "Archivar proyecto", "request": { "method": "POST", "url": "{{baseUrl}}/kairos/projects/{{projectId}}/archive" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('Proyecto archivado',()=>pm.response.to.have.status(200));"] } }] },
+        { "name": "Transferir propiedad atómicamente", "request": { "method": "POST", "url": "{{baseUrl}}/kairos/projects/{{projectId}}/members/{{memberUserId}}/transfer" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('Propiedad transferida o conflicto documentado',()=>pm.expect([200,403,404,409]).to.include(pm.response.code));"] } }] },
+        { "name": "Quitar miembro", "request": { "method": "DELETE", "url": "{{baseUrl}}/kairos/projects/{{projectId}}/members/{{memberUserId}}" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('Miembro removido o conflicto documentado',()=>pm.expect([200,404,409]).to.include(pm.response.code));"] } }] }
       ]
     }
   ]
