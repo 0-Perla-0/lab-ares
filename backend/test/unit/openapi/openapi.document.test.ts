@@ -25,6 +25,7 @@ describe("OpenAPI document", () => {
     "/api/organization/turnos",
     "/api/users",
     "/api/users/{id}",
+    "/api/kairos/projects/{projectId}/kanban",
     "/api/attendance/me",
     "/api/attendance/open",
     "/api/attendance/check-in",
@@ -40,5 +41,16 @@ describe("OpenAPI document", () => {
       expect.objectContaining({ name: "Idempotency-Key", required: true }),
     );
     expect(operation.requestBody.required).toBe(true);
+  });
+
+  it("documents the strict seven-lane Kanban projection contract", () => {
+    const operation = document.paths["/api/kairos/projects/{projectId}/kanban"].get;
+    expect(operation.parameters).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: "projectId", schema: expect.objectContaining({ pattern: "^c[a-z0-9]{20,30}$" }) }),
+      expect.objectContaining({ name: "limitPerLane", schema: expect.objectContaining({ minimum: 1, maximum: 100 }) }),
+    ]));
+    expect(document.components.schemas.KairosKanban.properties.lanes).toMatchObject({ minItems: 7, maxItems: 7 });
+    expect(document.components.schemas.KairosKanbanLane.properties.state.enum).toHaveLength(7);
+    expect(document.components.schemas.KairosKanbanCard.properties.vencida.description).toContain("Derived");
   });
 });

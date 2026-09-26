@@ -15,7 +15,7 @@
 
 - Docker local quedó reparado y verificado con MinIO compatible, MariaDB en el host `3307`, 11/11 migraciones y respuestas HTTP 200 de backend, frontend, MinIO y Mailpit.
 - El perfil académico/adscripción histórica, el expediente documental funcional, la base de proyectos/membresías y las actividades/evidencias de Kairos de Backend 2 quedan cerrados y verificados.
-- La implementación continúa con Kanban; después seguirán frontend e integración E2E.
+- Kanban queda implementado y verificado en backend como proyección de las actividades; después seguirán frontend e integración E2E.
 - Los dominios de Backend 1 quedan excluidos de este bloque.
 
 ### Cierre verificado: perfil académico y adscripción histórica
@@ -38,7 +38,7 @@
 - Endpoints verificados: `list`, `create requirement`, `upload`, `review` y `download`.
 - OpenAPI y ambas colecciones/entornos de Postman quedaron actualizados.
 - Gate verde: 345 pruebas backend, `check`, `build`, Prisma, Compose y contratos; incluye pruebas de PNG y documentos.
-- Esta fase queda **COMPLETADA**. El siguiente bloque es Kairos: proyectos, membresías, actividades y evidencias; después, Kanban.
+- Esta fase queda **COMPLETADA**. El bloque de Kairos (proyectos, membresías, actividades, evidencias y Kanban) también queda cerrado y verificado en backend; siguen frontend, integración y E2E.
 
 ## 1. Alcance y criterio de comparación
 
@@ -70,7 +70,7 @@ No se asigna un porcentaje global de avance porque daría el mismo peso a una pa
 
 - **Base técnica y administración inicial:** implementadas.
 - **Operación de Servicio Social:** asistencia incremento 1 implementada; validación, ausencias, calendario y documentos pendientes.
-- **Kairos:** proyectos, membresías, favoritos, actividades y evidencias implementados y verificados en backend; Kanban pendiente.
+- **Kairos:** proyectos, membresías, favoritos, actividades, evidencias y Kanban implementados y verificados en backend; frontend, integración y E2E pendientes.
 - **Funciones secundarias requeridas:** pendientes de desarrollo con un MVP obligatorio ya delimitado.
 
 ### 2.1 Qué aporta la documentación encontrada
@@ -252,7 +252,7 @@ La estrategia correcta es reconstruir contratos de negocio sobre esta arquitectu
 | Kairos - miembros               | Roles `PROPIETARIO`, `SUBLIDER`, `COLABORADOR` y `OBSERVADOR`                               | Membresías implementadas y verificadas en backend: baja lógica/reactivación, historial y transferencia atómica de propietario único | Invitación/asignación, matriz de acciones y compatibilidad con roles globales                                                                       | P1                    |
 | Kairos - actividades            | Título, descripción, fechas, complejidad, asignados, estado, duplicado y movimiento         | Implementado y verificado en backend: responsable/participantes, estados y transiciones, vencida derivada, correcciones, reapertura con motivo, comentarios e historial append-only, lecturas históricas archivadas | CRUD, transiciones, reasignación, trazabilidad al mover entre proyectos y validación                                                                | P1                    |
 | Evidencias Kairos               | Archivos y comentarios con revisión e historial                                             | Implementado y verificado en backend: versiones inmutables, revisión separada de responsable, adjuntos privados con escaneo asíncrono y estado de escaneo, propiedad endurecida y vínculo inequívoco con actividad | Almacenamiento, autorización, versión, retroalimentación y vínculo inequívoco con actividad                                                         | P1                    |
-| Kairos - Kanban                 | Carriles `PENDIENTES -> REVISADOS -> EN_PROCESO -> TERMINADO`                               | Pendiente                                                    | Confirmar esos estados, reglas de movimiento y evidencia mínima; construir sobre actividades estables                                               | P2                    |
+| Kairos - Kanban                 | Carriles históricos `PENDIENTES -> REVISADOS -> EN_PROCESO -> TERMINADO`; vista actual derivada de actividades | El diseño histórico fue supersedido por la decisión vinculante de siete estados de `ActividadKairos`; implementado y verificado como proyección, sin dominio Kanban separado; filtros, vencida derivada, límite por carril, OpenAPI/Postman y 448 pruebas backend | Integrar interfaz, accesibilidad, integración y E2E | P2 |
 | Gamificación y XP               | XP base por calidad, nivel, racha, monedas y progreso                                       | Pendiente; MVP obligatorio aprobado                          | Puntos privados por actividades Kairos aprobadas, nivel derivado, insignias limitadas y libro de eventos; asistencia no otorga XP                   | P3                    |
 | Insignias y ranking             | Logros, medallas y clasificación                                                            | Pendiente; sólo insignias en MVP                             | Catálogo y otorgamiento auditable de insignias; no habrá ranking público inicial                                                                    | P3                    |
 | Tienda y recompensas            | Canje de monedas, catálogo, stock y carrito                                                 | Fuera del MVP                                                | No implementar monedas, carrito, stock de recompensas ni canje en el cierre actual                                                                  | Backlog posterior     |
@@ -331,7 +331,7 @@ Estos contratos recuperados ya incorporan las decisiones aprobadas de la secció
 
 ### P2 - experiencia operativa y módulos de apoyo
 
-1. Kanban de Kairos como representación visual de las transiciones aprobadas, una vez estabilizado el dominio.
+1. Frontend, accesibilidad, integración y E2E del Kanban de Kairos, ya implementado como representación visual de las transiciones aprobadas.
 2. Tableros operativos y exportaciones CSV con alcance, límites y procesamiento asíncrono aprobados.
 3. Biblioteca operativa versionada y directorio interno con reglas explícitas de alcance y privacidad.
 4. Consulta administrativa de auditoría con filtros por alcance, correlación, actor, objeto y resultado.
@@ -381,7 +381,7 @@ Estos contratos recuperados ya incorporan las decisiones aprobadas de la secció
 - Entrega de evidencias con versiones inmutables, revisión separada del responsable, correcciones, reapertura con motivo, comentarios e historial append-only; adjuntos privados con estado de escaneo asíncrono y propiedad endurecida.
 - OpenAPI/Postman actualizado y gate verde con 434 pruebas backend.
 
-La base de proyectos/membresías y el bloque de actividades/evidencias de Kairos quedan **COMPLETADOS y verificados en backend**. La evidencia incluye CRUD de proyectos, roles internos separados del RBAC global, un único propietario activo con transferencia atómica, baja lógica/reactivación, favoritos auditados, archivo terminal, actividades con máquina de estados, evidencias versionadas e inmutables, revisión separada, correcciones/reapertura, historial append-only, adjuntos privados y OpenAPI/Postman. El gate actual registra 434 pruebas backend aprobadas. No se afirma todavía implementación de frontend, Kanban ni pruebas E2E.
+La base de proyectos/membresías, actividades/evidencias y Kanban de Kairos queda **COMPLETADA y verificada en backend**. La evidencia incluye CRUD de proyectos, roles internos separados del RBAC global, un único propietario activo con transferencia atómica, baja lógica/reactivación, favoritos auditados, archivo terminal, actividades con máquina de estados, evidencias versionadas e inmutables, revisión separada, correcciones/reapertura, historial append-only, adjuntos privados, Kanban como proyección de los siete estados reales con filtros, vencida derivada y límite por carril, y OpenAPI/Postman. El gate actual registra 448 pruebas backend aprobadas. No se afirma todavía implementación de frontend, integración ni pruebas E2E.
 
 ### Incremento 4 - Kairos visual y experiencia operativa
 

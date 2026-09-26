@@ -1839,5 +1839,13 @@
         { "name": "Agregar comentario", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"body\":\"Comentario de seguimiento\"}" }, "url": "{{baseUrl}}/kairos/projects/{{projectId}}/activities/{{activityId}}/comments" } }
       ]
     }
+    ,{
+      "name": "11 - Kairos Kanban projection",
+      "description": "Read-only projection over activities. Requires active membership; archived projects remain readable. Seven canonical lanes are returned.",
+      "item": [
+        { "name": "Consultar tablero Kanban (7 carriles)", "request": { "method": "GET", "url": "{{baseUrl}}/kairos/projects/{{projectId}}/kanban?limitPerLane=20&vencida=false" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('Kanban accesible',()=>pm.response.to.have.status(200));", "const data=pm.response.json().data;", "pm.expect(data.lanes).to.have.length(7);", "pm.expect(data.lanes.map(l=>l.state)).to.eql(['PENDIENTE','EN_PROGRESO','BLOQUEADA','EN_REVISION','REQUIERE_CORRECCION','TERMINADA','CANCELADA']);", "pm.expect(data.lanes[0]).to.have.all.keys('state','total','items');"] } }] },
+        { "name": "Filtrar Kanban por responsable/prioridad", "request": { "method": "GET", "url": "{{baseUrl}}/kairos/projects/{{projectId}}/kanban?responsableId={{userId}}&priority=MEDIA&complexity=MEDIA&limitPerLane=5" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('Filtro Kanban',()=>pm.response.to.have.status(200));", "pm.expect(pm.response.json().data.lanes).to.have.length(7);"] } }] }
+      ]
+    }
   ]
 }
