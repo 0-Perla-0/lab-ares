@@ -33,6 +33,10 @@ describe("OpenAPI document", () => {
     "/api/attendance/{id}/close",
     "/api/directory",
     "/api/directory/preferences/me",
+    "/api/reports/operational-metrics",
+    "/api/reports/export",
+    "/api/reports/export/{id}/status",
+    "/api/reports/export/{id}/download",
   ])("documents %s", (path) => {
     expect(document.paths).toHaveProperty(path);
   });
@@ -65,5 +69,46 @@ describe("OpenAPI document", () => {
     ]));
     expect(document.paths["/api/directory/preferences/me"].patch.requestBody.required).toBe(true);
     expect(document.components.schemas.DirectoryItem.properties.email.description).toContain("Omitted");
+  });
+
+  it("documents scoped report metrics and the synchronous/asynchronous export contract", () => {
+    const metrics = document.paths["/api/reports/operational-metrics"].get;
+    expect(metrics.description).toContain(
+      "authenticated actor's backend access scope",
+    );
+    expect(metrics.parameters).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "from",
+          schema: expect.objectContaining({ format: "date-time" }),
+        }),
+        expect.objectContaining({
+          name: "to",
+          schema: expect.objectContaining({ format: "date-time" }),
+        }),
+      ]),
+    );
+    const exportOperation = document.paths["/api/reports/export"].post;
+    expect(exportOperation.responses[200].content["text/csv"]).toBeDefined();
+    expect(
+      exportOperation.responses[202].content["application/json"],
+    ).toBeDefined();
+    expect(exportOperation.description).toContain("5,000");
+    expect(document.components.schemas.ReportExportType.enum).toEqual([
+      "ATTENDANCE",
+      "DOCUMENTS",
+      "KAIROS",
+    ]);
+    expect(
+      document.components.schemas.ReportExportJob.properties.id.pattern,
+    ).toBe("^[a-z0-9]{20,30}$");
+    expect(
+      document.components.schemas.OperationalMetricsResponse.properties.data
+        .properties.kairos.type,
+    ).toBe("object");
+    expect(
+      document.components.schemas.ReportDownloadResponse.properties.data
+        .properties.url.description,
+    ).toContain("24-hour");
   });
 });

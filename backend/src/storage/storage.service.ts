@@ -44,4 +44,7 @@ export class StorageService {
     if (!file) throw new NotFoundException("Archivo no encontrado");
     return { ...file, sizeBytes: Number(file.sizeBytes) };
   }
+  /** Internal trusted path for generated reports; bypasses quarantine because content is generated server-side. */
+  async storeGeneratedCsv(ownerId:number,reportId:string,body:Buffer){const id=randomBytes(15).toString("hex"),digest=createHash("sha256").update(body).digest("hex"),key=`reports/${reportId}/${id}-${digest}`;await this.storage.put("available",key,body,"text/csv; charset=utf-8");try{return await this.prisma.archivo.create({data:{id,propietarioId:ownerId,objectKey:key,quarantineKey:key,originalName:`reporte-${reportId}.csv`,detectedMime:"text/csv",extension:"csv",sizeBytes:body.length,sha256:digest,status:EstadoArchivo.DISPONIBLE}});}catch(error){try{await this.storage.delete("available",key);}catch{}throw error;}}
+  async removeGenerated(id:string){const file=await this.prisma.archivo.findUnique({where:{id},select:{objectKey:true,status:true}});if(!file)return;await this.storage.delete("available",file.objectKey);await this.prisma.archivo.update({where:{id},data:{status:EstadoArchivo.ELIMINADO}});}
 }

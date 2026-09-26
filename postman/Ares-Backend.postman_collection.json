@@ -80,6 +80,7 @@
     ,{ "key": "activityId", "value": "", "type": "string" }
     ,{ "key": "evidenceId", "value": "", "type": "string" }
     ,{ "key": "activityFileId", "value": "", "type": "string" }
+    ,{ "key": "reportJobId", "value": "", "type": "string" }
     ,{ "key": "fixtureFilePath", "value": "", "type": "string" }
   ],
   "item": [
@@ -1856,6 +1857,16 @@
         { "name": "Listar global", "request": { "method": "GET", "url": "{{baseUrl}}/directory?scope=all&page=1&pageSize=20" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,403]).to.include(pm.response.code);"] } }] },
         { "name": "Mis preferencias GET", "request": { "method": "GET", "url": "{{baseUrl}}/directory/preferences/me" }, "event": [{ "listen": "test", "script": { "exec": ["pm.response.to.have.status(200);", "pm.expect(pm.response.json().data).to.have.property('mostrarEmail');"] } }] },
         { "name": "Mis preferencias PATCH", "request": { "method": "PATCH", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"visibleEnArea\":true,\"visibleEnProyectos\":true,\"mostrarEmail\":false}" }, "url": "{{baseUrl}}/directory/preferences/me" }, "event": [{ "listen": "test", "script": { "exec": ["pm.response.to.have.status(200);"] } }] }
+      ]
+    },
+    {
+      "name": "13 - Reportes operativos",
+      "description": "Métricas con alcance organizacional y exportaciones CSV síncronas o asíncronas.",
+      "item": [
+        { "name": "Métricas operativas", "request": { "method": "GET", "url": "{{baseUrl}}/reports/operational-metrics" }, "event": [{ "listen": "test", "script": { "exec": ["pm.response.to.have.status(200);", "pm.expect(pm.response.json().data).to.have.all.keys('attendance','documents','kairos');"] } }] },
+        { "name": "Exportar Kairos", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"type\":\"KAIROS\"}" }, "url": "{{baseUrl}}/reports/export" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,202]).to.include(pm.response.code);", "if(pm.response.code===202){const id=pm.response.json().data.id; pm.expect(id).to.match(/^[a-z0-9]{20,30}$/); pm.collectionVariables.set('reportJobId',id);}", "if(pm.response.code===200){pm.expect(pm.response.headers.get('Content-Type')).to.include('text/csv');}"] } }] },
+        { "name": "Estado de exportación", "request": { "method": "GET", "url": "{{baseUrl}}/reports/export/{{reportJobId}}/status" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,400,404]).to.include(pm.response.code);", "if(pm.response.code===200){pm.expect(['PENDIENTE','PROCESANDO','COMPLETADO','FALLIDO','EXPIRADO']).to.include(pm.response.json().data.status);}"] } }] },
+        { "name": "Descargar exportación", "request": { "method": "GET", "url": "{{baseUrl}}/reports/export/{{reportJobId}}/download" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,400,404]).to.include(pm.response.code);", "if(pm.response.code===200){pm.expect(pm.response.json().data.url).to.be.a('string').and.not.empty;}"] } }] }
       ]
     }
   ]

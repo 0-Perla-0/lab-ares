@@ -83,6 +83,245 @@ const directorySchemas = {
   DirectoryPreferencesResponse: { type: "object", required: ["data"], properties: { data: { $ref: "#/components/schemas/DirectoryPreferences" } } },
 };
 
+const reportsPaths = {
+  "/api/reports/operational-metrics": {
+    get: {
+      tags: ["Reports"],
+      security: cookieSecurity,
+      description:
+        "Returns attendance, document and Kairos aggregates constrained by the authenticated actor's backend access scope. The interval is [from, to): from is inclusive and to is exclusive. Both values are ISO-8601 datetimes with offset; defaults to the previous 30 days and cannot exceed one year.",
+      parameters: [
+        {
+          name: "from",
+          in: "query",
+          schema: { type: "string", format: "date-time" },
+          description: "Inclusive ISO-8601 datetime with offset.",
+        },
+        {
+          name: "to",
+          in: "query",
+          schema: { type: "string", format: "date-time" },
+          description: "Exclusive ISO-8601 datetime with offset.",
+        },
+      ],
+      responses: {
+        200: {
+          description: "Scope-filtered operational aggregates",
+          content: {
+            "application/json": {
+              schema: {
+                $ref: "#/components/schemas/OperationalMetricsResponse",
+              },
+            },
+          },
+        },
+        ...errorResponses,
+      },
+    },
+  },
+  "/api/reports/export": {
+    post: {
+      tags: ["Reports"],
+      security: cookieSecurity,
+      description:
+        "Exports a scope-filtered report. Requests with at most 5,000 rows complete synchronously as UTF-8 CSV. Larger requests return a private asynchronous job; its generated download is retained for 24 hours and every request/download is audited.",
+      requestBody: {
+        required: true,
+        content: {
+          "application/json": {
+            schema: { $ref: "#/components/schemas/ReportExportInput" },
+          },
+        },
+      },
+      responses: {
+        200: {
+          description: "Synchronous UTF-8 CSV export (at most 5,000 rows)",
+          headers: { "Content-Disposition": { schema: { type: "string" } } },
+          content: {
+            "text/csv": { schema: { type: "string", format: "binary" } },
+          },
+        },
+        202: {
+          description:
+            "Asynchronous export job accepted (more than 5,000 rows)",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/ReportExportJobResponse" },
+            },
+          },
+        },
+        ...errorResponses,
+      },
+    },
+  },
+  "/api/reports/export/{id}/status": {
+    get: {
+      tags: ["Reports"],
+      security: cookieSecurity,
+      parameters: [
+        {
+          name: "id",
+          in: "path",
+          required: true,
+          schema: {
+            type: "string",
+            pattern: "^[a-z0-9]{20,30}$",
+            minLength: 20,
+            maxLength: 30,
+          },
+        },
+      ],
+      responses: {
+        200: {
+          description:
+            "Private export job status. Retryable failures return to PENDIENTE; terminal failures expose only a safe error code.",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/ReportExportJobResponse" },
+            },
+          },
+        },
+        ...errorResponses,
+      },
+    },
+  },
+  "/api/reports/export/{id}/download": {
+    get: {
+      tags: ["Reports"],
+      security: cookieSecurity,
+      parameters: [
+        {
+          name: "id",
+          in: "path",
+          required: true,
+          schema: {
+            type: "string",
+            pattern: "^[a-z0-9]{20,30}$",
+            minLength: 20,
+            maxLength: 30,
+          },
+        },
+      ],
+      responses: {
+        200: {
+          description:
+            "Private temporary download URL for a completed and unexpired export",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/ReportDownloadResponse" },
+            },
+          },
+        },
+        ...errorResponses,
+      },
+    },
+  },
+};
+
+const reportsSchemas = {
+  ReportExportType: {
+    type: "string",
+    enum: ["ATTENDANCE", "DOCUMENTS", "KAIROS"],
+  },
+  ReportExportInput: {
+    type: "object",
+    required: ["type"],
+    additionalProperties: false,
+    properties: {
+      type: { $ref: "#/components/schemas/ReportExportType" },
+      from: { type: "string", format: "date-time" },
+      to: { type: "string", format: "date-time" },
+    },
+  },
+  OperationalMetricsResponse: {
+    type: "object",
+    required: ["data"],
+    properties: {
+      data: {
+        type: "object",
+        required: [
+          "from",
+          "to",
+          "attendance",
+          "documents",
+          "kairos",
+          "semantics",
+        ],
+        properties: {
+          from: { type: "string", format: "date-time" },
+          to: { type: "string", format: "date-time" },
+          attendance: {
+            type: "array",
+            items: { type: "object", additionalProperties: true },
+          },
+          documents: {
+            type: "array",
+            items: { type: "object", additionalProperties: true },
+          },
+          kairos: {
+            type: "object",
+            required: ["byState", "overdue"],
+            properties: {
+              byState: {
+                type: "array",
+                items: { type: "object", additionalProperties: true },
+              },
+              overdue: { type: "integer", minimum: 0 },
+            },
+          },
+          semantics: { type: "string" },
+        },
+      },
+    },
+  },
+  ReportExportJob: {
+    type: "object",
+    required: ["id", "status", "totalFilas"],
+    additionalProperties: false,
+    properties: {
+      id: {
+        type: "string",
+        pattern: "^[a-z0-9]{20,30}$",
+        minLength: 20,
+        maxLength: 30,
+      },
+      type: { $ref: "#/components/schemas/ReportExportType" },
+      status: {
+        type: "string",
+        enum: ["PENDIENTE", "GENERANDO", "COMPLETADO", "FALLIDO", "EXPIRADO"],
+      },
+      totalFilas: { type: "integer", minimum: 0 },
+      errorCode: { type: ["string", "null"], maxLength: 100 },
+      expiresAt: { type: ["string", "null"], format: "date-time" },
+      createdAt: { type: "string", format: "date-time" },
+      updatedAt: { type: "string", format: "date-time" },
+    },
+  },
+  ReportExportJobResponse: {
+    type: "object",
+    required: ["data"],
+    properties: { data: { $ref: "#/components/schemas/ReportExportJob" } },
+  },
+  ReportDownloadResponse: {
+    type: "object",
+    required: ["data"],
+    properties: {
+      data: {
+        type: "object",
+        required: ["url"],
+        properties: {
+          url: {
+            type: "string",
+            format: "uri",
+            description:
+              "Private temporary URL; available only until the 24-hour retention expiry.",
+          },
+        },
+      },
+    },
+  },
+};
+
 const kairosPaths = {
   "/api/kairos/projects": {
     get: { tags: ["Kairos"], security: cookieSecurity, parameters: [
@@ -502,6 +741,7 @@ export function createOpenApiDocument() {
       ...kairosPaths,
       ...storagePaths,
       ...directoryPaths,
+      ...reportsPaths,
       "/api/academic/catalogs": {
         get: { tags: ["Academic"], security: cookieSecurity, parameters: [{ name: "page", in: "query", schema: { type: "integer", minimum: 1 } }, { name: "pageSize", in: "query", schema: { type: "integer", minimum: 1, maximum: 100 } }, { name: "search", in: "query", schema: { type: "string" } }], responses: { 200: { description: "Active academic catalogues with pagination", content: { "application/json": { schema: { $ref: "#/components/schemas/AcademicCatalogsResponse" } } } }, ...academicErrorResponses } },
       },
@@ -713,6 +953,7 @@ export function createOpenApiDocument() {
           },
         },
         ...identitySchemas,
+        ...reportsSchemas,
       },
     },
   } as const;

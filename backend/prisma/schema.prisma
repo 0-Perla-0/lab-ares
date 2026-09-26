@@ -150,6 +150,7 @@ model Usuario {
   kairosActivityHistory HistorialActividadKairos[] @relation("KairosActivityActor")
   archivosPropiedad Archivo[] @relation("ArchivoOwner")
   directorioPreferencia DirectorioPreferencia?
+  reportExportsRequested ReporteExportacion[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -387,6 +388,42 @@ model AuditEvent {
   @@index([actorId, occurredAt])
 }
 
+enum TipoReporteExportacion {
+  ATTENDANCE
+  DOCUMENTS
+  KAIROS
+}
+enum EstadoReporteExportacion {
+  PENDIENTE
+  GENERANDO
+  COMPLETADO
+  FALLIDO
+  EXPIRADO
+}
+model ReporteExportacion {
+  id String @id @default(cuid()) @db.VarChar(30)
+  requesterId Int
+  requester Usuario @relation(fields:[requesterId], references:[id], onDelete:Restrict)
+  type TipoReporteExportacion
+  filters Json
+  totalFilas Int @default(0)
+  archivoId String? @unique @db.VarChar(30)
+  archivo Archivo? @relation(fields:[archivoId], references:[id], onDelete:SetNull)
+  status EstadoReporteExportacion @default(PENDIENTE)
+  leaseOwner String? @db.VarChar(80)
+  leaseUntil DateTime?
+  attempts Int @default(0)
+  nextAttemptAt DateTime?
+  errorCode String? @db.VarChar(100)
+  expiresAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([requesterId, createdAt])
+  @@index([status, leaseUntil, createdAt])
+  @@index([status, nextAttemptAt, createdAt])
+  @@index([expiresAt, status])
+}
+
 enum EstadoArchivo {
   RECIBIDO
   PENDIENTE_ANALISIS
@@ -426,6 +463,7 @@ model Archivo {
   analyses        AnalisisArchivo[]
   documentoVersiones DocumentoVersion[]
   kairosEvidence EntregaEvidenciaKairos[]
+  reportExports ReporteExportacion[]
 
   @@index([status, nextAttemptAt])
   @@index([leaseUntil])

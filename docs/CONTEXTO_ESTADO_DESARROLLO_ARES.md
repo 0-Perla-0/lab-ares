@@ -16,6 +16,7 @@
 - Docker local quedó reparado y verificado con MinIO compatible, MariaDB en el host `3307`, 11/11 migraciones y respuestas HTTP 200 de backend, frontend, MinIO y Mailpit.
 - El perfil académico/adscripción histórica, el expediente documental funcional, la base de proyectos/membresías y las actividades/evidencias de Kairos de Backend 2 quedan cerrados y verificados.
 - Kanban queda implementado y verificado en backend como proyección de las actividades; después seguirán frontend e integración E2E.
+- Los reportes operativos quedan **COMPLETADOS y verificados en backend**; frontend y E2E permanecen pendientes.
 - Los dominios de Backend 1 quedan excluidos de este bloque.
 
 ### Cierre verificado: perfil académico y adscripción histórica
@@ -49,6 +50,13 @@
 - OpenAPI y Postman quedaron actualizados.
 - Gate verde: 470 pruebas backend, incluyendo la matriz de alcances, privacidad, usuarios inactivos y búsqueda sin filtración de correos.
 - Esta fase queda **COMPLETADA** en backend. La interfaz del directorio, integración frontend y pruebas E2E permanecen pendientes.
+
+### Cierre verificado: reportes operativos
+
+- Métricas de asistencia, documentos y Kairos quedan acotadas organizacionalmente; la sincronización CSV usa ejecución directa hasta 5000 filas y jobs asíncronos por encima de ese umbral, con leases, reintentos, expiración y limpieza.
+- El almacenamiento privado y la descarga por capability quedan protegidos por revalidación de estado activo, permiso y snapshot del alcance original; las operaciones quedan auditadas.
+- OpenAPI y ambas colecciones/entornos de Postman quedaron actualizados; migración aplicada: `20260925240000_operational_reports`.
+- Gate verde: 513/513 pruebas, `check`, `build` y Prisma válido. Esta fase queda **COMPLETADA** en backend; frontend y pruebas E2E permanecen pendientes.
 
 ## 1. Alcance y criterio de comparación
 
@@ -496,6 +504,8 @@ Como no se proporcionaron nombres, se usan identificadores de rol. El reparto si
 - **Implementado — pipeline técnico de archivos:** la recepción aplica límite de tamaño, streaming acotado a spool temporal con permisos restringidos, SHA-256 y validación de PDF, JPEG, texto UTF-8 y STL ASCII/binario; rechaza ZIP, firmas incompatibles, archivos truncados y dobles extensiones. El objeto entra primero en cuarentena y sólo se promueve a `available` después del análisis.
 - **Implementado — análisis asíncrono:** ClamAV analiza desde cuarentena; los estados persistidos incluyen pendiente, análisis, disponible, rechazado y error. El worker reclama trabajos con lease, reintenta errores y marca el agotamiento del máximo de intentos; un reconciliador programado repara promociones incompletas, residuos y objetos huérfanos.
 - **Implementado — descarga autorizada:** la URL firmada sólo se emite para archivos disponibles y exige una capacidad de descarga ligada al recurso, sujeto y propósito, con expiración corta.
+- **Implementado — reportes operativos:** métricas de asistencia, documentos y Kairos con alcance organizacional; CSV directo hasta 5000 filas y jobs asíncronos sobre ese umbral con leases, reintentos, expiración y limpieza, además de almacenamiento privado, descarga por capability, revalidación de estado/permiso/snapshot de alcance, auditoría, OpenAPI, Postman y migración `20260925240000_operational_reports`.
+- **Cerrado en backend:** el gate de reportes registra 513/513 pruebas, `check`, `build` y Prisma válido; frontend y E2E siguen pendientes.
 - Diseñar requisitos y versiones documentales inmutables, retroalimentación, estados aprobados y autorización de descarga.
 - Diseñar proyectos Kairos y miembros con relaciones canónicas y roles internos distintos al rol global.
 - Implementar actividades, participantes, entregas/evidencias inmutables, comentarios, revisión independiente y transiciones de estado.

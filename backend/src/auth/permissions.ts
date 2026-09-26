@@ -18,6 +18,8 @@ export enum Permission {
   DOCUMENTS_READ = "documents:read",
   DOCUMENTS_UPLOAD = "documents:upload",
   DOCUMENTS_REVIEW = "documents:review",
+  REPORTS_READ = "reports:read",
+  REPORTS_EXPORT = "reports:export",
 }
 
 export enum AccessScope {
@@ -50,6 +52,8 @@ const areaManagerGrants: RoleGrants = {
   [Permission.ACADEMIC_PROFILE_READ]: AccessScope.AREA,
   [Permission.DOCUMENTS_READ]: AccessScope.AREA,
   [Permission.DOCUMENTS_REVIEW]: AccessScope.AREA,
+  [Permission.REPORTS_READ]: AccessScope.AREA,
+  [Permission.REPORTS_EXPORT]: AccessScope.AREA,
 };
 
 const permissionsByRole: Record<RolUsuario, RoleGrants> = {
@@ -70,6 +74,8 @@ const permissionsByRole: Record<RolUsuario, RoleGrants> = {
     [Permission.ACADEMIC_PROFILE_READ]: AccessScope.SEDE,
     [Permission.DOCUMENTS_READ]: AccessScope.SEDE,
     [Permission.DOCUMENTS_REVIEW]: AccessScope.SEDE,
+    [Permission.REPORTS_READ]: AccessScope.SEDE,
+    [Permission.REPORTS_EXPORT]: AccessScope.SEDE,
   },
   [RolUsuario.JEFE_COORDINADORES]: {
     ...areaManagerGrants,
@@ -82,6 +88,8 @@ const permissionsByRole: Record<RolUsuario, RoleGrants> = {
     [Permission.ACADEMIC_CATALOG_MANAGE]: AccessScope.GLOBAL,
     [Permission.DOCUMENTS_READ]: AccessScope.GLOBAL,
     [Permission.DOCUMENTS_REVIEW]: AccessScope.GLOBAL,
+    [Permission.REPORTS_READ]: AccessScope.GLOBAL,
+    [Permission.REPORTS_EXPORT]: AccessScope.GLOBAL,
   },
   [RolUsuario.ADMIN]: Object.fromEntries(
     Object.values(Permission).map((permission) => [

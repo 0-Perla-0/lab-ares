@@ -8,13 +8,23 @@ const insecureProductionSecrets = new Set([
   DEVELOPMENT_SESSION_SECRET,
   DOCUMENTED_SESSION_SECRET_PLACEHOLDER,
 ]);
-const insecureKeyMarkers = ["development-only", "change-me", "replace-this", "test-outbox-encryption-key"];
+const insecureKeyMarkers = [
+  "development-only",
+  "change-me",
+  "replace-this",
+  "test-outbox-encryption-key",
+];
 
 function hasSecureEntropy(value: string) {
-  if (insecureKeyMarkers.some((marker) => value.toLowerCase().includes(marker))) return false;
+  if (insecureKeyMarkers.some((marker) => value.toLowerCase().includes(marker)))
+    return false;
   // Accept either a raw 32-byte secret or a base64/base64url encoding of at least 32 bytes.
   if (Buffer.byteLength(value, "utf8") >= 32) return true;
-  try { return Buffer.from(value, "base64url").length >= 32; } catch { return false; }
+  try {
+    return Buffer.from(value, "base64url").length >= 32;
+  } catch {
+    return false;
+  }
 }
 
 const timeZone = z.string().refine((value) => {
@@ -61,6 +71,16 @@ const environmentSchema = z
     STORAGE_WORKER_INTERVAL_MS: z.coerce.number().int().min(1000).default(5000),
     STORAGE_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(20).default(5),
     STORAGE_RECONCILER_ENABLED: z.coerce.boolean().default(false),
+    REPORTS_WORKER_ENABLED: z.coerce.boolean().default(true),
+    REPORTS_WORKER_INTERVAL_MS: z.coerce
+      .number()
+      .int()
+      .min(1000)
+      .default(60000),
+    REPORTS_BATCH_SIZE: z.coerce.number().int().min(1).max(50).default(10),
+    REPORTS_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(20).default(3),
+    REPORTS_LEASE_MS: z.coerce.number().int().min(10000).default(120000),
+    REPORTS_RETRY_BASE_MS: z.coerce.number().int().min(1000).default(60000),
     SMTP_ENABLED: z.coerce.boolean().default(false),
     OUTBOX_WORKER_ENABLED: z.coerce.boolean().default(true),
     SMTP_HOST: z.string().min(1).default("localhost"),
@@ -96,16 +116,17 @@ const environmentSchema = z
           message: "SESSION_SECRET must be replaced in production",
         });
       }
-      if (NODE_ENV === "production" && !hasSecureEntropy(OUTBOX_ENCRYPTION_KEY)) {
+      if (
+        NODE_ENV === "production" &&
+        !hasSecureEntropy(OUTBOX_ENCRYPTION_KEY)
+      ) {
         context.addIssue({
           code: "custom",
           path: ["OUTBOX_ENCRYPTION_KEY"],
           message: "OUTBOX_ENCRYPTION_KEY must be replaced in production",
         });
       }
-      if (
-        NODE_ENV === "production" && !hasSecureEntropy(MFA_ENCRYPTION_KEY)
-      )
+      if (NODE_ENV === "production" && !hasSecureEntropy(MFA_ENCRYPTION_KEY))
         context.addIssue({
           code: "custom",
           path: ["MFA_ENCRYPTION_KEY"],
