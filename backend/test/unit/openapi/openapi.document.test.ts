@@ -46,6 +46,16 @@ describe("OpenAPI document", () => {
     "/api/library/versions/{id}/publish",
     "/api/library/versions/{id}/download",
     "/api/library/versions/{id}/acknowledge",
+    "/api/public-content/pages/{slug}",
+    "/api/public-content/faq",
+    "/api/public-content/assets/{id}",
+    "/api/public-content/admin/pages",
+    "/api/public-content/admin/pages/{id}",
+    "/api/public-content/admin/pages/{id}/versions",
+    "/api/public-content/admin/versions/{id}/publish",
+    "/api/public-content/admin/pages/{id}/archive",
+    "/api/public-content/admin/assets",
+    "/api/public-content/admin/assets/{id}/archive",
   ])("documents %s", (path) => {
     expect(document.paths).toHaveProperty(path);
   });
@@ -158,5 +168,33 @@ describe("OpenAPI document", () => {
     expect(
       document.components.schemas.LibraryCreateInput.properties.archivoId.pattern,
     ).toBe("^[a-f0-9]{30}$");
+  });
+
+  it("documents the safe public CMS and isolated public-asset contract", () => {
+    expect(
+      document.paths["/api/public-content/pages/{slug}"].get.security,
+    ).toEqual([]);
+    expect(
+      document.paths["/api/public-content/admin/pages"].post.security,
+    ).toEqual([{ cookieAuth: [] }]);
+    expect(
+      document.paths["/api/public-content/admin/versions/{id}/publish"].post
+        .description,
+    ).toContain("Administrator-only");
+    expect(
+      document.paths["/api/public-content/admin/assets"].post.description,
+    ).toContain("isolated public bucket");
+    expect(document.components.schemas.PublicPageSlug.enum).toEqual([
+      "inicio",
+      "servicio-social",
+      "preguntas-frecuentes",
+      "acerca-de-ares",
+      "contacto",
+      "informacion-legal",
+    ]);
+    expect(document.components.schemas.PublicContentBlock.oneOf).toHaveLength(7);
+    expect(
+      document.components.schemas.PublicContentState.enum,
+    ).toEqual(["BORRADOR", "PUBLICADO", "ARCHIVADO"]);
   });
 });

@@ -51,6 +51,10 @@
     ,{ "key": "libraryNextFileId", "value": "" }
     ,{ "key": "librarySedeId", "value": "" }
     ,{ "key": "libraryAreaId", "value": "" }
+    ,{ "key": "publicPageId", "value": "" }
+    ,{ "key": "publicVersionId", "value": "" }
+    ,{ "key": "publicAssetFileId", "value": "" }
+    ,{ "key": "publicAssetId", "value": "" }
     ,{ "key": "fixtureFilePath", "value": "" }
   ],
   "event": [
@@ -1115,6 +1119,21 @@
         { "name": "Descargar versión autorizada", "request": { "method": "GET", "url": "{{baseUrl}}/library/versions/{{libraryVersionId}}/download" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,400,404]).to.include(pm.response.code);", "if(pm.response.code===200){pm.expect(pm.response.json().data.url).to.be.a('string').and.not.empty;}"] } }] },
         { "name": "Registrar acuse idempotente", "request": { "method": "POST", "url": "{{baseUrl}}/library/versions/{{libraryVersionId}}/acknowledge" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,400,403,404]).to.include(pm.response.code);", "if(pm.response.code===200){pm.expect(pm.response.json().data).to.have.property('acknowledgedAt');}"] } }] },
         { "name": "Archivar documento con motivo", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"motivo\":\"Sustituido por una política posterior\"}" }, "url": "{{baseUrl}}/library/{{libraryDocumentId}}/archive" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,400,403,404,409]).to.include(pm.response.code);"] } }] }
+      ]
+    },
+    {
+      "name": "Public Content - CMS seguro",
+      "description": "CMS público versionado con bloques controlados. Crear borradores requiere permiso; publicar/archivar requiere ADMIN. Los JPG/PNG públicos se copian a un bucket separado.",
+      "item": [
+        { "name": "Consultar Inicio publicado (sin sesión)", "request": { "method": "GET", "url": "{{baseUrl}}/public-content/pages/inicio" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,404]).to.include(pm.response.code);", "if(pm.response.code===200){const d=pm.response.json().data;pm.expect(d.estado).to.eql('PUBLICADO');pm.expect(d.bloques).to.be.an('array');}"] } }] },
+        { "name": "Consultar FAQ publicada (sin sesión)", "request": { "method": "GET", "url": "{{baseUrl}}/public-content/faq" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,404]).to.include(pm.response.code);", "if(pm.response.code===200){pm.response.json().data.bloques.forEach(b=>pm.expect(b.tipo).to.eql('FAQ'));}"] } }] },
+        { "name": "Clasificar imagen pública", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"archivoId\":\"{{publicAssetFileId}}\"}" }, "url": "{{baseUrl}}/public-content/admin/assets" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([201,400,403,409]).to.include(pm.response.code);", "if(pm.response.code===201)pm.collectionVariables.set('publicAssetId',pm.response.json().data.id);"] } }] },
+        { "name": "Crear página Inicio y versión 1", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"slug\":\"inicio\",\"titulo\":\"Ares\",\"resumenCambios\":\"Versión inicial\",\"seoTitulo\":\"Ares Servicio Social\",\"seoDescripcion\":\"Portal institucional Ares\",\"bloques\":[{\"orden\":0,\"tipo\":\"ENCABEZADO\",\"contenido\":{\"texto\":\"Ares\",\"nivel\":1}},{\"orden\":1,\"tipo\":\"TEXTO\",\"contenido\":{\"texto\":\"Información institucional autorizada.\"}}]}" }, "url": "{{baseUrl}}/public-content/admin/pages" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([201,403,409]).to.include(pm.response.code);", "if(pm.response.code===201){const d=pm.response.json().data;pm.collectionVariables.set('publicPageId',d.id);pm.collectionVariables.set('publicVersionId',d.versiones[0].id);}"] } }] },
+        { "name": "Listar páginas CMS", "request": { "method": "GET", "url": "{{baseUrl}}/public-content/admin/pages?page=1&pageSize=20" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,403]).to.include(pm.response.code);", "if(pm.response.code===200)pm.expect(pm.response.json().data).to.have.all.keys('items','total','page','pageSize');"] } }] },
+        { "name": "Consultar historial CMS", "request": { "method": "GET", "url": "{{baseUrl}}/public-content/admin/pages/{{publicPageId}}" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,400,403,404]).to.include(pm.response.code);"] } }] },
+        { "name": "Publicar versión (ADMIN)", "request": { "method": "POST", "url": "{{baseUrl}}/public-content/admin/versions/{{publicVersionId}}/publish" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,400,403,404,409]).to.include(pm.response.code);"] } }] },
+        { "name": "Crear versión siguiente", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"titulo\":\"Ares actualizado\",\"resumenCambios\":\"Actualización controlada\",\"bloques\":[{\"orden\":0,\"tipo\":\"TEXTO\",\"contenido\":{\"texto\":\"Nueva versión pública.\"}}]}" }, "url": "{{baseUrl}}/public-content/admin/pages/{{publicPageId}}/versions" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([201,400,403,404,409]).to.include(pm.response.code);", "if(pm.response.code===201)pm.collectionVariables.set('publicVersionId',pm.response.json().data.id);"] } }] },
+        { "name": "Archivar página (ADMIN)", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"motivo\":\"Retiro institucional autorizado\"}" }, "url": "{{baseUrl}}/public-content/admin/pages/{{publicPageId}}/archive" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,400,403,404,409]).to.include(pm.response.code);"] } }] }
       ]
     }
   ]

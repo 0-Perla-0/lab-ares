@@ -85,6 +85,10 @@
     ,{ "key": "libraryVersionId", "value": "", "type": "string" }
     ,{ "key": "libraryFileId", "value": "", "type": "string" }
     ,{ "key": "libraryNextFileId", "value": "", "type": "string" }
+    ,{ "key": "publicPageId", "value": "", "type": "string" }
+    ,{ "key": "publicVersionId", "value": "", "type": "string" }
+    ,{ "key": "publicAssetFileId", "value": "", "type": "string" }
+    ,{ "key": "publicAssetId", "value": "", "type": "string" }
     ,{ "key": "fixtureFilePath", "value": "", "type": "string" }
   ],
   "item": [
@@ -1887,6 +1891,21 @@
         { "name": "Descargar", "request": { "method": "GET", "url": "{{baseUrl}}/library/versions/{{libraryVersionId}}/download" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,400,404]).to.include(pm.response.code);", "if(pm.response.code===200){pm.expect(pm.response.json().data).to.have.property('url');}"] } }] },
         { "name": "Acusar recepción", "request": { "method": "POST", "url": "{{baseUrl}}/library/versions/{{libraryVersionId}}/acknowledge" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,400,403,404]).to.include(pm.response.code);"] } }] },
         { "name": "Archivar", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"motivo\":\"Fin de vigencia\"}" }, "url": "{{baseUrl}}/library/{{libraryDocumentId}}/archive" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,400,403,404,409]).to.include(pm.response.code);"] } }] }
+      ]
+    },
+    {
+      "name": "15 - Contenido público CMS",
+      "description": "CMS versionado de Backend 2: bloques seguros, publicación exclusiva de ADMIN y activos copiados al bucket público aislado.",
+      "item": [
+        { "name": "Inicio público", "request": { "method": "GET", "url": "{{baseUrl}}/public-content/pages/inicio" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,404]).to.include(pm.response.code);"] } }] },
+        { "name": "FAQ pública", "request": { "method": "GET", "url": "{{baseUrl}}/public-content/faq" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,404]).to.include(pm.response.code);"] } }] },
+        { "name": "Clasificar imagen pública", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"archivoId\":\"{{publicAssetFileId}}\"}" }, "url": "{{baseUrl}}/public-content/admin/assets" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([201,400,403,409]).to.include(pm.response.code);", "if(pm.response.code===201)pm.collectionVariables.set('publicAssetId',pm.response.json().data.id);"] } }] },
+        { "name": "Crear página Inicio", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"slug\":\"inicio\",\"titulo\":\"Ares\",\"resumenCambios\":\"Versión inicial\",\"bloques\":[{\"orden\":0,\"tipo\":\"ENCABEZADO\",\"contenido\":{\"texto\":\"Ares\",\"nivel\":1}},{\"orden\":1,\"tipo\":\"TEXTO\",\"contenido\":{\"texto\":\"Información institucional autorizada.\"}}]}" }, "url": "{{baseUrl}}/public-content/admin/pages" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([201,403,409]).to.include(pm.response.code);", "if(pm.response.code===201){const d=pm.response.json().data;pm.collectionVariables.set('publicPageId',d.id);pm.collectionVariables.set('publicVersionId',d.versiones[0].id);}"] } }] },
+        { "name": "Listar páginas CMS", "request": { "method": "GET", "url": "{{baseUrl}}/public-content/admin/pages?page=1&pageSize=20" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,403]).to.include(pm.response.code);"] } }] },
+        { "name": "Detalle e historial", "request": { "method": "GET", "url": "{{baseUrl}}/public-content/admin/pages/{{publicPageId}}" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,400,403,404]).to.include(pm.response.code);"] } }] },
+        { "name": "Publicar (ADMIN)", "request": { "method": "POST", "url": "{{baseUrl}}/public-content/admin/versions/{{publicVersionId}}/publish" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,400,403,404,409]).to.include(pm.response.code);"] } }] },
+        { "name": "Nueva versión", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"titulo\":\"Ares actualizado\",\"resumenCambios\":\"Actualización controlada\",\"bloques\":[{\"orden\":0,\"tipo\":\"TEXTO\",\"contenido\":{\"texto\":\"Nueva versión pública.\"}}]}" }, "url": "{{baseUrl}}/public-content/admin/pages/{{publicPageId}}/versions" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([201,400,403,404,409]).to.include(pm.response.code);", "if(pm.response.code===201)pm.collectionVariables.set('publicVersionId',pm.response.json().data.id);"] } }] },
+        { "name": "Archivar página (ADMIN)", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"motivo\":\"Retiro institucional autorizado\"}" }, "url": "{{baseUrl}}/public-content/admin/pages/{{publicPageId}}/archive" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,400,403,404,409]).to.include(pm.response.code);"] } }] }
       ]
     }
   ]

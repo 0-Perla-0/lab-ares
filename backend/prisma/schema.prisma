@@ -159,6 +159,11 @@ model Usuario {
   bibliotecaVersionesRevisadas VersionBiblioteca[] @relation("LibraryVersionReviewer")
   bibliotecaVersionesPublicadas VersionBiblioteca[] @relation("LibraryVersionPublisher")
   bibliotecaAcuses AcuseBiblioteca[]
+  paginasPublicasCreadas PaginaPublica[] @relation("PublicPageCreator")
+  paginasPublicasArchivadas PaginaPublica[] @relation("PublicPageArchiver")
+  contenidoPublicoCreado VersionContenidoPublico[] @relation("PublicContentAuthor")
+  contenidoPublicoPublicado VersionContenidoPublico[] @relation("PublicContentPublisher")
+  activosPublicosPublicados ActivoPublico[] @relation("PublicAssetPublisher")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -473,6 +478,7 @@ model Archivo {
   kairosEvidence EntregaEvidenciaKairos[]
   reportExports ReporteExportacion[]
   bibliotecaVersion VersionBiblioteca?
+  activoPublico ActivoPublico?
 
   @@index([status, nextAttemptAt])
   @@index([leaseUntil])
@@ -807,6 +813,96 @@ model AcuseBiblioteca {
   acknowledgedAt DateTime @default(now())
   @@unique([versionId,usuarioId])
   @@index([usuarioId,acknowledgedAt])
+}
+
+enum EstadoContenidoPublico {
+  BORRADOR
+  PUBLICADO
+  ARCHIVADO
+}
+
+enum TipoBloqueContenidoPublico {
+  TEXTO
+  ENCABEZADO
+  LISTA
+  ENLACE
+  AVISO
+  IMAGEN
+  FAQ
+}
+
+model PaginaPublica {
+  id String @id @default(cuid()) @db.VarChar(30)
+  slug String @unique @db.VarChar(80)
+  titulo String @db.VarChar(191)
+  estado EstadoContenidoPublico @default(BORRADOR)
+  creadoPorId Int
+  creadoPor Usuario @relation("PublicPageCreator", fields:[creadoPorId], references:[id], onDelete:Restrict)
+  archivadoPorId Int?
+  archivadoPor Usuario? @relation("PublicPageArchiver", fields:[archivadoPorId], references:[id], onDelete:Restrict)
+  motivoArchivo String? @db.VarChar(1000)
+  archivadoAt DateTime?
+  versiones VersionContenidoPublico[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([estado,updatedAt])
+}
+
+model VersionContenidoPublico {
+  id String @id @default(cuid()) @db.VarChar(30)
+  paginaId String @db.VarChar(30)
+  pagina PaginaPublica @relation(fields:[paginaId], references:[id], onDelete:Restrict)
+  numero Int
+  estado EstadoContenidoPublico @default(BORRADOR)
+  autorId Int
+  autor Usuario @relation("PublicContentAuthor", fields:[autorId], references:[id], onDelete:Restrict)
+  publicadoPorId Int?
+  publicadoPor Usuario? @relation("PublicContentPublisher", fields:[publicadoPorId], references:[id], onDelete:Restrict)
+  titulo String @db.VarChar(191)
+  resumenCambios String @db.VarChar(2000)
+  seoTitulo String? @db.VarChar(191)
+  seoDescripcion String? @db.VarChar(500)
+  publishedAt DateTime?
+  archivedAt DateTime?
+  bloques BloqueContenidoPublico[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([paginaId,numero])
+  @@index([paginaId,estado,numero])
+  @@index([estado,publishedAt])
+}
+
+model BloqueContenidoPublico {
+  id String @id @default(cuid()) @db.VarChar(30)
+  versionId String @db.VarChar(30)
+  version VersionContenidoPublico @relation(fields:[versionId], references:[id], onDelete:Restrict)
+  orden Int
+  tipo TipoBloqueContenidoPublico
+  contenido Json
+  activoPublicoId String? @db.VarChar(30)
+  activoPublico ActivoPublico? @relation(fields:[activoPublicoId], references:[id], onDelete:Restrict)
+  createdAt DateTime @default(now())
+  @@unique([versionId,orden])
+  @@index([activoPublicoId])
+}
+
+model ActivoPublico {
+  id String @id @default(cuid()) @db.VarChar(30)
+  archivoOrigenId String @unique @db.VarChar(30)
+  archivoOrigen Archivo @relation(fields:[archivoOrigenId], references:[id], onDelete:Restrict)
+  objectKey String @unique @db.VarChar(500)
+  nombre String @db.VarChar(255)
+  mime String @db.VarChar(150)
+  sizeBytes BigInt
+  publicadoPorId Int
+  publicadoPor Usuario @relation("PublicAssetPublisher", fields:[publicadoPorId], references:[id], onDelete:Restrict)
+  activo Boolean @default(true)
+  motivoArchivo String? @db.VarChar(1000)
+  archivadoAt DateTime?
+  bloques BloqueContenidoPublico[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([activo,createdAt])
 }
 
 model Asistencia {

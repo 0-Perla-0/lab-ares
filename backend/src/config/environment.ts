@@ -63,6 +63,7 @@ const environmentSchema = z
     S3_FORCE_PATH_STYLE: z.coerce.boolean().default(true),
     S3_QUARANTINE_BUCKET: z.string().min(1).default("ares-quarantine"),
     S3_AVAILABLE_BUCKET: z.string().min(1).default("ares-available"),
+    S3_PUBLIC_BUCKET: z.string().min(1).default("ares-public"),
     STORAGE_MAX_BYTES: z.coerce.number().int().positive().default(52428800),
     LIBRARY_MAX_BYTES: z.coerce.number().int().positive().default(26214400),
     CLAMAV_HOST: z.string().min(1).default("localhost"),

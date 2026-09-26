@@ -26,6 +26,9 @@ export enum Permission {
   LIBRARY_PUBLISH = "library:publish",
   LIBRARY_ARCHIVE = "library:archive",
   LIBRARY_ACKNOWLEDGE = "library:acknowledge",
+  PUBLIC_CONTENT_DRAFT = "public-content:draft",
+  PUBLIC_CONTENT_PUBLISH = "public-content:publish",
+  PUBLIC_CONTENT_ARCHIVE = "public-content:archive",
 }
 
 export enum AccessScope {
@@ -64,6 +67,7 @@ const areaManagerGrants: RoleGrants = {
   [Permission.REPORTS_EXPORT]: AccessScope.AREA,
   [Permission.LIBRARY_READ]: AccessScope.AREA,
   [Permission.LIBRARY_DRAFT_CREATE]: AccessScope.AREA,
+  [Permission.PUBLIC_CONTENT_DRAFT]: AccessScope.GLOBAL,
 };
 
 const permissionsByRole: Record<RolUsuario, RoleGrants> = {

@@ -65,6 +65,14 @@
 - El acuse por versión es idempotente y no constituye firma ni aceptación legal; notificaciones y auditoría quedan integradas. OpenAPI y ambas colecciones/entornos de Postman quedaron actualizados; migración aplicada: `20260925250000_operational_library`.
 - Gate verde: 552/552 pruebas, `check`, `build` y Prisma válido. Esta fase queda **COMPLETADA** en backend; frontend y pruebas E2E permanecen pendientes.
 
+### Cierre verificado: CMS público versionado
+
+- Quedan aprobadas las páginas Inicio, Servicio Social, FAQ, Acerca, Contacto y las páginas legales. El contenido usa estados `BORRADOR`/`PUBLICADO`/`ARCHIVADO` y versiones inmutables.
+- Los bloques permitidos son `TEXTO`, `ENCABEZADO`, `LISTA`, `ENLACE`, `AVISO`, `IMAGEN` y `FAQ`; no admiten HTML ni scripts. Los enlaces sólo pueden ser HTTPS o relativos.
+- La publicación y la clasificación de activos están restringidas a `ADMIN`. Las imágenes JPG/PNG escaneadas se copian de `available` a un bucket separado `ares-public` y se sirven mediante URL firmada de corta duración. El archivado exige motivo y las operaciones quedan auditadas.
+- Migración aplicada: `20260925270000_public_content_cms`. OpenAPI y Postman quedaron actualizados.
+- Gate verde: 50 archivos y 580 pruebas, además de `build`, `tsc` y `Prisma validate`. Esta fase queda **COMPLETADA en backend**; la integración de frontend y las pruebas E2E permanecen pendientes.
+
 ## 1. Alcance y criterio de comparación
 
 Este documento separa cinco capas de evidencia que no deben confundirse:
@@ -283,7 +291,7 @@ La estrategia correcta es reconstruir contratos de negocio sobre esta arquitectu
 | Tienda y recompensas            | Canje de monedas, catálogo, stock y carrito                                                 | Fuera del MVP                                                | No implementar monedas, carrito, stock de recompensas ni canje en el cierre actual                                                                  | Backlog posterior     |
 | Monitoreo y reportes            | Pendientes por módulo, sesiones abiertas, ocupación, tiempos de validación y Excel/CSV      | Pendiente; alcance aprobado                                  | Tableros por alcance, refresco de 60 segundos, CSV controlado y exportación asíncrona para más de 5,000 filas                                       | P1/P2                 |
 | Directorio público              | Consulta de contactos autorizados                                                           | Sustituido por directorio interno                            | Implementar visibilidad por área/proyecto y preferencias; un directorio público requeriría contrato separado                                        | P2                    |
-| Sitio público                   | Landing, FAQ, contacto y contenido institucional                                            | Parcial; alcance público limitado aprobado                   | Completar páginas institucionales y contenido versionado, sin directorio público, autorregistro, datos personales ni formularios anónimos iniciales | P3                    |
+| Sitio público                   | Landing, FAQ, contacto y contenido institucional                                            | CMS público versionado implementado y verificado en backend; frontend pendiente | Integrar páginas institucionales y contenido versionado, sin directorio público, autorregistro, datos personales ni formularios anónimos iniciales | P3                    |
 | Solicitud de impresión 3D       | Solicitud y seguimiento                                                                     | Pendiente; MVP obligatorio aprobado                          | Implementar `TrabajoImpresion3D` canónico, archivo STL privado, estados, asignación y resolución                                                    | P3                    |
 | Bitácora de impresión 3D        | Tiempo, peso, material y archivo STL                                                        | Pendiente; ejecución mínima aprobada                         | Registrar intentos/ejecuciones separados con inicio, fin, material, peso opcional, resultado y observación                                          | P3                    |
 | Inventario                      | Catálogo del laboratorio                                                                    | Pendiente; MVP obligatorio aprobado                          | Separar consumibles y activos; ubicaciones, movimientos auditables y préstamos/devoluciones sin compras, contabilidad o ERP                         | P3                    |

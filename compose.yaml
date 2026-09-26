@@ -6,7 +6,7 @@ services:
     environment:
       MINIO_ROOT_USER: ${S3_ACCESS_KEY:-ares-local}
       MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-ares-local-secret}
-      MINIO_DEFAULT_BUCKETS: ares-quarantine,ares-available
+      MINIO_DEFAULT_BUCKETS: ares-quarantine,ares-available,ares-public
       MINIO_BROWSER: "on"
     ports:
       - "127.0.0.1:9000:9000"
@@ -91,6 +91,7 @@ services:
       S3_FORCE_PATH_STYLE: "true"
       S3_QUARANTINE_BUCKET: ares-quarantine
       S3_AVAILABLE_BUCKET: ares-available
+      S3_PUBLIC_BUCKET: ares-public
       CLAMAV_HOST: clamav
       CLAMAV_PORT: 3310
       STORAGE_SCANNER_ENABLED: "true"

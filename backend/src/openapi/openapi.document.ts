@@ -405,6 +405,64 @@ const librarySchemas = {
   LibraryAcknowledgementResponse: { type: "object", required: ["data"], properties: { data: { type: "object", required: ["id","versionId","usuarioId","acknowledgedAt"], properties: { id: { type: "string", pattern: "^c[a-z0-9]{20,30}$" }, versionId: { type: "string", pattern: "^c[a-z0-9]{20,30}$" }, usuarioId: { type: "integer" }, acknowledgedAt: { type: "string", format: "date-time" } } } } },
 };
 
+const publicContentIdParameter = { name: "id", in: "path", required: true, schema: { type: "string", pattern: "^c[a-z0-9]{20,30}$" } };
+const publicContentPaths = {
+  "/api/public-content/pages/{slug}": {
+    get: { tags: ["Public Content"], security: [], description: "Returns the current published version of one approved public page. It never exposes authors, publishers, private file keys or internal records.", parameters: [{ name: "slug", in: "path", required: true, schema: { $ref: "#/components/schemas/PublicPageSlug" } }], responses: { 200: { description: "Published page rendered from controlled blocks", content: { "application/json": { schema: { $ref: "#/components/schemas/PublicPageResponse" } } } }, 404: { description: "No published page exists" } } },
+  },
+  "/api/public-content/faq": {
+    get: { tags: ["Public Content"], security: [], description: "Returns only FAQ blocks from the published Preguntas frecuentes page.", responses: { 200: { description: "Published FAQ", content: { "application/json": { schema: { $ref: "#/components/schemas/PublicPageResponse" } } } }, 404: { description: "No published FAQ exists" } } },
+  },
+  "/api/public-content/assets/{id}": {
+    get: { tags: ["Public Content"], security: [], description: "Returns a short-lived inline URL from the dedicated public bucket. Private/quarantine URLs are never reused.", parameters: [publicContentIdParameter], responses: { 200: { description: "Public asset access", content: { "application/json": { schema: { $ref: "#/components/schemas/PublicAssetAccessResponse" } } } }, 404: { description: "Public asset not found" } } },
+  },
+  "/api/public-content/admin/pages": {
+    get: { tags: ["Public Content"], security: cookieSecurity, description: "Lists public-page workflow records for authorized draft editors.", parameters: [{ name: "page", in: "query", schema: { type: "integer", minimum: 1, default: 1 } }, { name: "pageSize", in: "query", schema: { type: "integer", minimum: 1, maximum: 100, default: 20 } }, { name: "estado", in: "query", schema: { $ref: "#/components/schemas/PublicContentState" } }], responses: { 200: { description: "CMS page", content: { "application/json": { schema: { $ref: "#/components/schemas/PublicAdminPageListResponse" } } } }, ...errorResponses } },
+    post: { tags: ["Public Content"], security: cookieSecurity, description: "Creates one approved public page and immutable draft version 1 using only controlled blocks.", requestBody: jsonBody({ $ref: "#/components/schemas/PublicContentCreateInput" }), responses: { 201: { description: "Draft page created" }, ...errorResponses } },
+  },
+  "/api/public-content/admin/pages/{id}": {
+    get: { tags: ["Public Content"], security: cookieSecurity, parameters: [publicContentIdParameter], responses: { 200: { description: "Complete CMS version history" }, ...errorResponses } },
+  },
+  "/api/public-content/admin/pages/{id}/versions": {
+    post: { tags: ["Public Content"], security: cookieSecurity, parameters: [publicContentIdParameter], description: "Creates a new immutable draft. A page may have only one open draft.", requestBody: jsonBody({ $ref: "#/components/schemas/PublicContentVersionInput" }), responses: { 201: { description: "Draft version created" }, ...errorResponses } },
+  },
+  "/api/public-content/admin/versions/{id}/publish": {
+    post: { tags: ["Public Content"], security: cookieSecurity, parameters: [publicContentIdParameter], description: "Administrator-only atomic publication. The previous publication is archived and author, publisher, date, version and change summary are retained.", responses: { 200: { description: "Version published" }, ...errorResponses } },
+  },
+  "/api/public-content/admin/pages/{id}/archive": {
+    post: { tags: ["Public Content"], security: cookieSecurity, parameters: [publicContentIdParameter], description: "Administrator-only page withdrawal with a mandatory reason.", requestBody: jsonBody({ $ref: "#/components/schemas/PublicContentArchiveInput" }), responses: { 200: { description: "Page archived" }, ...errorResponses } },
+  },
+  "/api/public-content/admin/assets": {
+    post: { tags: ["Public Content"], security: cookieSecurity, description: "Explicitly classifies an owned, scanned JPG/PNG as public and copies it into the isolated public bucket.", requestBody: jsonBody({ $ref: "#/components/schemas/PublicAssetClassifyInput" }), responses: { 201: { description: "Asset classified as public" }, ...errorResponses } },
+  },
+  "/api/public-content/admin/assets/{id}/archive": {
+    post: { tags: ["Public Content"], security: cookieSecurity, parameters: [publicContentIdParameter], description: "Administrator-only public-asset withdrawal. Assets used by a published page cannot be archived.", requestBody: jsonBody({ $ref: "#/components/schemas/PublicContentArchiveInput" }), responses: { 200: { description: "Asset archived" }, ...errorResponses } },
+  },
+};
+
+const publicContentSchemas = {
+  PublicPageSlug: { type: "string", enum: ["inicio", "servicio-social", "preguntas-frecuentes", "acerca-de-ares", "contacto", "informacion-legal"] },
+  PublicContentState: { type: "string", enum: ["BORRADOR", "PUBLICADO", "ARCHIVADO"] },
+  PublicContentBlock: {
+    oneOf: [
+      { type: "object", additionalProperties: false, required: ["orden","tipo","contenido"], properties: { orden: { type: "integer", minimum: 0, maximum: 999 }, tipo: { const: "TEXTO" }, contenido: { type: "object", additionalProperties: false, required: ["texto"], properties: { texto: { type: "string", minLength: 1, maxLength: 10000 } } } } },
+      { type: "object", additionalProperties: false, required: ["orden","tipo","contenido"], properties: { orden: { type: "integer", minimum: 0, maximum: 999 }, tipo: { const: "ENCABEZADO" }, contenido: { type: "object", additionalProperties: false, required: ["texto","nivel"], properties: { texto: { type: "string", minLength: 1, maxLength: 300 }, nivel: { type: "integer", minimum: 1, maximum: 6 } } } } },
+      { type: "object", additionalProperties: false, required: ["orden","tipo","contenido"], properties: { orden: { type: "integer", minimum: 0, maximum: 999 }, tipo: { const: "LISTA" }, contenido: { type: "object", additionalProperties: false, required: ["elementos"], properties: { elementos: { type: "array", minItems: 1, maxItems: 50, items: { type: "string", minLength: 1, maxLength: 500 } }, ordenada: { type: "boolean", default: false } } } } },
+      { type: "object", additionalProperties: false, required: ["orden","tipo","contenido"], properties: { orden: { type: "integer", minimum: 0, maximum: 999 }, tipo: { const: "ENLACE" }, contenido: { type: "object", additionalProperties: false, required: ["etiqueta","url"], properties: { etiqueta: { type: "string", minLength: 1, maxLength: 200 }, url: { type: "string", maxLength: 2048, description: "Absolute HTTPS or root-relative URL; HTTP, javascript and data schemes are rejected" }, nuevaVentana: { type: "boolean", default: false } } } } },
+      { type: "object", additionalProperties: false, required: ["orden","tipo","contenido"], properties: { orden: { type: "integer", minimum: 0, maximum: 999 }, tipo: { const: "AVISO" }, contenido: { type: "object", additionalProperties: false, required: ["texto"], properties: { titulo: { type: "string", maxLength: 200 }, texto: { type: "string", minLength: 1, maxLength: 2000 }, tono: { type: "string", enum: ["INFORMATIVO","ADVERTENCIA","EXITO"], default: "INFORMATIVO" } } } } },
+      { type: "object", additionalProperties: false, required: ["orden","tipo","activoPublicoId","contenido"], properties: { orden: { type: "integer", minimum: 0, maximum: 999 }, tipo: { const: "IMAGEN" }, activoPublicoId: { type: "string", pattern: "^c[a-z0-9]{20,30}$" }, contenido: { type: "object", additionalProperties: false, required: ["alt"], properties: { alt: { type: "string", minLength: 1, maxLength: 300 }, pie: { type: "string", maxLength: 500 } } } } },
+      { type: "object", additionalProperties: false, required: ["orden","tipo","contenido"], properties: { orden: { type: "integer", minimum: 0, maximum: 999 }, tipo: { const: "FAQ" }, contenido: { type: "object", additionalProperties: false, required: ["pregunta","respuesta"], properties: { pregunta: { type: "string", minLength: 1, maxLength: 500 }, respuesta: { type: "string", minLength: 1, maxLength: 5000 } } } } },
+    ],
+  },
+  PublicContentVersionInput: { type: "object", additionalProperties: false, required: ["titulo","resumenCambios","bloques"], properties: { titulo: { type: "string", minLength: 1, maxLength: 191 }, resumenCambios: { type: "string", minLength: 1, maxLength: 2000 }, seoTitulo: { type: "string", maxLength: 191 }, seoDescripcion: { type: "string", maxLength: 500 }, bloques: { type: "array", minItems: 1, maxItems: 100, items: { $ref: "#/components/schemas/PublicContentBlock" } } } },
+  PublicContentCreateInput: { allOf: [{ $ref: "#/components/schemas/PublicContentVersionInput" }, { type: "object", required: ["slug"], properties: { slug: { $ref: "#/components/schemas/PublicPageSlug" } } }] },
+  PublicContentArchiveInput: { type: "object", additionalProperties: false, required: ["motivo"], properties: { motivo: { type: "string", minLength: 1, maxLength: 1000 } } },
+  PublicAssetClassifyInput: { type: "object", additionalProperties: false, required: ["archivoId"], properties: { archivoId: { type: "string", pattern: "^c[a-z0-9]{20,30}$" } } },
+  PublicPageResponse: { type: "object", required: ["data"], properties: { data: { type: "object", additionalProperties: false, required: ["slug","titulo","estado","metadata","bloques"], properties: { slug: { $ref: "#/components/schemas/PublicPageSlug" }, titulo: { type: "string" }, estado: { const: "PUBLICADO" }, metadata: { type: "object", required: ["version","resumenCambios","publishedAt"], properties: { version: { type: "integer", minimum: 1 }, resumenCambios: { type: "string" }, publishedAt: { type: "string", format: "date-time" }, seoTitulo: { type: ["string","null"] }, seoDescripcion: { type: ["string","null"] } } }, bloques: { type: "array", items: { type: "object" } } } } } },
+  PublicAssetAccessResponse: { type: "object", required: ["data"], properties: { data: { type: "object", required: ["id","url","expiresIn","mime"], properties: { id: { type: "string" }, url: { type: "string", format: "uri" }, expiresIn: { type: "integer", maximum: 900 }, mime: { type: "string", enum: ["image/jpeg","image/png"] } } } } },
+  PublicAdminPageListResponse: { type: "object", required: ["data"], properties: { data: { type: "object", required: ["items","total","page","pageSize"], properties: { items: { type: "array", items: { type: "object" } }, total: { type: "integer", minimum: 0 }, page: { type: "integer", minimum: 1 }, pageSize: { type: "integer", minimum: 1, maximum: 100 } } } } },
+};
+
 const kairosPaths = {
   "/api/kairos/projects": {
     get: { tags: ["Kairos"], security: cookieSecurity, parameters: [
@@ -755,6 +813,7 @@ export function createOpenApiDocument() {
       { name: "Kairos", description: "Project collaboration, membership and favorites" },
       { name: "Directory", description: "Privacy-filtered active user directory and personal visibility preferences" },
       { name: "Files", description: "Private multipart uploads and asynchronous malware analysis status" },
+      { name: "Public Content", description: "Versioned public CMS with controlled blocks and isolated public assets" },
     ],
     paths: {
       "/api/health": {
@@ -826,6 +885,7 @@ export function createOpenApiDocument() {
       ...directoryPaths,
       ...reportsPaths,
       ...libraryPaths,
+      ...publicContentPaths,
       "/api/academic/catalogs": {
         get: { tags: ["Academic"], security: cookieSecurity, parameters: [{ name: "page", in: "query", schema: { type: "integer", minimum: 1 } }, { name: "pageSize", in: "query", schema: { type: "integer", minimum: 1, maximum: 100 } }, { name: "search", in: "query", schema: { type: "string" } }], responses: { 200: { description: "Active academic catalogues with pagination", content: { "application/json": { schema: { $ref: "#/components/schemas/AcademicCatalogsResponse" } } } }, ...academicErrorResponses } },
       },
@@ -1039,6 +1099,7 @@ export function createOpenApiDocument() {
         ...identitySchemas,
         ...reportsSchemas,
         ...librarySchemas,
+        ...publicContentSchemas,
       },
     },
   } as const;
