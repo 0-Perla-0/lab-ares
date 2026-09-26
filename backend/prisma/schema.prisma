@@ -164,6 +164,10 @@ model Usuario {
   contenidoPublicoCreado VersionContenidoPublico[] @relation("PublicContentAuthor")
   contenidoPublicoPublicado VersionContenidoPublico[] @relation("PublicContentPublisher")
   activosPublicosPublicados ActivoPublico[] @relation("PublicAssetPublisher")
+  reglasGamificacionCreadas ReglaGamificacion[] @relation("GamificationRuleCreator")
+  insigniasGamificacionCreadas InsigniaGamificacion[] @relation("GamificationBadgeCreator")
+  eventosGamificacion EventoGamificacion[] @relation("GamificationSubject")
+  eventosGamificacionActuados EventoGamificacion[] @relation("GamificationActor")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -660,6 +664,7 @@ model ActividadKairos {
   evidence EntregaEvidenciaKairos[]
   comments ComentarioActividadKairos[]
   history HistorialActividadKairos[]
+  gamificationEvents EventoGamificacion[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@index([proyectoId,state,dueAt])
@@ -903,6 +908,71 @@ model ActivoPublico {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@index([activo,createdAt])
+}
+
+enum OrigenReglaGamificacion {
+  KAIROS_TERMINADA
+}
+
+enum TipoEventoGamificacion {
+  OTORGAMIENTO
+  REVERSO
+  RECONOCIMIENTO_MANUAL
+}
+
+model ReglaGamificacion {
+  id String @id @default(cuid()) @db.VarChar(30)
+  codigo String @db.VarChar(80)
+  version Int
+  origen OrigenReglaGamificacion
+  puntos Int
+  activa Boolean @default(true)
+  motivo String @db.VarChar(1000)
+  creadoPorId Int?
+  creadoPor Usuario? @relation("GamificationRuleCreator", fields:[creadoPorId], references:[id], onDelete:Restrict)
+  eventos EventoGamificacion[]
+  createdAt DateTime @default(now())
+  @@unique([codigo,version])
+  @@index([origen,activa,version])
+}
+
+model InsigniaGamificacion {
+  id String @id @default(cuid()) @db.VarChar(30)
+  codigo String @db.VarChar(80)
+  version Int
+  nombre String @db.VarChar(120)
+  descripcion String @db.VarChar(500)
+  umbralPuntos Int
+  activa Boolean @default(true)
+  motivo String @db.VarChar(1000)
+  creadoPorId Int?
+  creadoPor Usuario? @relation("GamificationBadgeCreator", fields:[creadoPorId], references:[id], onDelete:Restrict)
+  createdAt DateTime @default(now())
+  @@unique([codigo,version])
+  @@index([activa,umbralPuntos])
+}
+
+model EventoGamificacion {
+  id String @id @default(cuid()) @db.VarChar(30)
+  usuarioId Int
+  usuario Usuario @relation("GamificationSubject", fields:[usuarioId], references:[id], onDelete:Restrict)
+  actorId Int?
+  actor Usuario? @relation("GamificationActor", fields:[actorId], references:[id], onDelete:Restrict)
+  tipo TipoEventoGamificacion
+  puntos Int
+  sourceKey String @unique @db.VarChar(191)
+  motivo String @db.VarChar(1000)
+  actividadId String? @db.VarChar(30)
+  actividad ActividadKairos? @relation(fields:[actividadId], references:[id], onDelete:Restrict)
+  reglaId String? @db.VarChar(30)
+  regla ReglaGamificacion? @relation(fields:[reglaId], references:[id], onDelete:Restrict)
+  reversaDeId String? @unique @db.VarChar(30)
+  reversaDe EventoGamificacion? @relation("GamificationReversal", fields:[reversaDeId], references:[id], onDelete:Restrict)
+  reverso EventoGamificacion? @relation("GamificationReversal")
+  createdAt DateTime @default(now())
+  @@index([usuarioId,createdAt])
+  @@index([actividadId,tipo,createdAt])
+  @@index([actorId,createdAt])
 }
 
 model Asistencia {

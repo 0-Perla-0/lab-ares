@@ -17,6 +17,7 @@ import {
 } from "../generated/prisma/enums";
 import type { AuthUser } from "../auth/auth-user";
 import type { ActivityInput, ActivityUpdate } from "./activities.schemas";
+import { GamificationService } from "../gamification/gamification.service";
 const detail = {
   id: true,
   proyectoId: true,
@@ -39,6 +40,7 @@ export class KairosActivitiesService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly storage: StorageService,
+    private readonly gamification: GamificationService = null as any,
   ) {}
   private active(a: AuthUser) {
     if (!a || a.estado !== "ACTIVA")
@@ -105,7 +107,7 @@ export class KairosActivitiesService {
       throw invalidInput("KAIROS_MEMBER_INVALID");
   }
   private async hist(tx: any, activityId: string, actorId: number, data: any) {
-    await tx.historialActividadKairos.create({
+    const history = await tx.historialActividadKairos.create({
       data: { actividadId: activityId, actorId, ...data },
     });
     await this.audit.append(
@@ -119,6 +121,7 @@ export class KairosActivitiesService {
       },
       tx,
     );
+    return history;
   }
   async create(actor: AuthUser, pid: string, input: ActivityInput) {
     this.active(actor);
@@ -363,13 +366,20 @@ export class KairosActivitiesService {
         data: { state, closedAt: state === "TERMINADA" ? new Date() : null },
         select: detail,
       });
-      await this.hist(tx, id, actor.id, {
+      const history = await this.hist(tx, id, actor.id, {
         type: TipoHistorialActividadKairos.REVISION,
         fromState: a.state,
         toState: state,
         comment,
         reviewerId: actor.id,
       });
+      if (state === EstadoActividadKairos.TERMINADA)
+        await this.gamification?.awardKairos(tx, {
+          activityId: id,
+          userId: a.responsableId,
+          actorId: actor.id,
+          historyId: history.id,
+        });
       return out;
     });
   }
@@ -386,12 +396,19 @@ export class KairosActivitiesService {
         data: { state: EstadoActividadKairos.PENDIENTE, closedAt: null },
         select: detail,
       });
-      await this.hist(tx, id, actor.id, {
+      const history = await this.hist(tx, id, actor.id, {
         type: TipoHistorialActividadKairos.REAPERTURA,
         fromState: a.state,
         toState: EstadoActividadKairos.PENDIENTE,
         comment: reason,
       });
+      if (a.state === EstadoActividadKairos.TERMINADA)
+        await this.gamification?.reverseKairos(tx, {
+          activityId: id,
+          actorId: actor.id,
+          historyId: history.id,
+          reason,
+        });
       return out;
     });
   }

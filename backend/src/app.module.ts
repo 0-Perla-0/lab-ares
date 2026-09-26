@@ -24,6 +24,7 @@ import { DirectoryModule } from "./directory/directory.module";
 import { ReportsModule } from "./reports/reports.module";
 import { LibraryModule } from "./library/library.module";
 import { PublicContentModule } from "./public-content/public-content.module";
+import { GamificationModule } from "./gamification/gamification.module";
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { PublicContentModule } from "./public-content/public-content.module";
     ReportsModule,
     LibraryModule,
     PublicContentModule,
+    GamificationModule,
     OpenApiModule,
   ],
   providers: [

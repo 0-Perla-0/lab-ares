@@ -16,7 +16,19 @@ describe("validateEnvironment", () => {
       BACKEND_PORT: 3000,
       APP_TIME_ZONE: "America/Mexico_City",
       SESSION_SECRET: DEVELOPMENT_SESSION_SECRET,
+      GAMIFICATION_ENABLED: false,
     });
+  });
+
+  it("parses the gamification feature flag without treating the string false as true", () => {
+    expect(
+      validateEnvironment({ ...base, GAMIFICATION_ENABLED: "false" })
+        .GAMIFICATION_ENABLED,
+    ).toBe(false);
+    expect(
+      validateEnvironment({ ...base, GAMIFICATION_ENABLED: "true" })
+        .GAMIFICATION_ENABLED,
+    ).toBe(true);
   });
 
   it("rejects an invalid application time zone", () => {

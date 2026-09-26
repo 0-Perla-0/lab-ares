@@ -7,5 +7,6 @@ import { KairosKanbanController } from "./kanban.controller";
 import { KairosKanbanService } from "./kanban.service";
 import { AuthModule } from "../auth/auth.module";
 import { StorageModule } from "../storage/storage.module";
-@Module({ imports:[AuthModule,StorageModule], controllers: [KairosController,KairosActivitiesController,KairosKanbanController], providers: [KairosService,KairosActivitiesService,KairosKanbanService] })
+import { GamificationModule } from "../gamification/gamification.module";
+@Module({ imports:[AuthModule,StorageModule,GamificationModule], controllers: [KairosController,KairosActivitiesController,KairosKanbanController], providers: [KairosService,KairosActivitiesService,KairosKanbanService] })
 export class KairosModule {}

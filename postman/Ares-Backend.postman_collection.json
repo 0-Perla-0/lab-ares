@@ -89,6 +89,8 @@
     ,{ "key": "publicVersionId", "value": "", "type": "string" }
     ,{ "key": "publicAssetFileId", "value": "", "type": "string" }
     ,{ "key": "publicAssetId", "value": "", "type": "string" }
+    ,{ "key": "gamificationUserId", "value": "", "type": "string" }
+    ,{ "key": "gamificationEventId", "value": "", "type": "string" }
     ,{ "key": "fixtureFilePath", "value": "", "type": "string" }
   ],
   "item": [
@@ -1906,6 +1908,22 @@
         { "name": "Publicar (ADMIN)", "request": { "method": "POST", "url": "{{baseUrl}}/public-content/admin/versions/{{publicVersionId}}/publish" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,400,403,404,409]).to.include(pm.response.code);"] } }] },
         { "name": "Nueva versión", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"titulo\":\"Ares actualizado\",\"resumenCambios\":\"Actualización controlada\",\"bloques\":[{\"orden\":0,\"tipo\":\"TEXTO\",\"contenido\":{\"texto\":\"Nueva versión pública.\"}}]}" }, "url": "{{baseUrl}}/public-content/admin/pages/{{publicPageId}}/versions" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([201,400,403,404,409]).to.include(pm.response.code);", "if(pm.response.code===201)pm.collectionVariables.set('publicVersionId',pm.response.json().data.id);"] } }] },
         { "name": "Archivar página (ADMIN)", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"motivo\":\"Retiro institucional autorizado\"}" }, "url": "{{baseUrl}}/public-content/admin/pages/{{publicPageId}}/archive" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,400,403,404,409]).to.include(pm.response.code);"] } }] }
+      ]
+    },
+    {
+      "name": "16 - Gamificación privada",
+      "description": "MVP privado y desactivado por defecto. Para probarlo configura GAMIFICATION_ENABLED=true y reinicia el backend. No existe ranking público, moneda, tienda ni premios.",
+      "item": [
+        { "name": "Mi perfil privado", "request": { "method": "GET", "url": "{{baseUrl}}/gamification/me" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,503]).to.include(pm.response.code);", "if(pm.response.code===200){const d=pm.response.json().data;pm.expect(d.privado).to.eql(true);pm.expect(d).not.to.have.property('ranking');}"] } }] },
+        { "name": "Mi historial de puntos", "request": { "method": "GET", "url": "{{baseUrl}}/gamification/me/history?page=1&pageSize=20" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,503]).to.include(pm.response.code);", "if(pm.response.code===200)pm.expect(pm.response.json().data.items).to.be.an('array');"] } }] },
+        { "name": "Perfil de usuario (ADMIN)", "request": { "method": "GET", "url": "{{baseUrl}}/gamification/admin/users/{{gamificationUserId}}" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,400,403,404,503]).to.include(pm.response.code);"] } }] },
+        { "name": "Historial de usuario (ADMIN)", "request": { "method": "GET", "url": "{{baseUrl}}/gamification/admin/users/{{gamificationUserId}}/history?page=1&pageSize=20" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,400,403,404,503]).to.include(pm.response.code);"] } }] },
+        { "name": "Listar reglas versionadas (ADMIN)", "request": { "method": "GET", "url": "{{baseUrl}}/gamification/admin/rules" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,403,503]).to.include(pm.response.code);"] } }] },
+        { "name": "Crear versión de regla Kairos (ADMIN)", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"codigo\":\"KAIROS_COMPLETADA\",\"origen\":\"KAIROS_TERMINADA\",\"puntos\":100,\"motivo\":\"Ajuste administrativo aprobado\"}" }, "url": "{{baseUrl}}/gamification/admin/rules" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([201,400,403,503]).to.include(pm.response.code);"] } }] },
+        { "name": "Listar insignias versionadas (ADMIN)", "request": { "method": "GET", "url": "{{baseUrl}}/gamification/admin/badges" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,403,503]).to.include(pm.response.code);"] } }] },
+        { "name": "Crear versión de insignia (ADMIN)", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"codigo\":\"COLABORADOR_DESTACADO\",\"nombre\":\"Colaborador destacado\",\"descripcion\":\"Reconoce mil puntos acumulados\",\"umbralPuntos\":1000,\"motivo\":\"Catálogo institucional\"}" }, "url": "{{baseUrl}}/gamification/admin/badges" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([201,400,403,503]).to.include(pm.response.code);"] } }] },
+        { "name": "Otorgar reconocimiento manual idempotente (ADMIN)", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Idempotency-Key", "value": "postman-recognition-{{$timestamp}}" }], "body": { "mode": "raw", "raw": "{\"usuarioId\":{{gamificationUserId}},\"puntos\":25,\"motivo\":\"Reconocimiento administrativo con justificación\"}" }, "url": "{{baseUrl}}/gamification/admin/recognitions" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([201,400,403,404,409,503]).to.include(pm.response.code);", "if(pm.response.code===201)pm.collectionVariables.set('gamificationEventId',pm.response.json().data.id);"] } }] },
+        { "name": "Reversar reconocimiento sin editar el original (ADMIN)", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Idempotency-Key", "value": "postman-reversal-{{$timestamp}}" }], "body": { "mode": "raw", "raw": "{\"motivo\":\"Corrección administrativa autorizada\"}" }, "url": "{{baseUrl}}/gamification/admin/events/{{gamificationEventId}}/reverse" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([201,400,403,404,409,503]).to.include(pm.response.code);", "if(pm.response.code===201)pm.expect(pm.response.json().data.puntos).to.be.below(0);"] } }] }
       ]
     }
   ]

@@ -73,6 +73,15 @@
 - Migración aplicada: `20260925270000_public_content_cms`. OpenAPI y Postman quedaron actualizados.
 - Gate verde: 50 archivos y 580 pruebas, además de `build`, `tsc` y `Prisma validate`. Esta fase queda **COMPLETADA en backend**; la integración de frontend y las pruebas E2E permanecen pendientes.
 
+### Cierre verificado: gamificación privada
+
+- La gamificación queda protegida por `GAMIFICATION_ENABLED`, desactivado por defecto, y usa permisos separados para consulta propia y administración.
+- `EventoGamificacion` es un ledger append-only de otorgamientos, reversos y reconocimientos manuales idempotentes. El nivel se deriva de los puntos vigentes; las insignias y reglas tienen catálogo/versionado y no se editan retroactivamente.
+- Sólo una actividad Kairos `TERMINADA` y aprobada puede otorgar puntos automáticamente. Si la actividad se reabre, se agrega un reverso; las correcciones nunca modifican el evento original. El reconocimiento manual exige autorización, motivo e idempotencia.
+- Cada usuario sólo puede consultar su perfil e historial; un `ADMIN` puede consultar perfiles administrativos y gestionar reglas, insignias y reconocimientos. No se implementan ranking público, XP por asistencia/puntualidad/horas, rachas, monedas, tienda ni premios.
+- Migración creada y validada: `20260925280000_private_gamification`. OpenAPI y las dos colecciones de Postman quedaron actualizadas con 10 solicitudes de la fase en cada colección.
+- Gate verde: 51 archivos y 598 pruebas, además de typecheck, build, validación Prisma y contrato Postman. Esta fase queda **COMPLETADA en backend**; frontend, integración y E2E permanecen pendientes.
+
 ## 1. Alcance y criterio de comparación
 
 Este documento separa cinco capas de evidencia que no deben confundirse:
@@ -903,17 +912,17 @@ La migración 16B se ejecutará sólo si aparecen fuentes del sistema anterior, 
 
 ## 12. Próximo paso recomendado
 
-El perfil académico/adscripción histórica, el expediente documental funcional, el directorio interno y la base de proyectos/membresías y actividades/evidencias de Kairos ya están cerrados y verificados en backend. El siguiente bloque es Kanban. Luego deben abordarse frontend, integración y E2E. Los dominios de Backend 1 están fuera de este bloque.
+El perfil académico/adscripción histórica, el expediente documental funcional, el directorio interno, la base de proyectos/membresías y actividades/evidencias de Kairos, los reportes, la biblioteca, el CMS público y la gamificación privada ya están cerrados y verificados en backend. Permanecen pendientes para Backend 2 la impresión 3D, retención/supresión, operación/auditoría y la recuperación/reconciliación que le corresponde; después deben abordarse frontend, integración y E2E. Los dominios de Backend 1 están fuera de este bloque.
 
 El contrato funcional principal ya produjo el primer recorrido backend implementable. El orden recomendado desde este corte es:
 
 **Decisiones funcionales pendientes: ninguna.** Las decisiones externas al control del repositorio se omiten de esta secuencia y se resolverán por separado cuando corresponda; no bloquean los contratos ni la implementación local.
 
-1. Implementar validación individual y autorización masiva verde de máximo 100, con decisiones inmutables.
-2. Sustituir la bolsa agregada provisional por el historial de decisiones de validación y el semáforo definitivo.
-3. Implementar ausencias, calendario y los jobs idempotentes de aviso/cálculo acordados.
-4. Completar auditoría transversal y separación de funciones para validación y correcciones futuras.
-5. Continuar con documentos; en paralelo se mantienen los carriles ya asignados a Backend 2 y Frontend 2.
+1. Implementar impresión 3D con cuarentena, estados, ejecuciones separadas, permisos, auditoría y pruebas.
+2. Implementar la matriz de retención/supresión y sus jobs idempotentes, con bloqueo de periodos institucionales hasta contar con aprobación.
+3. Completar operación/auditoría, integridad, salud/correlación/alertas y recuperación/reconciliación del alcance de Backend 2.
+4. Mantener la documentación de importadores legacy como pendiente hasta recibir fuentes aprobadas e identificables.
+5. Crear la rama Git Flow de frontend para integrar gamificación e impresión 3D y cerrar las pruebas E2E, sin incorporar dominios de Backend 1.
 
 El Incremento 1 quedó integrado en `develop`. Backend 1 y Frontend 1 deben continuar con validación, ausencias y calendario sin duplicar las reglas ya centralizadas. En paralelo, Backend 2 puede preparar almacenamiento/documentos y Frontend 2 los componentes de estados y navegación de Kairos. Los cuatro MVP P3 siguen comprometidos, pero comienzan después de estabilizar sus dependencias y no desplazan el núcleo de Servicio Social.
 

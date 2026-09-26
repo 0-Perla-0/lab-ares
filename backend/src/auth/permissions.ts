@@ -29,6 +29,8 @@ export enum Permission {
   PUBLIC_CONTENT_DRAFT = "public-content:draft",
   PUBLIC_CONTENT_PUBLISH = "public-content:publish",
   PUBLIC_CONTENT_ARCHIVE = "public-content:archive",
+  GAMIFICATION_READ = "gamification:read",
+  GAMIFICATION_MANAGE = "gamification:manage",
 }
 
 export enum AccessScope {
@@ -52,6 +54,7 @@ const commonUserGrants: RoleGrants = {
   [Permission.DIRECTORY_READ]: AccessScope.GLOBAL,
   [Permission.LIBRARY_READ]: AccessScope.SELF,
   [Permission.LIBRARY_ACKNOWLEDGE]: AccessScope.SELF,
+  [Permission.GAMIFICATION_READ]: AccessScope.SELF,
 };
 
 const areaManagerGrants: RoleGrants = {

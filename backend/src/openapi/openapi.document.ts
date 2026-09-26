@@ -463,6 +463,61 @@ const publicContentSchemas = {
   PublicAdminPageListResponse: { type: "object", required: ["data"], properties: { data: { type: "object", required: ["items","total","page","pageSize"], properties: { items: { type: "array", items: { type: "object" } }, total: { type: "integer", minimum: 0 }, page: { type: "integer", minimum: 1 }, pageSize: { type: "integer", minimum: 1, maximum: 100 } } } } },
 };
 
+const gamificationPageParameters = [
+  { name: "page", in: "query", schema: { type: "integer", minimum: 1, maximum: 10000, default: 1 } },
+  { name: "pageSize", in: "query", schema: { type: "integer", minimum: 1, maximum: 100, default: 20 } },
+];
+const gamificationUserIdParameter = { name: "id", in: "path", required: true, schema: { type: "integer", minimum: 1 } };
+const gamificationEventIdParameter = { name: "id", in: "path", required: true, schema: { type: "string", pattern: "^c[a-z0-9]{20,30}$" } };
+const gamificationIdempotencyParameter = { name: "Idempotency-Key", in: "header", required: true, schema: { type: "string", minLength: 8, maxLength: 128, pattern: "^[A-Za-z0-9._:-]+$" }, description: "Stable key for one logical administrative operation" };
+const gamificationUnavailableResponse = { 503: { description: "Gamification feature flag is disabled" } };
+const gamificationPaths = {
+  "/api/gamification/me": {
+    get: { tags: ["Gamification"], security: cookieSecurity, description: "Returns only the authenticated user's private points, derived level and earned badges. No public ranking exists.", responses: { 200: { description: "Private gamification profile", content: { "application/json": { schema: { $ref: "#/components/schemas/GamificationProfileResponse" } } } }, ...errorResponses, ...gamificationUnavailableResponse } },
+  },
+  "/api/gamification/me/history": {
+    get: { tags: ["Gamification"], security: cookieSecurity, description: "Returns the authenticated user's append-only point history.", parameters: gamificationPageParameters, responses: { 200: { description: "Private gamification history", content: { "application/json": { schema: { $ref: "#/components/schemas/GamificationHistoryResponse" } } } }, ...errorResponses, ...gamificationUnavailableResponse } },
+  },
+  "/api/gamification/admin/users/{id}": {
+    get: { tags: ["Gamification"], security: cookieSecurity, description: "Administrator-only private profile inspection.", parameters: [gamificationUserIdParameter], responses: { 200: { description: "User gamification profile", content: { "application/json": { schema: { $ref: "#/components/schemas/GamificationProfileResponse" } } } }, ...errorResponses, ...gamificationUnavailableResponse } },
+  },
+  "/api/gamification/admin/users/{id}/history": {
+    get: { tags: ["Gamification"], security: cookieSecurity, description: "Administrator-only private append-only history.", parameters: [gamificationUserIdParameter, ...gamificationPageParameters], responses: { 200: { description: "User gamification history", content: { "application/json": { schema: { $ref: "#/components/schemas/GamificationHistoryResponse" } } } }, ...errorResponses, ...gamificationUnavailableResponse } },
+  },
+  "/api/gamification/admin/rules": {
+    get: { tags: ["Gamification"], security: cookieSecurity, description: "Lists the versioned rule catalog for administrators.", responses: { 200: { description: "Rule catalog", content: { "application/json": { schema: { $ref: "#/components/schemas/GamificationRuleListResponse" } } } }, ...errorResponses, ...gamificationUnavailableResponse } },
+    post: { tags: ["Gamification"], security: cookieSecurity, description: "Creates a new rule version and deactivates the prior rule for the same origin without rewriting history.", requestBody: jsonBody({ $ref: "#/components/schemas/GamificationRuleInput" }), responses: { 201: { description: "Rule version created", content: { "application/json": { schema: { $ref: "#/components/schemas/GamificationRuleResponse" } } } }, ...errorResponses, ...gamificationUnavailableResponse } },
+  },
+  "/api/gamification/admin/badges": {
+    get: { tags: ["Gamification"], security: cookieSecurity, description: "Lists the versioned badge catalog for administrators.", responses: { 200: { description: "Badge catalog", content: { "application/json": { schema: { $ref: "#/components/schemas/GamificationBadgeListResponse" } } } }, ...errorResponses, ...gamificationUnavailableResponse } },
+    post: { tags: ["Gamification"], security: cookieSecurity, description: "Creates a new threshold badge version without rewriting prior versions.", requestBody: jsonBody({ $ref: "#/components/schemas/GamificationBadgeInput" }), responses: { 201: { description: "Badge version created", content: { "application/json": { schema: { $ref: "#/components/schemas/GamificationBadgeResponse" } } } }, ...errorResponses, ...gamificationUnavailableResponse } },
+  },
+  "/api/gamification/admin/recognitions": {
+    post: { tags: ["Gamification"], security: cookieSecurity, description: "Administrator-only positive manual recognition. A mandatory reason and idempotency key are retained.", parameters: [gamificationIdempotencyParameter], requestBody: jsonBody({ $ref: "#/components/schemas/GamificationRecognitionInput" }), responses: { 201: { description: "Recognition appended", content: { "application/json": { schema: { $ref: "#/components/schemas/GamificationEventResponse" } } } }, ...errorResponses, ...gamificationUnavailableResponse } },
+  },
+  "/api/gamification/admin/events/{id}/reverse": {
+    post: { tags: ["Gamification"], security: cookieSecurity, description: "Appends an exact negative reversal for a manual recognition. The original event is never edited or deleted.", parameters: [gamificationEventIdParameter, gamificationIdempotencyParameter], requestBody: jsonBody({ $ref: "#/components/schemas/GamificationReversalInput" }), responses: { 201: { description: "Reversal appended", content: { "application/json": { schema: { $ref: "#/components/schemas/GamificationEventResponse" } } } }, ...errorResponses, ...gamificationUnavailableResponse } },
+  },
+};
+
+const gamificationSchemas = {
+  GamificationRuleOrigin: { type: "string", enum: ["KAIROS_TERMINADA"] },
+  GamificationEventType: { type: "string", enum: ["OTORGAMIENTO", "REVERSO", "RECONOCIMIENTO_MANUAL"] },
+  GamificationRuleInput: { type: "object", additionalProperties: false, required: ["codigo", "origen", "puntos", "motivo"], properties: { codigo: { type: "string", minLength: 2, maxLength: 80, pattern: "^[A-Z0-9_]+$" }, origen: { $ref: "#/components/schemas/GamificationRuleOrigin" }, puntos: { type: "integer", minimum: 1, maximum: 10000 }, motivo: { type: "string", minLength: 1, maxLength: 1000 } } },
+  GamificationBadgeInput: { type: "object", additionalProperties: false, required: ["codigo", "nombre", "descripcion", "umbralPuntos", "motivo"], properties: { codigo: { type: "string", minLength: 2, maxLength: 80, pattern: "^[A-Z0-9_]+$" }, nombre: { type: "string", minLength: 1, maxLength: 120 }, descripcion: { type: "string", minLength: 1, maxLength: 500 }, umbralPuntos: { type: "integer", minimum: 1, maximum: 1000000 }, motivo: { type: "string", minLength: 1, maxLength: 1000 } } },
+  GamificationRecognitionInput: { type: "object", additionalProperties: false, required: ["usuarioId", "puntos", "motivo"], properties: { usuarioId: { type: "integer", minimum: 1 }, puntos: { type: "integer", minimum: 1, maximum: 10000 }, motivo: { type: "string", minLength: 1, maxLength: 1000 } } },
+  GamificationReversalInput: { type: "object", additionalProperties: false, required: ["motivo"], properties: { motivo: { type: "string", minLength: 1, maxLength: 1000 } } },
+  GamificationBadge: { type: "object", additionalProperties: false, required: ["codigo", "nombre", "descripcion", "umbralPuntos", "version"], properties: { codigo: { type: "string" }, nombre: { type: "string" }, descripcion: { type: "string" }, umbralPuntos: { type: "integer" }, version: { type: "integer", minimum: 1 } } },
+  GamificationProfileResponse: { type: "object", required: ["data"], properties: { data: { type: "object", additionalProperties: false, required: ["usuario", "puntos", "nivel", "puntosPorNivel", "eventos", "insignias", "privado"], properties: { usuario: { type: "object", additionalProperties: false, required: ["id", "codigo"], properties: { id: { type: "integer" }, codigo: { type: "string" } } }, puntos: { type: "integer" }, nivel: { type: "integer", minimum: 1 }, puntosPorNivel: { type: "integer", minimum: 1 }, eventos: { type: "integer", minimum: 0 }, insignias: { type: "array", items: { $ref: "#/components/schemas/GamificationBadge" } }, privado: { const: true } } } } },
+  GamificationEvent: { type: "object", additionalProperties: false, required: ["id", "tipo", "puntos", "motivo", "createdAt"], properties: { id: { type: "string", pattern: "^c[a-z0-9]{20,30}$" }, tipo: { $ref: "#/components/schemas/GamificationEventType" }, puntos: { type: "integer", not: { const: 0 } }, motivo: { type: "string" }, actividadId: { type: ["string", "null"] }, regla: { anyOf: [{ type: "object", required: ["codigo", "version"], properties: { codigo: { type: "string" }, version: { type: "integer" } } }, { type: "null" }] }, reversaDeId: { type: ["string", "null"] }, createdAt: { type: "string", format: "date-time" } } },
+  GamificationHistoryResponse: { type: "object", required: ["data"], properties: { data: { type: "object", required: ["items", "total", "page", "pageSize"], properties: { items: { type: "array", items: { $ref: "#/components/schemas/GamificationEvent" } }, total: { type: "integer", minimum: 0 }, page: { type: "integer", minimum: 1 }, pageSize: { type: "integer", minimum: 1, maximum: 100 } } } } },
+  GamificationRuleResponse: { type: "object", required: ["data"], properties: { data: { type: "object" } } },
+  GamificationRuleListResponse: { type: "object", required: ["data"], properties: { data: { type: "array", items: { type: "object" } } } },
+  GamificationBadgeResponse: { type: "object", required: ["data"], properties: { data: { type: "object" } } },
+  GamificationBadgeListResponse: { type: "object", required: ["data"], properties: { data: { type: "array", items: { type: "object" } } } },
+  GamificationEventResponse: { type: "object", required: ["data"], properties: { data: { type: "object" } } },
+};
+
 const kairosPaths = {
   "/api/kairos/projects": {
     get: { tags: ["Kairos"], security: cookieSecurity, parameters: [
@@ -814,6 +869,7 @@ export function createOpenApiDocument() {
       { name: "Directory", description: "Privacy-filtered active user directory and personal visibility preferences" },
       { name: "Files", description: "Private multipart uploads and asynchronous malware analysis status" },
       { name: "Public Content", description: "Versioned public CMS with controlled blocks and isolated public assets" },
+      { name: "Gamification", description: "Feature-flagged private points ledger, derived levels and limited badges; no public ranking or redeemable value" },
     ],
     paths: {
       "/api/health": {
@@ -886,6 +942,7 @@ export function createOpenApiDocument() {
       ...reportsPaths,
       ...libraryPaths,
       ...publicContentPaths,
+      ...gamificationPaths,
       "/api/academic/catalogs": {
         get: { tags: ["Academic"], security: cookieSecurity, parameters: [{ name: "page", in: "query", schema: { type: "integer", minimum: 1 } }, { name: "pageSize", in: "query", schema: { type: "integer", minimum: 1, maximum: 100 } }, { name: "search", in: "query", schema: { type: "string" } }], responses: { 200: { description: "Active academic catalogues with pagination", content: { "application/json": { schema: { $ref: "#/components/schemas/AcademicCatalogsResponse" } } } }, ...academicErrorResponses } },
       },
@@ -1100,6 +1157,7 @@ export function createOpenApiDocument() {
         ...reportsSchemas,
         ...librarySchemas,
         ...publicContentSchemas,
+        ...gamificationSchemas,
       },
     },
   } as const;

@@ -18,7 +18,7 @@ function make(overrides: any = {}) {
     usuario: { findUnique: vi.fn().mockResolvedValue({ id: 1, estado: EstadoUsuario.ACTIVA }), findMany: vi.fn().mockResolvedValue([{ id: 1 }]) },
     actividadKairos: { create: vi.fn().mockResolvedValue(activity()), update: vi.fn().mockResolvedValue(activity()), findUnique: vi.fn().mockResolvedValue({ ...activity(), proyecto: { estado: EstadoProyectoKairos.ACTIVO } }), findFirst: vi.fn().mockResolvedValue({ ...activity(), proyecto: { estado: EstadoProyectoKairos.ACTIVO } }), findMany: vi.fn().mockResolvedValue([activity()]), count: vi.fn().mockResolvedValue(1) },
     participanteActividadKairos: { deleteMany: vi.fn(), createMany: vi.fn(), create: vi.fn(), findMany: vi.fn().mockResolvedValue([]) },
-    historialActividadKairos: { create: vi.fn(), findMany: vi.fn().mockResolvedValue([]), count: vi.fn().mockResolvedValue(0) },
+    historialActividadKairos: { create: vi.fn().mockResolvedValue({ id: "h-1" }), findMany: vi.fn().mockResolvedValue([]), count: vi.fn().mockResolvedValue(0) },
     entregaEvidenciaKairos: { aggregate: vi.fn().mockResolvedValue({ _max: { version: 0 } }), create: vi.fn().mockResolvedValue({ id: "e-1", version: 1 }), findUnique: vi.fn().mockResolvedValue({ archivoId: "f-1" }), findFirst: vi.fn().mockResolvedValue({ archivoId: "f-1" }), findMany: vi.fn().mockResolvedValue([]), count: vi.fn().mockResolvedValue(0) },
     comentarioActividadKairos: { create: vi.fn().mockResolvedValue({ id: "c-1", body: "ok" }), findMany: vi.fn().mockResolvedValue([]), count: vi.fn().mockResolvedValue(0) },
   };
@@ -27,7 +27,8 @@ function make(overrides: any = {}) {
   const db: any = { $transaction: vi.fn((fn: any) => fn(tx)), $executeRaw: tx.$executeRaw, miembroProyectoKairos: tx.miembroProyectoKairos, actividadKairos: { ...tx.actividadKairos, findMany: vi.fn().mockResolvedValue([activity()]) }, comentarioActividadKairos: tx.comentarioActividadKairos, historialActividadKairos: tx.historialActividadKairos, entregaEvidenciaKairos: tx.entregaEvidenciaKairos };
   const audit = { append: vi.fn().mockResolvedValue(undefined) };
   const storage = { downloadUrl: vi.fn().mockResolvedValue("https://download") };
-  return { s: new KairosActivitiesService(db, audit as any, storage as any), db, tx, audit, storage };
+  const gamification = overrides.gamification ?? { awardKairos: vi.fn().mockResolvedValue(undefined), reverseKairos: vi.fn().mockResolvedValue(undefined) };
+  return { s: new KairosActivitiesService(db, audit as any, storage as any, gamification as any), db, tx, audit, storage, gamification };
 }
 
 describe("Kairos activities contracts", () => {
@@ -126,10 +127,18 @@ describe("Kairos activities contracts", () => {
     await expect(responsible.review(actor(), "p-1", "a-1", EstadoActividadKairos.TERMINADA, "ok")).rejects.toMatchObject({ code: "KAIROS_ACTIVITY_REVIEW_INVALID" });
   });
 
+  it("awards the responsible user only after an independent reviewer approves completion", async () => {
+    const reviewed = { ...activity(EstadoActividadKairos.EN_REVISION), responsableId: 2, proyecto: { estado: EstadoProyectoKairos.ACTIVO } };
+    const { s, tx, gamification } = make({ tx: { actividadKairos: { findFirst: vi.fn().mockResolvedValue(reviewed) } } });
+    await expect(s.review(actor(), "p-1", "a-1", EstadoActividadKairos.TERMINADA, "approved")).resolves.toBeDefined();
+    expect(gamification.awardKairos).toHaveBeenCalledWith(tx, { activityId: "a-1", userId: 2, actorId: 1, historyId: "h-1" });
+  });
+
   it("reopens closed activities only with a reason and appends history", async () => {
-    const { s, tx } = make({ tx: { actividadKairos: { findFirst: vi.fn().mockResolvedValue({ ...activity(EstadoActividadKairos.TERMINADA), proyecto: { estado: EstadoProyectoKairos.ACTIVO } }) } } });
+    const { s, tx, gamification } = make({ tx: { actividadKairos: { findFirst: vi.fn().mockResolvedValue({ ...activity(EstadoActividadKairos.TERMINADA), proyecto: { estado: EstadoProyectoKairos.ACTIVO } }) } } });
     await expect(s.reopen(actor(), "p-1", "a-1", "needs correction")).resolves.toBeDefined();
     expect(tx.historialActividadKairos.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ comment: "needs correction" }) }));
+    expect(gamification.reverseKairos).toHaveBeenCalledWith(tx, { activityId: "a-1", actorId: 1, historyId: "h-1", reason: "needs correction" });
   });
 
   it("denies suspended actors consistently across activity operations", async () => {

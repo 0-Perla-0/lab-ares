@@ -197,4 +197,19 @@ describe("OpenAPI document", () => {
       document.components.schemas.PublicContentState.enum,
     ).toEqual(["BORRADOR", "PUBLICADO", "ARCHIVADO"]);
   });
+
+  it("documents private feature-flagged gamification and append-only reversals", () => {
+    const profile = document.paths["/api/gamification/me"].get;
+    expect(profile.security).toEqual([{ cookieAuth: [] }]);
+    expect(profile.description).toContain("No public ranking");
+    expect(profile.responses[503]).toBeDefined();
+    expect(document.paths["/api/gamification/admin/recognitions"].post.parameters).toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: "Idempotency-Key", required: true })]),
+    );
+    expect(document.paths["/api/gamification/admin/events/{id}/reverse"].post.description).toContain(
+      "never edited or deleted",
+    );
+    expect(document.components.schemas.GamificationRuleOrigin.enum).toEqual(["KAIROS_TERMINADA"]);
+    expect(document.components.schemas.GamificationProfileResponse.properties.data.properties.privado.const).toBe(true);
+  });
 });

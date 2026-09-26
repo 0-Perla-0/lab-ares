@@ -95,6 +95,8 @@ services:
       CLAMAV_HOST: clamav
       CLAMAV_PORT: 3310
       STORAGE_SCANNER_ENABLED: "true"
+      GAMIFICATION_ENABLED: ${GAMIFICATION_ENABLED:-false}
+      GAMIFICATION_POINTS_PER_LEVEL: ${GAMIFICATION_POINTS_PER_LEVEL:-100}
       MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:-development-only-mfa-key-change-me-32chars}
       OUTBOX_ENCRYPTION_KEY: ${OUTBOX_ENCRYPTION_KEY:-development-only-outbox-key-change-me-32chars}
       SMTP_ENABLED: ${SMTP_ENABLED:-true}

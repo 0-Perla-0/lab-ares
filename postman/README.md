@@ -177,6 +177,19 @@ El cuerpo es opcional, pero check-in y check-out requieren un header
 La ubicación es consentida y opcional; la respuesta sólo indica si se registró
 ubicación/IP, sin devolver sus valores completos.
 
+## Gamificación privada
+
+La carpeta `16 - Gamificación privada` requiere sesión y
+`GAMIFICATION_ENABLED=true`; el valor predeterminado es `false`. Configura
+`gamificationUserId` con un usuario activo. Las operaciones administrativas
+requieren un usuario `ADMIN` y los reconocimientos/reversos usan un
+`Idempotency-Key` distinto por operación.
+
+El perfil y el historial sólo son visibles para su propietario o para un
+administrador. Los puntos forman un ledger inmutable: una corrección agrega un
+reverso negativo y nunca modifica el evento original. No existe ranking
+público, moneda, tienda ni premios canjeables.
+
 ## Respuestas y errores
 
 Las respuestas exitosas del dominio usan `{ "data": ... }`. Los errores usan
@@ -194,6 +207,7 @@ su detalle estructurado.
 | 404    | Usuario, sede, área o turno inexistente                        |
 | 409    | Duplicado, estado incompatible o clave idempotente reutilizada |
 | 429    | Demasiados intentos de login                                   |
+| 503    | Funcionalidad desactivada mediante feature flag                |
 
 La colección hace borrados lógicos; los registros quedan en la base con
 `activa`/`activo` en `false` o, para usuarios, con `estado = BAJA`.
