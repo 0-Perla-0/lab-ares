@@ -20,6 +20,7 @@ import { NotificationsModule } from "./notifications/notifications.module";
 import { AcademicModule } from "./academic/academic.module";
 import { DocumentsModule } from "./documents/documents.module";
 import { KairosModule } from "./kairos/kairos.module";
+import { DirectoryModule } from "./directory/directory.module";
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { KairosModule } from "./kairos/kairos.module";
     AcademicModule,
     DocumentsModule,
     KairosModule,
+    DirectoryModule,
     OpenApiModule,
   ],
   providers: [

@@ -149,6 +149,7 @@ model Usuario {
   kairosActivityReviews HistorialActividadKairos[] @relation("KairosActivityReviewer")
   kairosActivityHistory HistorialActividadKairos[] @relation("KairosActivityActor")
   archivosPropiedad Archivo[] @relation("ArchivoOwner")
+  directorioPreferencia DirectorioPreferencia?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -158,6 +159,15 @@ model Usuario {
   @@index([sedeId])
   @@index([areaId])
   @@index([turnoId])
+}
+
+model DirectorioPreferencia {
+  usuarioId Int @id
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  visibleEnArea Boolean @default(true)
+  visibleEnProyectos Boolean @default(true)
+  mostrarEmail Boolean @default(false)
+  updatedAt DateTime @updatedAt
 }
 
 model InstitucionAcademica {

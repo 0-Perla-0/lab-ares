@@ -1072,6 +1072,17 @@
         { "name": "Consultar tablero Kanban (7 carriles)", "request": { "method": "GET", "url": "{{baseUrl}}/kairos/projects/{{projectId}}/kanban?limitPerLane=20&vencida=false" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('Kanban accesible',()=>pm.response.to.have.status(200));", "const data=pm.response.json().data;", "pm.expect(data.lanes).to.have.length(7);", "pm.expect(data.lanes.map(l=>l.state)).to.eql(['PENDIENTE','EN_PROGRESO','BLOQUEADA','EN_REVISION','REQUIERE_CORRECCION','TERMINADA','CANCELADA']);", "pm.expect(data.lanes[0]).to.have.all.keys('state','total','items');"] } }] },
         { "name": "Filtrar Kanban por responsable/prioridad", "request": { "method": "GET", "url": "{{baseUrl}}/kairos/projects/{{projectId}}/kanban?responsableId={{userId}}&priority=MEDIA&complexity=MEDIA&limitPerLane=5" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('Filtro Kanban',()=>pm.response.to.have.status(200));", "pm.expect(pm.response.json().data.lanes).to.have.length(7);"] } }] }
       ]
+    },
+    {
+      "name": "Directory - privacidad y preferencias",
+      "description": "Requiere sesión activa y permission directory:read. scope=all solo para roles globales; projectId es CUID y obligatorio con scope=project. El email respeta mostrarEmail, salvo el propio usuario.",
+      "item": [
+        { "name": "Listar directorio por área", "request": { "method": "GET", "url": "{{baseUrl}}/directory?scope=area&page=1&pageSize=20" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('Directorio por área',()=>pm.response.to.have.status(200));", "pm.expect(pm.response.json().data).to.have.all.keys('items','page','pageSize','total');"] } }] },
+        { "name": "Listar directorio por proyecto", "request": { "method": "GET", "url": "{{baseUrl}}/directory?scope=project&projectId={{projectId}}&q=&page=1&pageSize=20" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('Directorio por proyecto',()=>pm.expect([200,403,404]).to.include(pm.response.code));"] } }] },
+        { "name": "Listar directorio global", "request": { "method": "GET", "url": "{{baseUrl}}/directory?scope=all&page=1&pageSize=20" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('Directorio global autorizado o denegado',()=>pm.expect([200,403]).to.include(pm.response.code));"] } }] },
+        { "name": "Consultar mis preferencias", "request": { "method": "GET", "url": "{{baseUrl}}/directory/preferences/me" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('Preferencias consultadas',()=>pm.response.to.have.status(200));", "pm.expect(pm.response.json().data).to.have.all.keys('visibleEnArea','visibleEnProyectos','mostrarEmail');"] } }] },
+        { "name": "Actualizar mis preferencias", "request": { "method": "PATCH", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"visibleEnArea\":true,\"visibleEnProyectos\":true,\"mostrarEmail\":false}" }, "url": "{{baseUrl}}/directory/preferences/me" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('Preferencias actualizadas',()=>pm.response.to.have.status(200));", "pm.expect(pm.response.json().data).to.have.property('mostrarEmail');"] } }] }
+      ]
     }
   ]
 }

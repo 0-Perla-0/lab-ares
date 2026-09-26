@@ -10,6 +10,7 @@ export enum Permission {
   ORGANIZATION_MANAGE = "organization:manage",
   USERS_READ = "users:read",
   USERS_MANAGE = "users:manage",
+  DIRECTORY_READ = "directory:read",
   KAIROS_PROJECT_CREATE = "kairos:project:create",
   ACADEMIC_PROFILE_READ = "academic:profile:read",
   ACADEMIC_PROFILE_UPDATE = "academic:profile:update",
@@ -37,6 +38,7 @@ const commonUserGrants: RoleGrants = {
   [Permission.DOCUMENTS_UPLOAD]: AccessScope.SELF,
   // Organization data is a shared catalogue needed by authenticated flows.
   [Permission.ORGANIZATION_READ]: AccessScope.GLOBAL,
+  [Permission.DIRECTORY_READ]: AccessScope.GLOBAL,
 };
 
 const areaManagerGrants: RoleGrants = {

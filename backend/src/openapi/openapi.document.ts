@@ -54,6 +54,35 @@ const storagePaths = {
   },
 };
 
+const directoryPaths = {
+  "/api/directory": {
+    get: { tags: ["Directory"], security: cookieSecurity,
+      description: "Lists active users visible in the requested context. scope=all is restricted to global roles and includes all active users; area requires the actor's assigned area and sede; project requires active membership. The response is a safe DirectoryItem; email is returned only for the actor or when the target's mostrarEmail preference allows it.",
+      parameters: [
+        { name: "scope", in: "query", required: true, schema: { type: "string", enum: ["area", "project", "all"] } },
+        { name: "projectId", in: "query", schema: { type: "string", minLength: 21, maxLength: 31, pattern: "^c[a-z0-9]{20,30}$" }, description: "Required only with scope=project; Prisma CUID." },
+        { name: "q", in: "query", schema: { type: "string", maxLength: 80 }, description: "Searches code and privacy-permitted email." },
+        { name: "page", in: "query", schema: { type: "integer", minimum: 1, maximum: 10000, default: 1 } },
+        { name: "pageSize", in: "query", schema: { type: "integer", minimum: 1, maximum: 100, default: 20 } },
+      ],
+      responses: { 200: { description: "Paginated privacy-filtered directory", content: { "application/json": { schema: { $ref: "#/components/schemas/DirectoryPageResponse" } } } }, ...errorResponses },
+    },
+  },
+  "/api/directory/preferences/me": {
+    get: { tags: ["Directory"], security: cookieSecurity, responses: { 200: { description: "Current directory visibility preferences", content: { "application/json": { schema: { $ref: "#/components/schemas/DirectoryPreferencesResponse" } } } }, ...errorResponses } },
+    patch: { tags: ["Directory"], security: cookieSecurity, requestBody: jsonBody({ $ref: "#/components/schemas/DirectoryPreferencesInput" }), responses: { 200: { description: "Directory visibility preferences updated", content: { "application/json": { schema: { $ref: "#/components/schemas/DirectoryPreferencesResponse" } } } }, ...errorResponses } },
+  },
+};
+
+const directorySchemas = {
+  DirectoryItem: { type: "object", additionalProperties: false, required: ["id", "codigo", "rol", "sede", "area", "turno"], properties: { id: { type: "integer", minimum: 1 }, codigo: { type: "string" }, email: { type: "string", format: "email", description: "Omitted unless actor or target preference permits it." }, rol: { type: "string" }, sede: { type: ["object", "null"] }, area: { type: ["object", "null"] }, turno: { type: ["object", "null"] } } },
+  DirectoryPage: { type: "object", additionalProperties: false, required: ["items", "page", "pageSize", "total"], properties: { items: { type: "array", items: { $ref: "#/components/schemas/DirectoryItem" } }, page: { type: "integer", minimum: 1 }, pageSize: { type: "integer", minimum: 1, maximum: 100 }, total: { type: "integer", minimum: 0 } } },
+  DirectoryPageResponse: { type: "object", required: ["data"], properties: { data: { $ref: "#/components/schemas/DirectoryPage" } } },
+  DirectoryPreferencesInput: { type: "object", minProperties: 1, additionalProperties: false, properties: { visibleEnArea: { type: "boolean" }, visibleEnProyectos: { type: "boolean" }, mostrarEmail: { type: "boolean" } } },
+  DirectoryPreferences: { type: "object", required: ["visibleEnArea", "visibleEnProyectos", "mostrarEmail"], properties: { visibleEnArea: { type: "boolean" }, visibleEnProyectos: { type: "boolean" }, mostrarEmail: { type: "boolean" } } },
+  DirectoryPreferencesResponse: { type: "object", required: ["data"], properties: { data: { $ref: "#/components/schemas/DirectoryPreferences" } } },
+};
+
 const kairosPaths = {
   "/api/kairos/projects": {
     get: { tags: ["Kairos"], security: cookieSecurity, parameters: [
@@ -402,6 +431,7 @@ export function createOpenApiDocument() {
       { name: "Academic" },
       { name: "Documents" },
       { name: "Kairos", description: "Project collaboration, membership and favorites" },
+      { name: "Directory", description: "Privacy-filtered active user directory and personal visibility preferences" },
       { name: "Files", description: "Private multipart uploads and asynchronous malware analysis status" },
     ],
     paths: {
@@ -471,6 +501,7 @@ export function createOpenApiDocument() {
       ...documentPaths,
       ...kairosPaths,
       ...storagePaths,
+      ...directoryPaths,
       "/api/academic/catalogs": {
         get: { tags: ["Academic"], security: cookieSecurity, parameters: [{ name: "page", in: "query", schema: { type: "integer", minimum: 1 } }, { name: "pageSize", in: "query", schema: { type: "integer", minimum: 1, maximum: 100 } }, { name: "search", in: "query", schema: { type: "string" } }], responses: { 200: { description: "Active academic catalogues with pagination", content: { "application/json": { schema: { $ref: "#/components/schemas/AcademicCatalogsResponse" } } } }, ...academicErrorResponses } },
       },
@@ -506,6 +537,7 @@ export function createOpenApiDocument() {
         ...attendanceSchemas,
         ...documentSchemas,
         ...kairosSchemas,
+        ...directorySchemas,
         ...storageSchemas,
         AcademicProfileInput: {
           type: "object", required: ["institucionId", "programaAcademicoId", "inicio"], additionalProperties: false,

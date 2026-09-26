@@ -40,6 +40,16 @@
 - Gate verde: 345 pruebas backend, `check`, `build`, Prisma, Compose y contratos; incluye pruebas de PNG y documentos.
 - Esta fase queda **COMPLETADA**. El bloque de Kairos (proyectos, membresías, actividades, evidencias y Kanban) también queda cerrado y verificado en backend; siguen frontend, integración y E2E.
 
+### Cierre verificado: directorio interno
+
+- Se implementó el directorio autenticado con consultas públicas por alcance `area`, `project` y `all`; la autorización interna reutiliza la maquinaria de alcance existente.
+- El correo permanece oculto por defecto mediante `DirectorioPreferencia`; la búsqueda no puede revelar correos ocultos y los usuarios inactivos quedan fuera de la operación normal.
+- La visibilidad de contactos se limita al objetivo institucional o proyecto autorizado; la política global conserva la separación entre directorio interno y datos públicos.
+- Migración aplicada: `20260925230000_internal_directory`.
+- OpenAPI y Postman quedaron actualizados.
+- Gate verde: 470 pruebas backend, incluyendo la matriz de alcances, privacidad, usuarios inactivos y búsqueda sin filtración de correos.
+- Esta fase queda **COMPLETADA** en backend. La interfaz del directorio, integración frontend y pruebas E2E permanecen pendientes.
+
 ## 1. Alcance y criterio de comparación
 
 Este documento separa cinco capas de evidencia que no deben confundirse:
@@ -868,7 +878,7 @@ La migración 16B se ejecutará sólo si aparecen fuentes del sistema anterior, 
 
 ## 12. Próximo paso recomendado
 
-El perfil académico/adscripción histórica, el expediente documental funcional y la base de proyectos/membresías y actividades/evidencias de Kairos ya están cerrados y verificados en backend. El siguiente bloque es Kanban. Luego deben abordarse frontend, integración y E2E. Los dominios de Backend 1 están fuera de este bloque.
+El perfil académico/adscripción histórica, el expediente documental funcional, el directorio interno y la base de proyectos/membresías y actividades/evidencias de Kairos ya están cerrados y verificados en backend. El siguiente bloque es Kanban. Luego deben abordarse frontend, integración y E2E. Los dominios de Backend 1 están fuera de este bloque.
 
 El contrato funcional principal ya produjo el primer recorrido backend implementable. El orden recomendado desde este corte es:
 

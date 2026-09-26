@@ -31,6 +31,8 @@ describe("OpenAPI document", () => {
     "/api/attendance/check-in",
     "/api/attendance/check-out",
     "/api/attendance/{id}/close",
+    "/api/directory",
+    "/api/directory/preferences/me",
   ])("documents %s", (path) => {
     expect(document.paths).toHaveProperty(path);
   });
@@ -52,5 +54,16 @@ describe("OpenAPI document", () => {
     expect(document.components.schemas.KairosKanban.properties.lanes).toMatchObject({ minItems: 7, maxItems: 7 });
     expect(document.components.schemas.KairosKanbanLane.properties.state.enum).toHaveLength(7);
     expect(document.components.schemas.KairosKanbanCard.properties.vencida.description).toContain("Derived");
+  });
+
+  it("documents privacy-scoped directory and preferences contracts", () => {
+    const list = document.paths["/api/directory"].get;
+    expect(list.security).toEqual([{ cookieAuth: [] }]);
+    expect(list.parameters).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: "scope", required: true, schema: expect.objectContaining({ enum: ["area", "project", "all"] }) }),
+      expect.objectContaining({ name: "projectId", schema: expect.objectContaining({ pattern: "^c[a-z0-9]{20,30}$" }) }),
+    ]));
+    expect(document.paths["/api/directory/preferences/me"].patch.requestBody.required).toBe(true);
+    expect(document.components.schemas.DirectoryItem.properties.email.description).toContain("Omitted");
   });
 });
