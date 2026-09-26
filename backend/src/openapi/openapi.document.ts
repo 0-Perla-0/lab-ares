@@ -30,6 +30,30 @@ const errorResponses: Record<string, any> = {
 };
 const academicErrorResponses = { ...errorResponses, 404: { description: "Academic resource not found" }, 409: { description: "Academic conflict" } };
 
+const storagePaths = {
+  "/api/files": {
+    post: {
+      tags: ["Files"], security: cookieSecurity,
+      description: "Receives one private file as multipart/form-data. The object is stored in quarantine and scanned asynchronously; consumers must use the returned id and GET /api/files/{id} to observe the scan status before linking it as evidence.",
+      requestBody: { required: true, content: { "multipart/form-data": { schema: { type: "object", required: ["file"], additionalProperties: false, properties: { file: { type: "string", format: "binary" } } } } } },
+      responses: {
+        201: { description: "File accepted for asynchronous malware analysis", content: { "application/json": { schema: { $ref: "#/components/schemas/FileResponse" } } } },
+        400: { description: "Missing file, invalid name, size, extension, or content signature" },
+        413: { description: "File exceeds STORAGE_MAX_BYTES" },
+        415: { description: "Unsupported or mismatched file type" },
+        ...errorResponses,
+      },
+    },
+  },
+  "/api/files/{id}": {
+    get: {
+      tags: ["Files"], security: cookieSecurity,
+      parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", minLength: 30, maxLength: 30, pattern: "^[a-f0-9]{30}$" }, description: "30-character lowercase hexadecimal id of the private file returned by POST /api/files" }],
+      responses: { 200: { description: "Private file metadata and asynchronous scan status", content: { "application/json": { schema: { $ref: "#/components/schemas/FileResponse" } } } }, ...errorResponses },
+    },
+  },
+};
+
 const kairosPaths = {
   "/api/kairos/projects": {
     get: { tags: ["Kairos"], security: cookieSecurity, parameters: [
@@ -54,6 +78,25 @@ const kairosPaths = {
     post: { tags: ["Kairos"], security: cookieSecurity, description: "Transfers ownership atomically. Only the current PROPIETARIO may invoke it; the current owner becomes SUBLIDER and the destination becomes PROPIETARIO.", parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }, { name: "userId", in: "path", required: true, schema: { type: "integer", minimum: 1 } }], responses: { 200: { description: "Ownership transferred atomically" }, 403: { description: "Only the current owner may transfer ownership" }, 404: { description: "Project or member not found" }, 409: { description: "Destination is not an active member or transfer conflicts" }, ...errorResponses } },
   },
   "/api/kairos/projects/{id}/favorite": { put: { tags: ["Kairos"], security: cookieSecurity, parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }], requestBody: jsonBody({ $ref: "#/components/schemas/KairosFavoriteInput" }), responses: { 200: { description: "Favorite state updated", content: { "application/json": { schema: { $ref: "#/components/schemas/KairosFavoriteResponse" } } } }, ...errorResponses } } },
+  "/api/kairos/projects/{projectId}/activities": {
+    get: { tags: ["Kairos Activities"], security: cookieSecurity, parameters: [{ name: "projectId", in: "path", required: true, schema: { type: "string", minLength: 1, pattern: "^[a-z0-9]+$" } }], responses: { 200: { description: "Activities visible to an active project member, including historical activities in archived projects; vencida is derived from dueAt and state", content: { "application/json": { schema: { $ref: "#/components/schemas/KairosActivityListResponse" } } } }, ...errorResponses } },
+    post: { tags: ["Kairos Activities"], security: cookieSecurity, parameters: [{ name: "projectId", in: "path", required: true, schema: { type: "string", minLength: 1, pattern: "^[a-z0-9]+$" } }], requestBody: jsonBody({ $ref: "#/components/schemas/KairosActivityInput" }), responses: { 201: { description: "Activity created in PENDIENTE", content: { "application/json": { schema: { $ref: "#/components/schemas/KairosActivityResponse" } } } }, ...errorResponses } },
+  },
+  "/api/kairos/projects/{projectId}/activities/{id}": {
+    get: { tags: ["Kairos Activities"], security: cookieSecurity, parameters: [{ name: "projectId", in: "path", required: true, schema: { type: "string", pattern: "^[a-z0-9]+$" } }, { name: "id", in: "path", required: true, schema: { type: "string", pattern: "^[a-z0-9]+$" } }], responses: { 200: { description: "Activity detail with derived vencida; archived project history remains readable", content: { "application/json": { schema: { $ref: "#/components/schemas/KairosActivityResponse" } } } }, ...errorResponses } },
+    patch: { tags: ["Kairos Activities"], security: cookieSecurity, parameters: [{ name: "projectId", in: "path", required: true, schema: { type: "string", pattern: "^[a-z0-9]+$" } }, { name: "id", in: "path", required: true, schema: { type: "string", pattern: "^[a-z0-9]+$" } }], requestBody: jsonBody({ $ref: "#/components/schemas/KairosActivityUpdateInput" }), responses: { 200: { description: "Pending activity updated", content: { "application/json": { schema: { $ref: "#/components/schemas/KairosActivityResponse" } } } }, ...errorResponses } },
+  },
+  "/api/kairos/projects/{projectId}/activities/{id}/transition": { post: { tags: ["Kairos Activities"], security: cookieSecurity, parameters: [{ name: "projectId", in: "path", required: true, schema: { type: "string", pattern: "^[a-z0-9]+$" } }, { name: "id", in: "path", required: true, schema: { type: "string", pattern: "^[a-z0-9]+$" } }], requestBody: jsonBody({ $ref: "#/components/schemas/KairosActivityTransitionInput" }), responses: { 200: { description: "Activity state transitioned and history appended", content: { "application/json": { schema: { $ref: "#/components/schemas/KairosActivityResponse" } } } }, ...errorResponses } } },
+  "/api/kairos/projects/{projectId}/activities/{id}/submit": { post: { tags: ["Kairos Activities"], security: cookieSecurity, parameters: [{ name: "projectId", in: "path", required: true, schema: { type: "string", pattern: "^[a-z0-9]+$" } }, { name: "id", in: "path", required: true, schema: { type: "string", pattern: "^[a-z0-9]+$" } }], requestBody: jsonBody({ $ref: "#/components/schemas/KairosActivitySubmitInput" }), responses: { 200: { description: "Immutable evidence delivery created; activity enters EN_REVISION", content: { "application/json": { schema: { $ref: "#/components/schemas/KairosEvidenceResponse" } } } }, ...errorResponses } } },
+  "/api/kairos/projects/{projectId}/activities/{id}/review": { post: { tags: ["Kairos Activities"], security: cookieSecurity, parameters: [{ name: "projectId", in: "path", required: true, schema: { type: "string", pattern: "^[a-z0-9]+$" } }, { name: "id", in: "path", required: true, schema: { type: "string", pattern: "^[a-z0-9]+$" } }], requestBody: jsonBody({ $ref: "#/components/schemas/KairosActivityReviewInput" }), responses: { 200: { description: "Activity reviewed by a manager different from the responsible user", content: { "application/json": { schema: { $ref: "#/components/schemas/KairosActivityResponse" } } } }, ...errorResponses } } },
+  "/api/kairos/projects/{projectId}/activities/{id}/reopen": { post: { tags: ["Kairos Activities"], security: cookieSecurity, parameters: [{ name: "projectId", in: "path", required: true, schema: { type: "string", pattern: "^[a-z0-9]+$" } }, { name: "id", in: "path", required: true, schema: { type: "string", pattern: "^[a-z0-9]+$" } }], requestBody: jsonBody({ $ref: "#/components/schemas/KairosActivityReopenInput" }), responses: { 200: { description: "Closed activity reopened with mandatory reason", content: { "application/json": { schema: { $ref: "#/components/schemas/KairosActivityResponse" } } } }, ...errorResponses } } },
+  "/api/kairos/projects/{projectId}/activities/{id}/history": { get: { tags: ["Kairos Activities"], security: cookieSecurity, parameters: [{ name: "projectId", in: "path", required: true, schema: { type: "string", minLength: 20, maxLength: 30, pattern: "^[a-z0-9]+$" } }, { name: "id", in: "path", required: true, schema: { type: "string", minLength: 20, maxLength: 30, pattern: "^[a-z0-9]+$" } }, { name: "page", in: "query", schema: { type: "integer", minimum: 1, default: 1 } }, { name: "pageSize", in: "query", schema: { type: "integer", minimum: 1, maximum: 100, default: 50 } }], responses: { 200: { description: "Paginated immutable activity history, including archived projects", content: { "application/json": { schema: { $ref: "#/components/schemas/KairosActivityHistoryResponse" } } } }, ...errorResponses } } },
+  "/api/kairos/projects/{projectId}/activities/{id}/evidence/{evidenceId}/download": { get: { tags: ["Kairos Activities"], security: cookieSecurity, parameters: [{ name: "projectId", in: "path", required: true, schema: { type: "string", pattern: "^[a-z0-9]+$" } }, { name: "id", in: "path", required: true, schema: { type: "string", pattern: "^[a-z0-9]+$" } }, { name: "evidenceId", in: "path", required: true, schema: { type: "string", pattern: "^[a-z0-9]+$" } }], responses: { 200: { description: "Short-lived authorized evidence download URL; archived project evidence remains downloadable to an active member", content: { "application/json": { schema: { $ref: "#/components/schemas/KairosDownloadResponse" } } } }, ...errorResponses } } },
+  "/api/kairos/projects/{projectId}/activities/{id}/evidence": { get: { tags: ["Kairos Activities"], security: cookieSecurity, parameters: [{ name: "projectId", in: "path", required: true, schema: { type: "string", minLength: 20, maxLength: 30, pattern: "^[a-z0-9]+$" } }, { name: "id", in: "path", required: true, schema: { type: "string", minLength: 20, maxLength: 30, pattern: "^[a-z0-9]+$" } }, { name: "page", in: "query", schema: { type: "integer", minimum: 1, default: 1 } }, { name: "pageSize", in: "query", schema: { type: "integer", minimum: 1, maximum: 100, default: 50 } }], responses: { 200: { description: "Paginated immutable evidence deliveries; readable by active members including archived projects", content: { "application/json": { schema: { $ref: "#/components/schemas/KairosEvidencePageResponse" } } } }, ...errorResponses } } },
+  "/api/kairos/projects/{projectId}/activities/{id}/comments": {
+    post: { tags: ["Kairos Activities"], security: cookieSecurity, parameters: [{ name: "projectId", in: "path", required: true, schema: { type: "string", pattern: "^[a-z0-9]+$" } }, { name: "id", in: "path", required: true, schema: { type: "string", pattern: "^[a-z0-9]+$" } }], requestBody: jsonBody({ $ref: "#/components/schemas/KairosActivityCommentInput" }), responses: { 201: { description: "Comment added", content: { "application/json": { schema: { $ref: "#/components/schemas/KairosCommentResponse" } } } }, ...errorResponses } },
+    get: { tags: ["Kairos Activities"], security: cookieSecurity, parameters: [{ name: "projectId", in: "path", required: true, schema: { type: "string", minLength: 20, maxLength: 30, pattern: "^[a-z0-9]+$" } }, { name: "id", in: "path", required: true, schema: { type: "string", minLength: 20, maxLength: 30, pattern: "^[a-z0-9]+$" } }, { name: "page", in: "query", schema: { type: "integer", minimum: 1, default: 1 } }, { name: "pageSize", in: "query", schema: { type: "integer", minimum: 1, maximum: 100, default: 50 } }], responses: { 200: { description: "Paginated activity comments; readable by active members including archived projects", content: { "application/json": { schema: { $ref: "#/components/schemas/KairosCommentPageResponse" } } } }, ...errorResponses } }
+  },
 };
 
 const kairosSchemas = {
@@ -68,6 +111,32 @@ const kairosSchemas = {
   KairosProjectResponse: { type: "object", properties: { data: { $ref: "#/components/schemas/KairosProject" } } },
   KairosProjectDetailResponse: { type: "object", properties: { data: { allOf: [{ $ref: "#/components/schemas/KairosProject" }, { type: "object", properties: { miembros: { type: "array", items: { $ref: "#/components/schemas/KairosMember" } } } }] } } },
   KairosFavoriteResponse: { type: "object", properties: { data: { type: "object", required: ["id", "favorito"], properties: { id: { type: "string" }, favorito: { type: "boolean" } } } } },
+  KairosActivityInput: { type: "object", required: ["title", "responsableId"], additionalProperties: false, properties: { title: { type: "string", minLength: 1, maxLength: 191 }, description: { type: ["string", "null"], maxLength: 3000 }, startAt: { type: "string", format: "date-time" }, dueAt: { type: "string", format: "date-time" }, priority: { type: "string", enum: ["BAJA", "MEDIA", "ALTA", "CRITICA"] }, complexity: { type: "string", enum: ["BAJA", "MEDIA", "ALTA"] }, responsableId: { type: "integer", minimum: 1 }, participantIds: { type: "array", maxItems: 100, items: { type: "integer", minimum: 1 } } } },
+  KairosActivityUpdateInput: { type: "object", minProperties: 1, additionalProperties: false, description: "Partial update; at least one property is required.", properties: { title: { type: "string", minLength: 1, maxLength: 191 }, description: { type: ["string", "null"], maxLength: 3000 }, startAt: { type: "string", format: "date-time" }, dueAt: { type: "string", format: "date-time" }, priority: { type: "string", enum: ["BAJA", "MEDIA", "ALTA", "CRITICA"] }, complexity: { type: "string", enum: ["BAJA", "MEDIA", "ALTA"] }, responsableId: { type: "integer", minimum: 1 }, participantIds: { type: "array", maxItems: 100, items: { type: "integer", minimum: 1 } } } },
+  KairosActivityTransitionInput: { type: "object", required: ["state"], additionalProperties: false, properties: { state: { type: "string", enum: ["EN_PROGRESO", "BLOQUEADA", "CANCELADA"] }, comment: { type: "string", maxLength: 2000 } } },
+  KairosActivitySubmitInput: { type: "object", required: ["archivoId"], additionalProperties: false, properties: { archivoId: { type: "string", minLength: 30, maxLength: 30, pattern: "^[a-f0-9]{30}$" }, comment: { type: "string", maxLength: 1000 } } },
+  KairosActivityReviewInput: { type: "object", required: ["state"], additionalProperties: false, properties: { state: { type: "string", enum: ["TERMINADA", "REQUIERE_CORRECCION"] }, comment: { type: "string", maxLength: 2000, description: "Required for REQUIERE_CORRECCION." } } },
+  KairosActivityReopenInput: { type: "object", required: ["reason"], additionalProperties: false, properties: { reason: { type: "string", minLength: 1, maxLength: 2000 } } },
+  KairosActivityCommentInput: { type: "object", required: ["body"], additionalProperties: false, properties: { body: { type: "string", minLength: 1, maxLength: 2000 } } },
+  KairosActivity: { type: "object", properties: { id: { type: "string" }, proyectoId: { type: "string" }, title: { type: "string" }, description: { type: ["string", "null"] }, startAt: { type: ["string", "null"], format: "date-time" }, dueAt: { type: ["string", "null"], format: "date-time" }, closedAt: { type: ["string", "null"], format: "date-time" }, priority: { type: "string", enum: ["BAJA", "MEDIA", "ALTA", "CRITICA"] }, complexity: { type: "string", enum: ["BAJA", "MEDIA", "ALTA"] }, state: { type: "string", enum: ["PENDIENTE", "EN_PROGRESO", "BLOQUEADA", "EN_REVISION", "REQUIERE_CORRECCION", "TERMINADA", "CANCELADA"] }, responsable: { type: "object" }, participants: { type: "array", items: { type: "object" } }, vencida: { type: "boolean", description: "Derived: dueAt is past and state is not TERMINADA or CANCELADA." } } },
+  KairosEvidence: { type: "object", properties: { id: { type: "string", minLength: 20, maxLength: 30, pattern: "^[a-z0-9]+$" }, actividadId: { type: "string", minLength: 20, maxLength: 30, pattern: "^[a-z0-9]+$" }, archivoId: { type: "string", minLength: 30, maxLength: 30, pattern: "^[a-f0-9]{30}$" }, authorId: { type: "integer" }, version: { type: "integer", minimum: 1 }, comment: { type: ["string", "null"] }, createdAt: { type: "string", format: "date-time" } } },
+  KairosActivityResponse: { type: "object", properties: { data: { $ref: "#/components/schemas/KairosActivity" } } },
+  KairosActivityListResponse: { type: "object", properties: { data: { type: "object", required: ["items", "total"], properties: { items: { type: "array", items: { $ref: "#/components/schemas/KairosActivity" } }, total: { type: "integer" } } } } },
+  KairosEvidenceResponse: { type: "object", properties: { data: { $ref: "#/components/schemas/KairosEvidence" } } },
+  KairosActivityHistoryResponse: { type: "object", additionalProperties: false, required: ["data"], properties: { data: { type: "object", additionalProperties: false, required: ["items", "total", "page", "pageSize"], properties: { items: { type: "array", items: { $ref: "#/components/schemas/KairosActivityHistoryItem" } }, total: { type: "integer", minimum: 0 }, page: { type: "integer", minimum: 1 }, pageSize: { type: "integer", minimum: 1, maximum: 100 } } } } },
+  KairosActivityHistoryItem: { type: "object", additionalProperties: false, properties: { id: { type: "string", minLength: 20, maxLength: 30, pattern: "^[a-z0-9]+$" }, actividadId: { type: "string", minLength: 20, maxLength: 30, pattern: "^[a-z0-9]+$" }, actorId: { type: "integer" }, type: { type: "string" }, fromState: { type: ["string", "null"] }, toState: { type: ["string", "null"] }, comment: { type: ["string", "null"] }, evidenceId: { type: ["string", "null"] }, createdAt: { type: "string", format: "date-time" } } },
+  KairosDownloadResponse: { type: "object", properties: { data: { type: "string", format: "uri" } } },
+  KairosCommentResponse: { type: "object", properties: { data: { type: "object", properties: { id: { type: "string" }, body: { type: "string" }, author: { type: "object" }, createdAt: { type: "string", format: "date-time" } } } } },
+};
+
+const storageSchemas = {
+  FileMetadata: { type: "object", additionalProperties: false, required: ["id", "status", "originalName", "detectedMime", "sizeBytes", "createdAt", "updatedAt"], properties: { id: { type: "string", minLength: 30, maxLength: 30, pattern: "^[a-f0-9]{30}$", description: "30-character lowercase hexadecimal id of the private file" }, status: { type: "string", enum: ["RECIBIDO", "PENDIENTE_ANALISIS", "ANALIZANDO", "DISPONIBLE", "RECHAZADO", "ERROR_ANALISIS", "ELIMINADO"], description: "Asynchronous malware scan lifecycle" }, originalName: { type: "string", maxLength: 255 }, detectedMime: { anyOf: [{ type: "string", maxLength: 150 }, { type: "null" }] }, sizeBytes: { type: "integer", format: "int64", minimum: 1 }, createdAt: { type: "string", format: "date-time" }, updatedAt: { type: "string", format: "date-time" } } },
+  FileResponse: { type: "object", additionalProperties: false, required: ["data"], properties: { data: { $ref: "#/components/schemas/FileMetadata" } } },
+  KairosEvidencePage: { type: "object", additionalProperties: false, required: ["items", "total", "page", "pageSize"], properties: { items: { type: "array", items: { $ref: "#/components/schemas/KairosEvidence" } }, total: { type: "integer", minimum: 0 }, page: { type: "integer", minimum: 1 }, pageSize: { type: "integer", minimum: 1, maximum: 100 } } },
+  KairosEvidencePageResponse: { type: "object", additionalProperties: false, required: ["data"], properties: { data: { $ref: "#/components/schemas/KairosEvidencePage" } } },
+  KairosComment: { type: "object", additionalProperties: false, required: ["id", "body", "createdAt", "author"], properties: { id: { type: "string", minLength: 20, maxLength: 30, pattern: "^[a-z0-9]+$" }, body: { type: "string", maxLength: 2000 }, createdAt: { type: "string", format: "date-time" }, author: { type: "object", additionalProperties: false, required: ["id", "codigo"], properties: { id: { type: "integer", minimum: 1 }, codigo: { type: "string", maxLength: 50 } } } } },
+  KairosCommentPage: { type: "object", additionalProperties: false, required: ["items", "total", "page", "pageSize"], properties: { items: { type: "array", items: { $ref: "#/components/schemas/KairosComment" } }, total: { type: "integer", minimum: 0 }, page: { type: "integer", minimum: 1 }, pageSize: { type: "integer", minimum: 1, maximum: 100 } } },
+  KairosCommentPageResponse: { type: "object", additionalProperties: false, required: ["data"], properties: { data: { $ref: "#/components/schemas/KairosCommentPage" } } },
 };
 
 function normalizeKairosPathParameters(paths: Record<string, any>) {
@@ -76,7 +145,7 @@ function normalizeKairosPathParameters(paths: Record<string, any>) {
     for (const operation of Object.values(operations as Record<string, any>)) {
       for (const parameter of operation.parameters ?? []) {
         if (parameter.name === "userId") parameter.schema = { type: "integer", minimum: 1 };
-        if (parameter.name === "id") parameter.schema = { type: "string", minLength: 1, pattern: "^[a-z0-9]+$", description: "Project CUID" };
+        if (["id", "projectId", "evidenceId"].includes(parameter.name)) parameter.schema = { type: "string", minLength: 20, maxLength: 30, pattern: "^[a-z0-9]+$", description: "CUID" };
       }
     }
   }
@@ -125,7 +194,7 @@ const documentPaths = {
 
 const documentSchemas = {
   DocumentRequirementInput: { type: "object", required: ["usuarioId", "codigo", "nombre"], additionalProperties: false, properties: { usuarioId: { type: "integer", minimum: 1 }, codigo: { type: "string", minLength: 1, maxLength: 80 }, nombre: { type: "string", minLength: 1, maxLength: 191 }, obligatorio: { type: "boolean", default: true } } },
-  DocumentUploadInput: { type: "object", required: ["requisitoId", "archivoId"], additionalProperties: false, properties: { requisitoId: { type: "integer", minimum: 1 }, archivoId: { type: "string", minLength: 1, maxLength: 30, description: "Previously scanned/available Archivo id; upload is linked to this stored object." } } },
+  DocumentUploadInput: { type: "object", required: ["requisitoId", "archivoId"], additionalProperties: false, properties: { requisitoId: { type: "integer", minimum: 1 }, archivoId: { type: "string", minLength: 30, maxLength: 30, pattern: "^[a-f0-9]{30}$", description: "Previously scanned/available Archivo id; upload is linked to this stored object." } } },
   DocumentReviewInput: {
     oneOf: [
       { type: "object", required: ["estado"], additionalProperties: false, properties: { estado: { const: "AUTORIZADO" }, comentario: { type: "string", maxLength: 1000 } } },
@@ -135,7 +204,7 @@ const documentSchemas = {
     description: "comentario is optional for AUTORIZADO and required, non-empty, for RECHAZADO or REQUIERE_CORRECCION.",
   },
   DocumentRequirement: { type: "object", properties: { id: { type: "integer" }, usuarioId: { type: "integer" }, codigo: { type: "string" }, nombre: { type: "string" }, obligatorio: { type: "boolean" }, activo: { type: "boolean" }, versiones: { type: "array", items: { $ref: "#/components/schemas/DocumentVersion" } } } },
-  DocumentVersion: { type: "object", properties: { id: { type: "string" }, requisitoId: { type: "integer" }, archivoId: { type: "string" }, version: { type: "integer" }, estado: { type: "string", enum: ["EN_REVISION", "AUTORIZADO", "RECHAZADO", "REQUIERE_CORRECCION"] }, comentario: { type: ["string", "null"] }, cargadoPorId: { type: "integer" }, revisadoPorId: { type: ["integer", "null"] } } },
+  DocumentVersion: { type: "object", properties: { id: { type: "string", minLength: 20, maxLength: 30, pattern: "^[a-z0-9]+$" }, requisitoId: { type: "integer" }, archivoId: { type: "string", minLength: 30, maxLength: 30, pattern: "^[a-f0-9]{30}$" }, version: { type: "integer" }, estado: { type: "string", enum: ["EN_REVISION", "AUTORIZADO", "RECHAZADO", "REQUIERE_CORRECCION"] }, comentario: { type: ["string", "null"] }, cargadoPorId: { type: "integer" }, revisadoPorId: { type: ["integer", "null"] } } },
   DocumentsPage: { type: "object", required: ["items", "total", "page", "pageSize"], properties: { items: { type: "array", items: { $ref: "#/components/schemas/DocumentRequirement" } }, total: { type: "integer" }, page: { type: "integer" }, pageSize: { type: "integer" } } },
   DocumentsPageResponse: { type: "object", properties: { data: { $ref: "#/components/schemas/DocumentsPage" } } },
   DocumentRequirementResponse: { type: "object", properties: { data: { $ref: "#/components/schemas/DocumentRequirement" } } },
@@ -312,6 +381,7 @@ export function createOpenApiDocument() {
       { name: "Academic" },
       { name: "Documents" },
       { name: "Kairos", description: "Project collaboration, membership and favorites" },
+      { name: "Files", description: "Private multipart uploads and asynchronous malware analysis status" },
     ],
     paths: {
       "/api/health": {
@@ -379,6 +449,7 @@ export function createOpenApiDocument() {
       ...attendancePaths,
       ...documentPaths,
       ...kairosPaths,
+      ...storagePaths,
       "/api/academic/catalogs": {
         get: { tags: ["Academic"], security: cookieSecurity, parameters: [{ name: "page", in: "query", schema: { type: "integer", minimum: 1 } }, { name: "pageSize", in: "query", schema: { type: "integer", minimum: 1, maximum: 100 } }, { name: "search", in: "query", schema: { type: "string" } }], responses: { 200: { description: "Active academic catalogues with pagination", content: { "application/json": { schema: { $ref: "#/components/schemas/AcademicCatalogsResponse" } } } }, ...academicErrorResponses } },
       },
@@ -414,6 +485,7 @@ export function createOpenApiDocument() {
         ...attendanceSchemas,
         ...documentSchemas,
         ...kairosSchemas,
+        ...storageSchemas,
         AcademicProfileInput: {
           type: "object", required: ["institucionId", "programaAcademicoId", "inicio"], additionalProperties: false,
           properties: { institucionId: { type: "integer", minimum: 1 }, unidadAcademicaId: nullableIdSchema(true), programaAcademicoId: { type: "integer", minimum: 1 }, cohorteId: nullableIdSchema(true), inicio: { type: "string", format: "date" }, fin: { anyOf: [{ type: "string", format: "date" }, { type: "null" }] } },

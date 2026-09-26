@@ -16,8 +16,9 @@ const requirement = (overrides: Record<string, unknown> = {}) => ({
 function harness() {
   const tx = {
     $executeRaw: vi.fn().mockResolvedValue(1),
-    requisitoDocumento: { create: vi.fn() },
+    requisitoDocumento: { create: vi.fn(), findUnique: vi.fn() },
     documentoVersion: { findFirst: vi.fn(), findUnique: vi.fn(), create: vi.fn(), update: vi.fn() },
+    archivo: { findUnique: vi.fn() },
   };
   const prisma = {
     requisitoDocumento: { findUnique: vi.fn(), create: vi.fn(), findMany: vi.fn(), count: vi.fn() },
@@ -47,12 +48,14 @@ describe("document requirement and version policies", () => {
   it("increments immutable versions inside a row lock and keeps uploader identity", async () => {
     const h = harness();
     h.prisma.requisitoDocumento.findUnique.mockResolvedValue(requirement());
-    h.prisma.archivo.findUnique.mockResolvedValue({ id: "file-1", status: EstadoArchivo.DISPONIBLE, detectedMime: "application/pdf" });
+    h.prisma.archivo.findUnique.mockResolvedValue({ id: "file-1", status: EstadoArchivo.DISPONIBLE, detectedMime: "application/pdf", propietarioId: 10 });
+    h.tx.requisitoDocumento.findUnique.mockResolvedValue(requirement());
+    h.tx.archivo.findUnique.mockResolvedValue({ id: "file-1", status: EstadoArchivo.DISPONIBLE, detectedMime: "application/pdf", propietarioId: 10 });
     h.tx.documentoVersion.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({ version: 3 });
     h.tx.documentoVersion.create.mockResolvedValue({ id: "v4", version: 4, estado: EstadoDocumento.EN_REVISION, cargadoPorId: 10 });
     const result = await h.service.upload(actor(), { requisitoId: 7, archivoId: "file-1" });
     expect(result).toMatchObject({ version: 4, estado: EstadoDocumento.EN_REVISION, cargadoPorId: 10 });
-    expect(h.tx.$executeRaw).toHaveBeenCalledTimes(1);
+    expect(h.tx.$executeRaw).toHaveBeenCalledTimes(2);
     expect(h.tx.documentoVersion.create).toHaveBeenCalledWith({ data: expect.objectContaining({ version: 4, archivoId: "file-1" }) });
     expect(h.audit.append).toHaveBeenCalledWith(expect.objectContaining({ action: "DOCUMENT_VERSION_UPLOADED", metadata: expect.not.objectContaining({ passwordHash: expect.anything(), objectKey: expect.anything() }) }), h.tx);
   });
@@ -82,6 +85,42 @@ describe("document requirement and version policies", () => {
     await expect(h.service.upload(actor(), { requisitoId: 7, archivoId: "x" })).rejects.toThrow();
     h.prisma.archivo.findUnique.mockResolvedValue({ id: "x", status: EstadoArchivo.DISPONIBLE, detectedMime: "application/zip" });
     await expect(h.service.upload(actor(), { requisitoId: 7, archivoId: "x" })).rejects.toThrow();
+  });
+
+  it("locks requirement and file rows in the same transaction and persists the actor as uploader", async () => {
+    const h = harness();
+    h.tx.requisitoDocumento.findUnique.mockResolvedValue(requirement());
+    h.tx.archivo.findUnique.mockResolvedValue({ id: "owned", status: EstadoArchivo.DISPONIBLE, detectedMime: "application/pdf", propietarioId: 10 });
+    h.tx.documentoVersion.findFirst.mockResolvedValue(null);
+    h.tx.documentoVersion.create.mockResolvedValue({ id: "v1", version: 1, cargadoPorId: 10 });
+    await h.service.upload(actor(), { requisitoId: 7, archivoId: "owned" });
+    expect(h.tx.$executeRaw).toHaveBeenCalledTimes(2);
+    expect(h.tx.documentoVersion.create).toHaveBeenCalledWith({ data: expect.objectContaining({ requisitoId: 7, archivoId: "owned", cargadoPorId: 10 }) });
+    expect(h.audit.append).toHaveBeenCalledWith(expect.objectContaining({ actorId: 10, resource: "document_version" }), h.tx);
+  });
+
+  it.each([
+    ["foreign", { id: "f", status: EstadoArchivo.DISPONIBLE, detectedMime: "application/pdf", propietarioId: 99 }],
+    ["unavailable", { id: "f", status: EstadoArchivo.RECHAZADO, detectedMime: "application/pdf", propietarioId: 10 }],
+    ["mime", { id: "f", status: EstadoArchivo.DISPONIBLE, detectedMime: "application/zip", propietarioId: 10 }],
+    ["missing", null],
+  ])("rejects %s file without creating a document version", async (_label, file) => {
+    const h = harness();
+    h.tx.requisitoDocumento.findUnique.mockResolvedValue(requirement());
+    h.tx.archivo.findUnique.mockResolvedValue(file);
+    await expect(h.service.upload(actor(), { requisitoId: 7, archivoId: "f" })).rejects.toThrow();
+    expect(h.tx.documentoVersion.create).not.toHaveBeenCalled();
+    expect(h.audit.append).not.toHaveBeenCalled();
+  });
+
+  it("does not audit or persist when the transaction callback fails", async () => {
+    const h = harness();
+    h.tx.requisitoDocumento.findUnique.mockResolvedValue(requirement());
+    h.tx.archivo.findUnique.mockResolvedValue({ id: "f", status: EstadoArchivo.DISPONIBLE, detectedMime: "application/pdf", propietarioId: 10 });
+    h.tx.documentoVersion.findFirst.mockResolvedValue(null);
+    h.tx.documentoVersion.create.mockRejectedValue(new Error("rollback"));
+    await expect(h.service.upload(actor(), { requisitoId: 7, archivoId: "f" })).rejects.toThrow("rollback");
+    expect(h.audit.append).not.toHaveBeenCalled();
   });
 
   it.each([EstadoArchivo.PENDIENTE_ANALISIS, EstadoArchivo.ANALIZANDO, EstadoArchivo.RECHAZADO, EstadoArchivo.ERROR_ANALISIS, EstadoArchivo.ELIMINADO])("rejects technical file state %s", async (status) => {
@@ -136,6 +175,19 @@ describe("document review and download policies", () => {
     h.tx.documentoVersion.findUnique.mockResolvedValue(version({ estado: EstadoDocumento.AUTORIZADO }));
     await expect(h.service.review(actor({ id: 21, rol: "COORDINADOR" }), "v1", { estado: "AUTORIZADO" })).rejects.toThrow();
     expect(h.audit.append).toHaveBeenCalledWith(expect.objectContaining({ action: "DOCUMENT_VERSION_REVIEWED", metadata: { result: "AUTORIZADO" } }), h.tx);
+    expect(h.tx.$executeRaw).toHaveBeenCalled();
+  });
+
+  it("revalidates reviewer scope and target status inside the locked transaction", async () => {
+    const h = harness();
+    h.tx.documentoVersion.findUnique.mockResolvedValue(version({ estado: EstadoDocumento.EN_REVISION }));
+    h.tx.documentoVersion.update.mockResolvedValue({ id: "v1", estado: EstadoDocumento.AUTORIZADO });
+    await expect(h.service.review(actor({ id: 20, rol: "COORDINADOR" }), "v1", { estado: "AUTORIZADO" })).resolves.toMatchObject({ estado: EstadoDocumento.AUTORIZADO });
+    expect(h.tx.documentoVersion.findUnique).toHaveBeenCalled();
+    expect(h.tx.$executeRaw).toHaveBeenCalled();
+    h.tx.documentoVersion.findUnique.mockResolvedValue(version({ estado: EstadoDocumento.EN_REVISION, requisito: { usuario: { id: 10, sedeId: 99, areaId: 99, estado: EstadoUsuario.ACTIVA } } }));
+    await expect(h.service.review(actor({ id: 20, rol: "COORDINADOR" }), "v1", { estado: "AUTORIZADO" })).rejects.toThrow();
+    expect(h.tx.documentoVersion.update).toHaveBeenCalledTimes(1);
   });
 
   it("rejects review for inactive target and every non-pending state", async () => {
@@ -170,9 +222,10 @@ describe("document review and download policies", () => {
   it("issues a capability-bound download URL only for an authorized document", async () => {
     const h = harness();
     h.prisma.documentoVersion.findUnique.mockResolvedValue(version({ estado: EstadoDocumento.AUTORIZADO, archivoId: "file-1", archivo: { id: "file-1" } }));
+    h.tx.documentoVersion.findUnique.mockResolvedValue(version({ estado: EstadoDocumento.AUTORIZADO, archivoId: "file-1", archivo: { id: "file-1" } }));
     await expect(h.service.download(actor(), "v1")).resolves.toBe("https://download.test/capability");
     expect(h.storage.downloadUrl).toHaveBeenCalledWith("file-1", expect.anything(), "10");
-    expect(h.audit.append).toHaveBeenCalledWith(expect.objectContaining({ action: "DOCUMENT_DOWNLOAD_REQUESTED", metadata: { result: "authorized" } }));
+    expect(h.audit.append).toHaveBeenCalledWith(expect.objectContaining({ action: "DOCUMENT_DOWNLOAD_REQUESTED", metadata: { result: "authorized" } }), h.tx);
   });
 
   it("does not download a missing or inactive target and records no audit for denied access", async () => {
@@ -192,9 +245,13 @@ describe("document input and file allowlist contracts", () => {
   });
 
   it("accepts only positive requirement ids and non-empty file ids", () => {
-    expect(uploadSchema.safeParse({ requisitoId: 1, archivoId: "file-1" }).success).toBe(true);
-    expect(uploadSchema.safeParse({ requisitoId: 0, archivoId: "file-1" }).success).toBe(false);
+    const valid = "0123456789abcdef0123456789abcd";
+    expect(uploadSchema.safeParse({ requisitoId: 1, archivoId: valid }).success).toBe(true);
+    expect(uploadSchema.safeParse({ requisitoId: 0, archivoId: valid }).success).toBe(false);
     expect(uploadSchema.safeParse({ requisitoId: 1, archivoId: "" }).success).toBe(false);
+    expect(uploadSchema.safeParse({ requisitoId: 1, archivoId: valid.slice(0, 29) }).success).toBe(false);
+    expect(uploadSchema.safeParse({ requisitoId: 1, archivoId: valid.toUpperCase() }).success).toBe(false);
+    expect(uploadSchema.safeParse({ requisitoId: 1, archivoId: `${valid.slice(0, 29)}g` }).success).toBe(false);
   });
 
   it("normalizes list pagination and rejects invalid query values", () => {

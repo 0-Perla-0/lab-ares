@@ -12,6 +12,13 @@ describe("StorageService policies", () => {
     await expect(service().receive({ originalName: "a.jpg", body: Buffer.from([0xff, 0xd8, 1, 2, 0xff, 0xd9]) })).resolves.toEqual({ id: "x" });
     await expect(service().receive({ originalName: "a.txt", contentType: "text/plain", body: Buffer.from("hello") })).resolves.toEqual({ id: "x" });
   });
+  it("persists the optional file owner without changing legacy callers", async () => {
+    const create = vi.fn().mockResolvedValue({ id: "owned" });
+    const svc = new StorageService({ archivo: { create, update: vi.fn() } } as never, { put: vi.fn().mockResolvedValue(undefined) } as never, {} as never, { get: (k: string) => k === "STORAGE_MAX_BYTES" ? 1000 : 5 } as never);
+    await svc.receive({ originalName: "owned.pdf", body: Buffer.from("%PDF-1.7\n%%EOF"), propietarioId: 7 });
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ propietarioId: 7 }) }));
+    await expect(service().receive({ originalName: "legacy.pdf", body: Buffer.from("%PDF-1.7\n%%EOF") })).resolves.toEqual({ id: "x" });
+  });
   it("accepts a valid PNG signature with IEND", async () => {
     const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.from("IHDR"), Buffer.alloc(16), Buffer.from("IEND")]);
     await expect(service().receive({ originalName: "evidence.png", body: png })).resolves.toEqual({ id: "x" });

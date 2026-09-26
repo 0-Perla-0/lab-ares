@@ -14,8 +14,8 @@
 ### Checkpoint del 25 de septiembre de 2026
 
 - Docker local quedó reparado y verificado con MinIO compatible, MariaDB en el host `3307`, 11/11 migraciones y respuestas HTTP 200 de backend, frontend, MinIO y Mailpit.
-- El perfil académico/adscripción histórica, el expediente documental funcional y la base de proyectos/membresías de Kairos de Backend 2 quedan cerrados y verificados.
-- La implementación continúa con actividades/evidencias de Kairos; después seguirá Kanban y, posteriormente, frontend e integración E2E.
+- El perfil académico/adscripción histórica, el expediente documental funcional, la base de proyectos/membresías y las actividades/evidencias de Kairos de Backend 2 quedan cerrados y verificados.
+- La implementación continúa con Kanban; después seguirán frontend e integración E2E.
 - Los dominios de Backend 1 quedan excluidos de este bloque.
 
 ### Cierre verificado: perfil académico y adscripción histórica
@@ -70,7 +70,7 @@ No se asigna un porcentaje global de avance porque daría el mismo peso a una pa
 
 - **Base técnica y administración inicial:** implementadas.
 - **Operación de Servicio Social:** asistencia incremento 1 implementada; validación, ausencias, calendario y documentos pendientes.
-- **Kairos:** proyectos, membresías y favoritos implementados y verificados en backend; actividades, evidencias y Kanban pendientes.
+- **Kairos:** proyectos, membresías, favoritos, actividades y evidencias implementados y verificados en backend; Kanban pendiente.
 - **Funciones secundarias requeridas:** pendientes de desarrollo con un MVP obligatorio ya delimitado.
 
 ### 2.1 Qué aporta la documentación encontrada
@@ -250,8 +250,8 @@ La estrategia correcta es reconstruir contratos de negocio sobre esta arquitectu
 | Documentación de coordinadores  | Sustituir directorios, manuales y bitácoras operadas en Excel                               | Pendiente; biblioteca operativa aprobada                     | Implementar documentos versionados por alcance; mantener directorios y bitácoras consultables como datos estructurados, no como hojas sustitutas    | P2                    |
 | Kairos - proyectos              | Nombre, descripción, prioridad, estado, miembros, favoritos y reportes                      | Proyectos, favoritos y archivo terminal implementados en backend; reportes pendientes | Modelo canónico, API autorizada, pantallas y alcance por proyecto                                                                                   | P1                    |
 | Kairos - miembros               | Roles `PROPIETARIO`, `SUBLIDER`, `COLABORADOR` y `OBSERVADOR`                               | Membresías implementadas y verificadas en backend: baja lógica/reactivación, historial y transferencia atómica de propietario único | Invitación/asignación, matriz de acciones y compatibilidad con roles globales                                                                       | P1                    |
-| Kairos - actividades            | Título, descripción, fechas, complejidad, asignados, estado, duplicado y movimiento         | Pendiente                                                    | CRUD, transiciones, reasignación, trazabilidad al mover entre proyectos y validación                                                                | P1                    |
-| Evidencias Kairos               | Archivos y comentarios con revisión e historial                                             | Pendiente                                                    | Almacenamiento, autorización, versión, retroalimentación y vínculo inequívoco con actividad                                                         | P1                    |
+| Kairos - actividades            | Título, descripción, fechas, complejidad, asignados, estado, duplicado y movimiento         | Implementado y verificado en backend: responsable/participantes, estados y transiciones, vencida derivada, correcciones, reapertura con motivo, comentarios e historial append-only, lecturas históricas archivadas | CRUD, transiciones, reasignación, trazabilidad al mover entre proyectos y validación                                                                | P1                    |
+| Evidencias Kairos               | Archivos y comentarios con revisión e historial                                             | Implementado y verificado en backend: versiones inmutables, revisión separada de responsable, adjuntos privados con escaneo asíncrono y estado de escaneo, propiedad endurecida y vínculo inequívoco con actividad | Almacenamiento, autorización, versión, retroalimentación y vínculo inequívoco con actividad                                                         | P1                    |
 | Kairos - Kanban                 | Carriles `PENDIENTES -> REVISADOS -> EN_PROCESO -> TERMINADO`                               | Pendiente                                                    | Confirmar esos estados, reglas de movimiento y evidencia mínima; construir sobre actividades estables                                               | P2                    |
 | Gamificación y XP               | XP base por calidad, nivel, racha, monedas y progreso                                       | Pendiente; MVP obligatorio aprobado                          | Puntos privados por actividades Kairos aprobadas, nivel derivado, insignias limitadas y libro de eventos; asistencia no otorga XP                   | P3                    |
 | Insignias y ranking             | Logros, medallas y clasificación                                                            | Pendiente; sólo insignias en MVP                             | Catálogo y otorgamiento auditable de insignias; no habrá ranking público inicial                                                                    | P3                    |
@@ -377,10 +377,11 @@ Estos contratos recuperados ya incorporan las decisiones aprobadas de la secció
 ### Incremento 3 - Kairos base
 
 - Proyectos, favoritos y miembros con roles internos, auditoría, archivo terminal y autorización server-side; migración `20260925210000_kairos_projects`.
-- Actividades, responsable principal, participantes y transiciones controladas.
-- Entrega, comentarios y revisión trazable de evidencias.
+- Actividades con responsable principal, participantes, campos funcionales, estados/transiciones controladas y condición derivada de vencimiento; migración `20260925220000_kairos_activities`.
+- Entrega de evidencias con versiones inmutables, revisión separada del responsable, correcciones, reapertura con motivo, comentarios e historial append-only; adjuntos privados con estado de escaneo asíncrono y propiedad endurecida.
+- OpenAPI/Postman actualizado y gate verde con 434 pruebas backend.
 
-La base de proyectos/membresías de Kairos queda **COMPLETADA y verificada en backend**. La evidencia incluye CRUD de proyectos, roles internos separados del RBAC global, un único propietario activo con transferencia atómica, baja lógica/reactivación, favoritos auditados, archivo terminal, OpenAPI/Postman y 392 pruebas backend aprobadas. No se afirma todavía implementación de frontend ni pruebas E2E.
+La base de proyectos/membresías y el bloque de actividades/evidencias de Kairos quedan **COMPLETADOS y verificados en backend**. La evidencia incluye CRUD de proyectos, roles internos separados del RBAC global, un único propietario activo con transferencia atómica, baja lógica/reactivación, favoritos auditados, archivo terminal, actividades con máquina de estados, evidencias versionadas e inmutables, revisión separada, correcciones/reapertura, historial append-only, adjuntos privados y OpenAPI/Postman. El gate actual registra 434 pruebas backend aprobadas. No se afirma todavía implementación de frontend, Kanban ni pruebas E2E.
 
 ### Incremento 4 - Kairos visual y experiencia operativa
 
@@ -867,7 +868,7 @@ La migración 16B se ejecutará sólo si aparecen fuentes del sistema anterior, 
 
 ## 12. Próximo paso recomendado
 
-El perfil académico/adscripción histórica, el expediente documental funcional y la base de proyectos/membresías de Kairos ya están cerrados y verificados en backend. El siguiente bloque es actividades y evidencias; después Kanban. Luego deben abordarse frontend, integración y E2E. Los dominios de Backend 1 están fuera de este bloque.
+El perfil académico/adscripción histórica, el expediente documental funcional y la base de proyectos/membresías y actividades/evidencias de Kairos ya están cerrados y verificados en backend. El siguiente bloque es Kanban. Luego deben abordarse frontend, integración y E2E. Los dominios de Backend 1 están fuera de este bloque.
 
 El contrato funcional principal ya produjo el primer recorrido backend implementable. El orden recomendado desde este corte es:
 

@@ -40,7 +40,11 @@
     { "key": "documentVersionId", "value": "" },
     { "key": "documentFileId", "value": "" },
     { "key": "projectId", "value": "" },
-    { "key": "memberUserId", "value": "" }
+    { "key": "memberUserId", "value": "" },
+    { "key": "activityId", "value": "" },
+    { "key": "evidenceId", "value": "" },
+    { "key": "activityFileId", "value": "" }
+    ,{ "key": "fixtureFilePath", "value": "" }
   ],
   "event": [
     {
@@ -1015,6 +1019,14 @@
       ]
     }
     ,{
+      "name": "Private files",
+      "description": "Multipart upload enters quarantine and is scanned asynchronously. Use the returned activityFileId only after GET /files/{id} reports DISPONIBLE.",
+      "item": [
+        { "name": "Upload private file (local fixture)", "request": { "method": "POST", "header": [], "body": { "mode": "formdata", "formdata": [{ "key": "file", "type": "file", "src": "{{fixtureFilePath}}" }] }, "url": "{{baseUrl}}/files" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([201,400,413,415]).to.include(pm.response.code);", "if(pm.response.code===201) { const id=pm.response.json().data.id; pm.expect(id).to.match(/^[a-f0-9]{30}$/); pm.collectionVariables.set('activityFileId',id); }"] } }] },
+        { "name": "Get scan status", "request": { "method": "GET", "url": "{{baseUrl}}/files/{{activityFileId}}" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,404]).to.include(pm.response.code);", "if(pm.response.code===200) pm.expect(['RECIBIDO','PENDIENTE_ANALISIS','ANALIZANDO','DISPONIBLE','RECHAZADO','ERROR_ANALISIS','ELIMINADO']).to.include(pm.response.json().data.status);"] } }] }
+      ]
+    },
+    {
       "name": "Documents",
       "item": [
         { "name": "List requirements", "request": { "method": "GET", "url": "{{baseUrl}}/documents?userId={{userId}}&page=1&pageSize=50" }, "event": [{ "listen": "test", "script": { "exec": ["pm.response.to.have.status(200);", "const d=pm.response.json().data; pm.expect(d).to.have.property('items'); if(d.items?.[0]?.id) pm.collectionVariables.set('documentRequirementId', d.items[0].id); const fileId=d.items?.[0]?.versiones?.[0]?.archivo?.id ?? d.items?.[0]?.versiones?.[0]?.archivoId; if(fileId) pm.collectionVariables.set('documentFileId', fileId);"] } }] },
@@ -1038,6 +1050,19 @@
         { "name": "Archivar proyecto", "request": { "method": "POST", "url": "{{baseUrl}}/kairos/projects/{{projectId}}/archive" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('Proyecto archivado',()=>pm.response.to.have.status(200));"] } }] },
         { "name": "Transferir propiedad atómicamente", "request": { "method": "POST", "url": "{{baseUrl}}/kairos/projects/{{projectId}}/members/{{memberUserId}}/transfer" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('Propiedad transferida o conflicto documentado',()=>pm.expect([200,403,404,409]).to.include(pm.response.code));"] } }] },
         { "name": "Quitar miembro", "request": { "method": "DELETE", "url": "{{baseUrl}}/kairos/projects/{{projectId}}/members/{{memberUserId}}" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('Miembro removido o conflicto documentado',()=>pm.expect([200,404,409]).to.include(pm.response.code));"] } }] }
+        ,{ "name": "Crear actividad", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"title\":\"Actividad Kairos {{$timestamp}}\",\"description\":\"Entrega de prueba\",\"priority\":\"MEDIA\",\"complexity\":\"MEDIA\",\"responsableId\":{{userId}}}" }, "url": "{{baseUrl}}/kairos/projects/{{projectId}}/activities" }, "event": [{ "listen": "test", "script": { "exec": ["pm.response.to.have.status(201);", "pm.collectionVariables.set('activityId',pm.response.json().data.id);"] } }] },
+        { "name": "Listar actividades", "request": { "method": "GET", "url": "{{baseUrl}}/kairos/projects/{{projectId}}/activities" }, "event": [{ "listen": "test", "script": { "exec": ["pm.response.to.have.status(200);", "pm.expect(pm.response.json().data.items).to.be.an('array');"] } }] },
+        { "name": "Consultar actividad", "request": { "method": "GET", "url": "{{baseUrl}}/kairos/projects/{{projectId}}/activities/{{activityId}}" }, "event": [{ "listen": "test", "script": { "exec": ["pm.response.to.have.status(200);", "pm.expect(pm.response.json().data).to.have.property('vencida');"] } }] },
+        { "name": "Actualizar actividad pendiente", "request": { "method": "PATCH", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"description\":\"Actualizada\"}" }, "url": "{{baseUrl}}/kairos/projects/{{projectId}}/activities/{{activityId}}" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,400,403]).to.include(pm.response.code);"] } }] },
+        { "name": "Transicionar a EN_PROGRESO", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"state\":\"EN_PROGRESO\"}" }, "url": "{{baseUrl}}/kairos/projects/{{projectId}}/activities/{{activityId}}/transition" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,400,403]).to.include(pm.response.code);"] } }] },
+        { "name": "Entregar evidencia inmutable", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"archivoId\":\"{{activityFileId}}\",\"comment\":\"Entrega inicial\"}" }, "url": "{{baseUrl}}/kairos/projects/{{projectId}}/activities/{{activityId}}/submit" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,400,403]).to.include(pm.response.code);", "if(pm.response.code===200) pm.collectionVariables.set('evidenceId',pm.response.json().data.id);"] } }] },
+        { "name": "Revisar actividad", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"state\":\"TERMINADA\",\"comment\":\"Aprobada\"}" }, "url": "{{baseUrl}}/kairos/projects/{{projectId}}/activities/{{activityId}}/review" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,400,403]).to.include(pm.response.code);"] } }] },
+        { "name": "Reabrir actividad con motivo", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"reason\":\"Corrección solicitada\"}" }, "url": "{{baseUrl}}/kairos/projects/{{projectId}}/activities/{{activityId}}/reopen" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,400,403]).to.include(pm.response.code);"] } }] },
+        { "name": "Historial inmutable paginado", "request": { "method": "GET", "url": "{{baseUrl}}/kairos/projects/{{projectId}}/activities/{{activityId}}/history?page=1&pageSize=50" }, "event": [{ "listen": "test", "script": { "exec": ["pm.response.to.have.status(200);", "pm.expect(pm.response.json().data.items).to.be.an('array');", "pm.expect(pm.response.json().data).to.have.property('total');"] } }] },
+        { "name": "Listar evidencias paginado", "request": { "method": "GET", "url": "{{baseUrl}}/kairos/projects/{{projectId}}/activities/{{activityId}}/evidence?page=1&pageSize=50" }, "event": [{ "listen": "test", "script": { "exec": ["pm.response.to.have.status(200);", "pm.expect(pm.response.json().data.items).to.be.an('array');"] } }] },
+        { "name": "Descargar evidencia autorizada", "request": { "method": "GET", "url": "{{baseUrl}}/kairos/projects/{{projectId}}/activities/{{activityId}}/evidence/{{evidenceId}}/download" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,400,404]).to.include(pm.response.code);"] } }] },
+        { "name": "Listar comentarios paginado", "request": { "method": "GET", "url": "{{baseUrl}}/kairos/projects/{{projectId}}/activities/{{activityId}}/comments?page=1&pageSize=50" }, "event": [{ "listen": "test", "script": { "exec": ["pm.response.to.have.status(200);", "pm.expect(pm.response.json().data.items).to.be.an('array');"] } }] },
+        { "name": "Agregar comentario", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"body\":\"Comentario de seguimiento\"}" }, "url": "{{baseUrl}}/kairos/projects/{{projectId}}/activities/{{activityId}}/comments" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([201,400,403]).to.include(pm.response.code);"] } }] }
       ]
     }
   ]

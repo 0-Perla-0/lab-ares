@@ -142,6 +142,13 @@ model Usuario {
   kairosProjectsCreated ProyectoKairos[] @relation("KairosProjectCreator")
   kairosMemberships MiembroProyectoKairos[]
   kairosFavorites FavoritoProyectoKairos[]
+  kairosActivitiesResponsible ActividadKairos[] @relation("KairosActivityResponsible")
+  kairosActivityParticipants ParticipanteActividadKairos[]
+  kairosEvidenceAuthors EntregaEvidenciaKairos[]
+  kairosActivityComments ComentarioActividadKairos[]
+  kairosActivityReviews HistorialActividadKairos[] @relation("KairosActivityReviewer")
+  kairosActivityHistory HistorialActividadKairos[] @relation("KairosActivityActor")
+  archivosPropiedad Archivo[] @relation("ArchivoOwner")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -388,6 +395,8 @@ enum ResultadoAnalisisArchivo {
 
 model Archivo {
   id              String       @id @default(cuid()) @db.VarChar(30)
+  propietarioId   Int?
+  propietario     Usuario? @relation("ArchivoOwner", fields:[propietarioId], references:[id], onDelete:SetNull)
   objectKey       String       @unique @db.VarChar(500)
   quarantineKey   String       @unique @db.VarChar(500)
   originalName    String       @db.VarChar(255)
@@ -406,9 +415,11 @@ model Archivo {
   updatedAt       DateTime     @updatedAt
   analyses        AnalisisArchivo[]
   documentoVersiones DocumentoVersion[]
+  kairosEvidence EntregaEvidenciaKairos[]
 
   @@index([status, nextAttemptAt])
   @@index([leaseUntil])
+  @@index([propietarioId])
 }
 
 enum EstadoDocumento {
@@ -506,6 +517,7 @@ model ProyectoKairos {
   creadoPor   Usuario @relation("KairosProjectCreator", fields: [creadoPorId], references: [id], onDelete: Restrict)
   miembros    MiembroProyectoKairos[]
   favoritos   FavoritoProyectoKairos[]
+  activities ActividadKairos[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -537,6 +549,107 @@ model FavoritoProyectoKairos {
 
   @@id([proyectoId, usuarioId])
   @@index([usuarioId, createdAt])
+}
+
+enum EstadoActividadKairos {
+  PENDIENTE
+  EN_PROGRESO
+  BLOQUEADA
+  EN_REVISION
+  REQUIERE_CORRECCION
+  TERMINADA
+  CANCELADA
+}
+enum PrioridadActividadKairos {
+  BAJA
+  MEDIA
+  ALTA
+  CRITICA
+}
+enum ComplejidadActividadKairos {
+  BAJA
+  MEDIA
+  ALTA
+}
+enum TipoHistorialActividadKairos {
+  TRANSICION
+  REVISION
+  REAPERTURA
+  ENTREGA
+}
+
+model ActividadKairos {
+  id String @id @default(cuid()) @db.VarChar(30)
+  proyectoId String @db.VarChar(30)
+  responsableId Int
+  title String @db.VarChar(191)
+  description String? @db.VarChar(3000)
+  startAt DateTime?
+  dueAt DateTime?
+  closedAt DateTime?
+  priority PrioridadActividadKairos @default(MEDIA)
+  complexity ComplejidadActividadKairos @default(MEDIA)
+  state EstadoActividadKairos @default(PENDIENTE)
+  proyecto ProyectoKairos @relation(fields:[proyectoId], references:[id], onDelete: Cascade)
+  responsable Usuario @relation("KairosActivityResponsible", fields:[responsableId], references:[id], onDelete: Restrict)
+  participants ParticipanteActividadKairos[]
+  evidence EntregaEvidenciaKairos[]
+  comments ComentarioActividadKairos[]
+  history HistorialActividadKairos[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([proyectoId,state,dueAt])
+  @@index([responsableId,state])
+}
+model ParticipanteActividadKairos {
+  actividadId String @db.VarChar(30)
+  usuarioId Int
+  actividad ActividadKairos @relation(fields:[actividadId], references:[id], onDelete: Cascade)
+  usuario Usuario @relation(fields:[usuarioId], references:[id], onDelete: Restrict)
+  createdAt DateTime @default(now())
+  @@id([actividadId,usuarioId])
+}
+model EntregaEvidenciaKairos {
+  id String @id @default(cuid()) @db.VarChar(30)
+  actividadId String @db.VarChar(30)
+  archivoId String @db.VarChar(30)
+  authorId Int
+  version Int
+  comment String? @db.VarChar(1000)
+  actividad ActividadKairos @relation(fields:[actividadId], references:[id], onDelete: Cascade)
+  archivo Archivo @relation(fields:[archivoId], references:[id], onDelete: Restrict)
+  author Usuario @relation(fields:[authorId], references:[id], onDelete: Restrict)
+  createdAt DateTime @default(now())
+  histories HistorialActividadKairos[]
+  @@unique([actividadId,version])
+  @@index([archivoId])
+}
+model ComentarioActividadKairos {
+  id String @id @default(cuid()) @db.VarChar(30)
+  actividadId String @db.VarChar(30)
+  authorId Int
+  body String @db.VarChar(2000)
+  actividad ActividadKairos @relation(fields:[actividadId], references:[id], onDelete: Cascade)
+  author Usuario @relation(fields:[authorId], references:[id], onDelete: Restrict)
+  createdAt DateTime @default(now())
+  @@index([actividadId,createdAt])
+}
+model HistorialActividadKairos {
+  id String @id @default(cuid()) @db.VarChar(30)
+  actividadId String @db.VarChar(30)
+  actorId Int
+  reviewerId Int?
+  type TipoHistorialActividadKairos
+  fromState EstadoActividadKairos?
+  toState EstadoActividadKairos?
+  comment String? @db.VarChar(2000)
+  evidenceId String? @db.VarChar(30)
+  evidence EntregaEvidenciaKairos? @relation(fields:[evidenceId], references:[id], onDelete: Restrict)
+  actividad ActividadKairos @relation(fields:[actividadId], references:[id], onDelete: Cascade)
+  actor Usuario @relation("KairosActivityActor", fields:[actorId], references:[id], onDelete: Restrict)
+  reviewer Usuario? @relation("KairosActivityReviewer", fields:[reviewerId], references:[id], onDelete: Restrict)
+  createdAt DateTime @default(now())
+  @@index([actividadId,createdAt])
 }
 
 model Asistencia {

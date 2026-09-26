@@ -1,6 +1,6 @@
 import { BadRequestException, Inject, Injectable, NotFoundException, ServiceUnavailableException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { Readable } from "node:stream";
 import { createReadStream, createWriteStream } from "node:fs";
 import { open, mkdtemp, rm } from "node:fs/promises";
@@ -17,7 +17,7 @@ const extensionMime: Record<string,string> = { ".pdf":"application/pdf", ".jpg":
 @Injectable()
 export class StorageService {
   constructor(private readonly prisma: PrismaService, private readonly storage: S3Storage, @Inject("MALWARE_SCANNER") private readonly scanner: MalwareScanner, private readonly config: ConfigService<Environment,true>) {}
-  async receive(input:{originalName:string;contentType?:string;body:Buffer|Readable|AsyncIterable<Buffer>;sizeBytes?:number}) {
+  async receive(input:{originalName:string;contentType?:string;body:Buffer|Readable|AsyncIterable<Buffer>;sizeBytes?:number;propietarioId?:number}) {
     const max=this.config.get("STORAGE_MAX_BYTES"); const name=basename(input.originalName);
     if(!name||name!==input.originalName||/\.[^.]+\.[^.]+$/.test(name)||/[\\/]/.test(input.originalName)) throw new BadRequestException("Nombre de archivo no permitido");
     if(input.sizeBytes!==undefined&&(input.sizeBytes<=0||input.sizeBytes>max)) throw new BadRequestException("Archivo vacío o excede el tamaño permitido");
@@ -26,7 +26,7 @@ export class StorageService {
       try { for await(const chunk of source){const b=Buffer.isBuffer(chunk)?chunk:Buffer.from(chunk); size+=b.length; if(size>max) throw new BadRequestException("Archivo vacío o excede el tamaño permitido"); hash.update(b); if(!out.write(b)) await new Promise<void>((resolve,reject)=>{out.once("drain",resolve);out.once("error",reject);});} await new Promise<void>((resolve,reject)=>{out.once("error",reject);out.end(resolve);}); } catch(e){out.destroy();throw e;}
       if(!size||(input.sizeBytes!==undefined&&input.sizeBytes!==size)) throw new BadRequestException("El tamaño declarado no coincide con el contenido");
       const detected=await this.detectMime(path,size,input.contentType), ext=extname(name).toLowerCase(); if(extensionMime[ext]!==detected) throw new BadRequestException("La extensión no coincide con el tipo de archivo"); if(input.contentType&&input.contentType!==detected) throw new BadRequestException("Tipo de archivo no coincide con su firma");
-      const digest=hash.digest("hex"), id=randomUUID(), key=`${id}/${digest}`; const file=await this.prisma.archivo.create({data:{id,objectKey:key,quarantineKey:key,originalName:name.slice(0,255),detectedMime:detected,extension:ext.slice(1),sizeBytes:size,sha256:digest,status:EstadoArchivo.PENDIENTE_ANALISIS}});
+      const digest=hash.digest("hex"), id=randomBytes(15).toString("hex"), key=`${id}/${digest}`; const file=await this.prisma.archivo.create({data:{id,propietarioId:input.propietarioId,objectKey:key,quarantineKey:key,originalName:name.slice(0,255),detectedMime:detected,extension:ext.slice(1),sizeBytes:size,sha256:digest,status:EstadoArchivo.PENDIENTE_ANALISIS}});
       try{await this.storage.put("quarantine",key,createReadStream(path),detected);}catch(error){await this.prisma.archivo.update({where:{id},data:{status:EstadoArchivo.ELIMINADO,lastError:this.safeError(error)}});throw error;} return file;
     } finally { await rm(dir,{recursive:true,force:true}); }
   }
@@ -38,4 +38,10 @@ export class StorageService {
   async analyze(id:string,owner?:string){const file=await this.prisma.archivo.findUnique({where:{id}});if(!file)throw new NotFoundException("Archivo no encontrado");if(owner&&(file.leaseOwner!==owner||file.status!==EstadoArchivo.ANALIZANDO||!file.leaseUntil||file.leaseUntil<=new Date()))return file;try{const result=await this.scanner.scan(await this.storage.get("quarantine",file.quarantineKey));await this.prisma.analisisArchivo.create({data:{archivoId:id,scanner:"clamav",resultado:result.clean?"LIMPIO":"INFECTADO",signature:result.signature,finishedAt:new Date()}});if(!result.clean){await this.storage.delete("quarantine",file.quarantineKey);await this.prisma.archivo.updateMany({where:{id,leaseOwner:owner,status:EstadoArchivo.ANALIZANDO,leaseUntil:{gt:new Date()}},data:{status:EstadoArchivo.RECHAZADO,lastError:result.signature,leaseOwner:null,leaseUntil:null}});return this.prisma.archivo.findUnique({where:{id}});}await this.storage.copy("quarantine","available",file.quarantineKey);const promoted=await this.prisma.archivo.updateMany({where:{id,leaseOwner:owner,status:EstadoArchivo.ANALIZANDO,leaseUntil:{gt:new Date()}},data:{status:EstadoArchivo.DISPONIBLE,objectKey:file.quarantineKey,leaseOwner:null,leaseUntil:null}});if(!promoted.count){try{await this.storage.delete("available",file.quarantineKey);}catch{}return this.prisma.archivo.findUnique({where:{id}});}try{await this.storage.delete("quarantine",file.quarantineKey);}catch{}return this.prisma.archivo.findUnique({where:{id}});}catch(error){const safe=this.safeError(error);await this.prisma.analisisArchivo.create({data:{archivoId:id,scanner:"clamav",resultado:"ERROR",error:safe,finishedAt:new Date()}});await this.prisma.archivo.updateMany({where:{id,leaseOwner:owner,status:EstadoArchivo.ANALIZANDO,leaseUntil:{gt:new Date()}},data:{status:EstadoArchivo.ERROR_ANALISIS,lastError:safe,nextAttemptAt:new Date(Date.now()+60000),leaseOwner:null,leaseUntil:null}});return this.prisma.archivo.findUnique({where:{id}});}}
   private safeError(error:unknown){const code=typeof error==="object"&&error&&"name"in error?String((error as{name?:unknown}).name):"StorageError";return code.replace(/[^A-Za-z0-9_.-]/g,"").slice(0,120);}
   async downloadUrl(id:string,capability:DownloadCapability,currentSubjectId:string){if(!capability||capability.subjectId!==currentSubjectId||capability.resourceId!==id||capability.purpose!=="download"||!(capability.issuedAt instanceof Date)||Date.now()-capability.issuedAt.getTime()>300000)throw new ServiceUnavailableException("Descarga no autorizada");const file=await this.prisma.archivo.findUnique({where:{id}});if(!file||file.status!==EstadoArchivo.DISPONIBLE)throw new ServiceUnavailableException("Archivo no disponible");return this.storage.signedDownload(file.objectKey,300,file.originalName,file.detectedMime??"application/octet-stream");}
+  async metadata(id: string, propietarioId: number) {
+    if (!/^[a-f0-9]{30}$/.test(id)) throw new NotFoundException("Archivo no encontrado");
+    const file = await this.prisma.archivo.findFirst({ where: { id, propietarioId }, select: { id: true, status: true, originalName: true, detectedMime: true, sizeBytes: true, createdAt: true, updatedAt: true } });
+    if (!file) throw new NotFoundException("Archivo no encontrado");
+    return { ...file, sizeBytes: Number(file.sizeBytes) };
+  }
 }
