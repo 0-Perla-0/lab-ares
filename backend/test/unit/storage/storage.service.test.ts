@@ -12,6 +12,17 @@ describe("StorageService policies", () => {
     await expect(service().receive({ originalName: "a.jpg", body: Buffer.from([0xff, 0xd8, 1, 2, 0xff, 0xd9]) })).resolves.toEqual({ id: "x" });
     await expect(service().receive({ originalName: "a.txt", contentType: "text/plain", body: Buffer.from("hello") })).resolves.toEqual({ id: "x" });
   });
+  it("accepts a valid PNG signature with IEND", async () => {
+    const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.from("IHDR"), Buffer.alloc(16), Buffer.from("IEND")]);
+    await expect(service().receive({ originalName: "evidence.png", body: png })).resolves.toEqual({ id: "x" });
+  });
+  it("rejects invalid, truncated, ZIP/polyglot and double-extension PNG payloads", async () => {
+    const signature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    await expect(service().receive({ originalName: "bad.png", body: Buffer.concat([Buffer.from("not-png"), Buffer.from("IEND")]) })).rejects.toThrow();
+    await expect(service().receive({ originalName: "truncated.png", body: signature })).rejects.toThrow();
+    await expect(service().receive({ originalName: "archive.png", body: Buffer.concat([Buffer.from([0x50, 0x4b, 0x03, 0x04]), signature, Buffer.from("IEND")]) })).rejects.toThrow();
+    await expect(service().receive({ originalName: "evidence.png.exe", body: Buffer.concat([signature, Buffer.from("IEND")]) })).rejects.toThrow();
+  });
   it("rejects empty, malformed and unsupported signatures", async () => {
     await expect(service().receive({ originalName: "a.stl", contentType: "model/stl", body: Buffer.from("solid") })).rejects.toThrow();
     await expect(service().receive({ originalName: "a.bin", body: Buffer.from([1, 2, 3]) })).rejects.toThrow();

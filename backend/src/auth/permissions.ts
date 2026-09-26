@@ -14,6 +14,9 @@ export enum Permission {
   ACADEMIC_PROFILE_READ = "academic:profile:read",
   ACADEMIC_PROFILE_UPDATE = "academic:profile:update",
   ACADEMIC_CATALOG_MANAGE = "academic:catalog:manage",
+  DOCUMENTS_READ = "documents:read",
+  DOCUMENTS_UPLOAD = "documents:upload",
+  DOCUMENTS_REVIEW = "documents:review",
 }
 
 export enum AccessScope {
@@ -30,6 +33,8 @@ const commonUserGrants: RoleGrants = {
   [Permission.ATTENDANCE_CHECK_IN]: AccessScope.SELF,
   [Permission.ACADEMIC_PROFILE_READ]: AccessScope.SELF,
   [Permission.ACADEMIC_PROFILE_UPDATE]: AccessScope.SELF,
+  [Permission.DOCUMENTS_READ]: AccessScope.SELF,
+  [Permission.DOCUMENTS_UPLOAD]: AccessScope.SELF,
   // Organization data is a shared catalogue needed by authenticated flows.
   [Permission.ORGANIZATION_READ]: AccessScope.GLOBAL,
 };
@@ -41,6 +46,8 @@ const areaManagerGrants: RoleGrants = {
   [Permission.USERS_MANAGE]: AccessScope.AREA,
   [Permission.KAIROS_PROJECT_CREATE]: AccessScope.AREA,
   [Permission.ACADEMIC_PROFILE_READ]: AccessScope.AREA,
+  [Permission.DOCUMENTS_READ]: AccessScope.AREA,
+  [Permission.DOCUMENTS_REVIEW]: AccessScope.AREA,
 };
 
 const permissionsByRole: Record<RolUsuario, RoleGrants> = {
@@ -59,6 +66,8 @@ const permissionsByRole: Record<RolUsuario, RoleGrants> = {
     [Permission.USERS_MANAGE]: AccessScope.SEDE,
     [Permission.KAIROS_PROJECT_CREATE]: AccessScope.SEDE,
     [Permission.ACADEMIC_PROFILE_READ]: AccessScope.SEDE,
+    [Permission.DOCUMENTS_READ]: AccessScope.SEDE,
+    [Permission.DOCUMENTS_REVIEW]: AccessScope.SEDE,
   },
   [RolUsuario.JEFE_COORDINADORES]: {
     ...areaManagerGrants,
@@ -69,6 +78,8 @@ const permissionsByRole: Record<RolUsuario, RoleGrants> = {
     [Permission.KAIROS_PROJECT_CREATE]: AccessScope.GLOBAL,
     [Permission.ACADEMIC_PROFILE_READ]: AccessScope.GLOBAL,
     [Permission.ACADEMIC_CATALOG_MANAGE]: AccessScope.GLOBAL,
+    [Permission.DOCUMENTS_READ]: AccessScope.GLOBAL,
+    [Permission.DOCUMENTS_REVIEW]: AccessScope.GLOBAL,
   },
   [RolUsuario.ADMIN]: Object.fromEntries(
     Object.values(Permission).map((permission) => [

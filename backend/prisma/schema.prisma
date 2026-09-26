@@ -136,6 +136,9 @@ model Usuario {
   adscripcionesAcademicas AdscripcionAcademica[]
   solicitudesAcademicas AdscripcionAcademica[] @relation("AcademicRequester")
   confirmacionesAcademicas AdscripcionAcademica[] @relation("AcademicConfirmer")
+  requisitosDocumentales RequisitoDocumento[]
+  documentosCargados DocumentoVersion[] @relation("DocumentoUploader")
+  documentosRevisados DocumentoVersion[] @relation("DocumentoReviewer")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -399,9 +402,54 @@ model Archivo {
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
   analyses        AnalisisArchivo[]
+  documentoVersiones DocumentoVersion[]
 
   @@index([status, nextAttemptAt])
   @@index([leaseUntil])
+}
+
+enum EstadoDocumento {
+  PENDIENTE_CARGA
+  EN_REVISION
+  AUTORIZADO
+  RECHAZADO
+  REQUIERE_CORRECCION
+  VENCIDO
+  CANCELADO
+}
+
+model RequisitoDocumento {
+  id Int @id @default(autoincrement())
+  usuarioId Int
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+  codigo String @db.VarChar(80)
+  nombre String @db.VarChar(191)
+  obligatorio Boolean @default(true)
+  activo Boolean @default(true)
+  versiones DocumentoVersion[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([usuarioId, codigo])
+  @@index([usuarioId, activo])
+}
+
+model DocumentoVersion {
+  id String @id @default(cuid()) @db.VarChar(30)
+  requisitoId Int
+  requisito RequisitoDocumento @relation(fields: [requisitoId], references: [id], onDelete: Restrict)
+  archivoId String
+  archivo Archivo @relation(fields: [archivoId], references: [id], onDelete: Restrict)
+  version Int
+  estado EstadoDocumento @default(PENDIENTE_CARGA)
+  comentario String? @db.VarChar(1000)
+  cargadoPorId Int
+  cargadoPor Usuario @relation("DocumentoUploader", fields: [cargadoPorId], references: [id], onDelete: Restrict)
+  revisadoPorId Int?
+  revisadoPor Usuario? @relation("DocumentoReviewer", fields: [revisadoPorId], references: [id], onDelete: Restrict)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([requisitoId, version])
+  @@index([requisitoId, estado, createdAt])
 }
 
 model AnalisisArchivo {

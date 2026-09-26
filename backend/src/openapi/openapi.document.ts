@@ -20,7 +20,7 @@ const userStates = [
   "BAJA",
 ] as const;
 
-const errorResponses = {
+const errorResponses: Record<string, any> = {
   400: { description: "Invalid request" },
   401: { description: "Authentication required" },
   403: { description: "Insufficient permissions" },
@@ -29,6 +29,67 @@ const errorResponses = {
   500: { description: "Unexpected server error" },
 };
 const academicErrorResponses = { ...errorResponses, 404: { description: "Academic resource not found" }, 409: { description: "Academic conflict" } };
+
+const documentPaths = {
+  "/api/documents": {
+    get: {
+      tags: ["Documents"], security: cookieSecurity,
+      parameters: [
+        { name: "userId", in: "query", schema: { type: "integer", minimum: 1 }, description: "Optional target user; visibility is limited by the actor scope." },
+        { name: "page", in: "query", schema: { type: "integer", minimum: 1, default: 1 } },
+        { name: "pageSize", in: "query", schema: { type: "integer", minimum: 1, maximum: 100, default: 50 } },
+      ],
+      responses: { 200: { description: "Active document requirements and latest versions", content: { "application/json": { schema: { $ref: "#/components/schemas/DocumentsPageResponse" } } } }, ...errorResponses },
+    },
+  },
+  "/api/documents/requirements": {
+    post: {
+      tags: ["Documents"], security: cookieSecurity,
+      requestBody: jsonBody({ $ref: "#/components/schemas/DocumentRequirementInput" }),
+      responses: { 201: { description: "Requirement created", content: { "application/json": { schema: { $ref: "#/components/schemas/DocumentRequirementResponse" } } } }, ...errorResponses },
+    },
+  },
+  "/api/documents/versions": {
+    post: {
+      tags: ["Documents"], security: cookieSecurity,
+      requestBody: jsonBody({ $ref: "#/components/schemas/DocumentUploadInput" }),
+      responses: { 201: { description: "Version uploaded for review", content: { "application/json": { schema: { $ref: "#/components/schemas/DocumentVersionResponse" } } } }, ...errorResponses, 413: { description: "Uploaded file exceeds configured size limit" }, 415: { description: "File type is not supported" } },
+    },
+  },
+  "/api/documents/versions/{id}/review": {
+    post: {
+      tags: ["Documents"], security: cookieSecurity, parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+      requestBody: jsonBody({ $ref: "#/components/schemas/DocumentReviewInput" }),
+      responses: { 200: { description: "Version reviewed", content: { "application/json": { schema: { $ref: "#/components/schemas/DocumentVersionResponse" } } } }, ...errorResponses },
+    },
+  },
+  "/api/documents/versions/{id}/download": {
+    get: {
+      tags: ["Documents"], security: cookieSecurity, parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+      responses: { 200: { description: "Short-lived authorized download URL", content: { "application/json": { schema: { $ref: "#/components/schemas/DocumentDownloadResponse" } } } }, ...errorResponses },
+    },
+  },
+};
+
+const documentSchemas = {
+  DocumentRequirementInput: { type: "object", required: ["usuarioId", "codigo", "nombre"], additionalProperties: false, properties: { usuarioId: { type: "integer", minimum: 1 }, codigo: { type: "string", minLength: 1, maxLength: 80 }, nombre: { type: "string", minLength: 1, maxLength: 191 }, obligatorio: { type: "boolean", default: true } } },
+  DocumentUploadInput: { type: "object", required: ["requisitoId", "archivoId"], additionalProperties: false, properties: { requisitoId: { type: "integer", minimum: 1 }, archivoId: { type: "string", minLength: 1, maxLength: 30, description: "Previously scanned/available Archivo id; upload is linked to this stored object." } } },
+  DocumentReviewInput: {
+    oneOf: [
+      { type: "object", required: ["estado"], additionalProperties: false, properties: { estado: { const: "AUTORIZADO" }, comentario: { type: "string", maxLength: 1000 } } },
+      { type: "object", required: ["estado", "comentario"], additionalProperties: false, properties: { estado: { const: "RECHAZADO" }, comentario: { type: "string", minLength: 1, maxLength: 1000 } } },
+      { type: "object", required: ["estado", "comentario"], additionalProperties: false, properties: { estado: { const: "REQUIERE_CORRECCION" }, comentario: { type: "string", minLength: 1, maxLength: 1000 } } },
+    ],
+    description: "comentario is optional for AUTORIZADO and required, non-empty, for RECHAZADO or REQUIERE_CORRECCION.",
+  },
+  DocumentRequirement: { type: "object", properties: { id: { type: "integer" }, usuarioId: { type: "integer" }, codigo: { type: "string" }, nombre: { type: "string" }, obligatorio: { type: "boolean" }, activo: { type: "boolean" }, versiones: { type: "array", items: { $ref: "#/components/schemas/DocumentVersion" } } } },
+  DocumentVersion: { type: "object", properties: { id: { type: "string" }, requisitoId: { type: "integer" }, archivoId: { type: "string" }, version: { type: "integer" }, estado: { type: "string", enum: ["EN_REVISION", "AUTORIZADO", "RECHAZADO", "REQUIERE_CORRECCION"] }, comentario: { type: ["string", "null"] }, cargadoPorId: { type: "integer" }, revisadoPorId: { type: ["integer", "null"] } } },
+  DocumentsPage: { type: "object", required: ["items", "total", "page", "pageSize"], properties: { items: { type: "array", items: { $ref: "#/components/schemas/DocumentRequirement" } }, total: { type: "integer" }, page: { type: "integer" }, pageSize: { type: "integer" } } },
+  DocumentsPageResponse: { type: "object", properties: { data: { $ref: "#/components/schemas/DocumentsPage" } } },
+  DocumentRequirementResponse: { type: "object", properties: { data: { $ref: "#/components/schemas/DocumentRequirement" } } },
+  DocumentVersionResponse: { type: "object", properties: { data: { $ref: "#/components/schemas/DocumentVersion" } } },
+  DocumentDownloadResponse: { type: "object", properties: { data: { type: "string", format: "uri", description: "Short-lived signed URL" } } },
+};
 
 function jsonBody(schema: object) {
   return {
@@ -196,6 +257,7 @@ export function createOpenApiDocument() {
       { name: "Organization" },
       { name: "Users" },
       { name: "Academic" },
+      { name: "Documents" },
     ],
     paths: {
       "/api/health": {
@@ -261,6 +323,7 @@ export function createOpenApiDocument() {
       ...userPaths(),
       ...identityPaths,
       ...attendancePaths,
+      ...documentPaths,
       "/api/academic/catalogs": {
         get: { tags: ["Academic"], security: cookieSecurity, parameters: [{ name: "page", in: "query", schema: { type: "integer", minimum: 1 } }, { name: "pageSize", in: "query", schema: { type: "integer", minimum: 1, maximum: 100 } }, { name: "search", in: "query", schema: { type: "string" } }], responses: { 200: { description: "Active academic catalogues with pagination", content: { "application/json": { schema: { $ref: "#/components/schemas/AcademicCatalogsResponse" } } } }, ...academicErrorResponses } },
       },
@@ -294,6 +357,7 @@ export function createOpenApiDocument() {
       },
       schemas: {
         ...attendanceSchemas,
+        ...documentSchemas,
         AcademicProfileInput: {
           type: "object", required: ["institucionId", "programaAcademicoId", "inicio"], additionalProperties: false,
           properties: { institucionId: { type: "integer", minimum: 1 }, unidadAcademicaId: nullableIdSchema(true), programaAcademicoId: { type: "integer", minimum: 1 }, cohorteId: nullableIdSchema(true), inicio: { type: "string", format: "date" }, fin: { anyOf: [{ type: "string", format: "date" }, { type: "null" }] } },

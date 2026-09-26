@@ -71,7 +71,10 @@
       "key": "academicRequestId",
       "value": "",
       "type": "string"
-    }
+    },
+    { "key": "documentRequirementId", "value": "", "type": "string" },
+    { "key": "documentVersionId", "value": "", "type": "string" },
+    { "key": "documentFileId", "value": "", "type": "string" }
   ],
   "item": [
     {
@@ -1781,6 +1784,16 @@
             }
           ]
         }
+      ]
+    }
+    ,{
+      "name": "08 - Documentos",
+      "item": [
+        { "name": "Listar requisitos", "request": { "method": "GET", "url": "{{baseUrl}}/documents?userId={{userId}}&page=1&pageSize=50" }, "event": [{ "listen": "test", "script": { "exec": ["pm.response.to.have.status(200);", "const d=pm.response.json().data; pm.expect(d).to.have.property('items'); if(d.items?.[0]?.id) pm.collectionVariables.set('documentRequirementId', d.items[0].id); const fileId=d.items?.[0]?.versiones?.[0]?.archivo?.id ?? d.items?.[0]?.versiones?.[0]?.archivoId; if(fileId) pm.collectionVariables.set('documentFileId', fileId);"] } }] },
+        { "name": "Crear requisito", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"usuarioId\":{{userId}},\"codigo\":\"INE\",\"nombre\":\"Identificación oficial\",\"obligatorio\":true}" }, "url": "{{baseUrl}}/documents/requirements" }, "event": [{ "listen": "test", "script": { "exec": ["pm.response.to.have.status(201);", "pm.collectionVariables.set('documentRequirementId', pm.response.json().data.id);"] } }] },
+        { "name": "Subir versión", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"requisitoId\":{{documentRequirementId}},\"archivoId\":\"{{documentFileId}}\"}" }, "url": "{{baseUrl}}/documents/versions" }, "event": [{ "listen": "test", "script": { "exec": ["pm.response.to.have.status(201);", "pm.collectionVariables.set('documentVersionId', pm.response.json().data.id);"] } }] },
+        { "name": "Revisar versión", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"estado\":\"AUTORIZADO\"}" }, "url": "{{baseUrl}}/documents/versions/{{documentVersionId}}/review" }, "event": [{ "listen": "test", "script": { "exec": ["pm.response.to.have.status(200);"] } }] },
+        { "name": "Descargar versión autorizada", "request": { "method": "GET", "url": "{{baseUrl}}/documents/versions/{{documentVersionId}}/download" }, "event": [{ "listen": "test", "script": { "exec": ["pm.response.to.have.status(200);", "pm.expect(pm.response.json().data).to.be.a('string');"] } }] }
       ]
     }
   ]

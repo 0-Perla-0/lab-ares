@@ -18,6 +18,7 @@ import { StorageModule } from "./storage/storage.module";
 import { InvitationsModule } from "./invitations/invitations.module";
 import { NotificationsModule } from "./notifications/notifications.module";
 import { AcademicModule } from "./academic/academic.module";
+import { DocumentsModule } from "./documents/documents.module";
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { AcademicModule } from "./academic/academic.module";
     InvitationsModule,
     NotificationsModule,
     AcademicModule,
+    DocumentsModule,
     OpenApiModule,
   ],
   providers: [

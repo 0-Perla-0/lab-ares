@@ -15,7 +15,7 @@
 
 - Docker local quedó reparado y verificado con MinIO compatible, MariaDB en el host `3307`, 11/11 migraciones y respuestas HTTP 200 de backend, frontend, MinIO y Mailpit.
 - La implementación está pausada por petición del usuario.
-- El perfil académico/adscripción histórica de Backend 2 queda cerrado y verificado; el siguiente bloque es el expediente documental funcional.
+- El perfil académico/adscripción histórica y el expediente documental funcional de Backend 2 quedan cerrados y verificados; el siguiente bloque es Kairos.
 - Los dominios de Backend 1 quedan excluidos de este bloque.
 
 ### Cierre verificado: perfil académico y adscripción histórica
@@ -26,7 +26,19 @@
 - Migraciones aplicadas: `20260925180000_academic_profile` y `20260925190000_academic_audit_fks`.
 - OpenAPI y ambas colecciones/entornos de Postman quedaron actualizados.
 - Gate verde: 310 pruebas backend, incluidos 22 casos del servicio académico y 6 schemas, además de build, check, Prisma y Compose.
-- El expediente documental funcional aún **NO** está implementado y es el siguiente bloque.
+- El expediente documental funcional queda implementado y verificado en este corte.
+
+### Cierre verificado: expediente documental funcional
+
+- Se implementaron `RequisitoDocumento` y `DocumentoVersion` sobre `Archivo`, con migración append-only `20260925200000_document_expedient`.
+- Estados exactos: `PENDIENTE_CARGA`, `EN_REVISION`, `AUTORIZADO`, `RECHAZADO`, `REQUIERE_CORRECCION`, `VENCIDO` y `CANCELADO`.
+- Las versiones son inmutables y sólo puede existir una versión pendiente bajo lock. Se aplican scopes/ownership, separación carga-revisión, retroalimentación y auditoría redactada.
+- La capability de descarga exige estado `AUTORIZADO` y `Archivo` `DISPONIBLE`.
+- La validación admite PNG por magic bytes e `IEND`, además de PDF/JPEG, con allowlist y límite de 10 MiB.
+- Endpoints verificados: `list`, `create requirement`, `upload`, `review` y `download`.
+- OpenAPI y ambas colecciones/entornos de Postman quedaron actualizados.
+- Gate verde: 345 pruebas backend, `check`, `build`, Prisma, Compose y contratos; incluye pruebas de PNG y documentos.
+- Esta fase queda **COMPLETADA**. El siguiente bloque es Kairos: proyectos, membresías, actividades y evidencias; después, Kanban.
 
 ## 1. Alcance y criterio de comparación
 
@@ -853,7 +865,7 @@ La migración 16B se ejecutará sólo si aparecen fuentes del sistema anterior, 
 
 ## 12. Próximo paso recomendado
 
-La implementación queda pausada por petición del usuario. Al reanudar, el perfil académico/adscripción histórica ya está cerrado; el siguiente bloque recomendado es el expediente documental funcional, seguido de frontend, integración y E2E. Los dominios de Backend 1 están fuera de este bloque.
+La implementación queda pausada por petición del usuario. Al reanudar, el perfil académico/adscripción histórica y el expediente documental funcional ya están cerrados; el siguiente bloque recomendado es Kairos (proyectos, membresías, actividades y evidencias), seguido de Kanban. Después deben abordarse frontend, integración y E2E. Los dominios de Backend 1 están fuera de este bloque.
 
 El contrato funcional principal ya produjo el primer recorrido backend implementable. El orden recomendado desde este corte es:
 
