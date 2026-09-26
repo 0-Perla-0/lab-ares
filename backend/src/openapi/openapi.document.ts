@@ -322,6 +322,89 @@ const reportsSchemas = {
   },
 };
 
+const libraryIdParameter = { name: "id", in: "path", required: true, schema: { type: "string", pattern: "^c[a-z0-9]{20,30}$" } };
+const libraryPaths = {
+  "/api/library": {
+    get: {
+      tags: ["Library"], security: cookieSecurity,
+      description: "Lists operational library entries visible through GLOBAL, SEDE, AREA or active PROYECTO membership scope. Ordinary readers receive only effective published versions.",
+      parameters: [
+        { name: "page", in: "query", schema: { type: "integer", minimum: 1, default: 1 } },
+        { name: "pageSize", in: "query", schema: { type: "integer", minimum: 1, maximum: 100, default: 20 } },
+        { name: "q", in: "query", schema: { type: "string", maxLength: 100 } },
+        { name: "categoria", in: "query", schema: { $ref: "#/components/schemas/LibraryCategory" } },
+        { name: "alcance", in: "query", schema: { $ref: "#/components/schemas/LibraryScope" } },
+        { name: "estado", in: "query", description: "Workflow users only", schema: { $ref: "#/components/schemas/LibraryState" } },
+        { name: "requiereAcuse", in: "query", schema: { type: "boolean" } },
+      ],
+      responses: { 200: { description: "Scoped library page", content: { "application/json": { schema: { $ref: "#/components/schemas/LibraryPageResponse" } } } }, ...errorResponses },
+    },
+    post: {
+      tags: ["Library"], security: cookieSecurity,
+      description: "Creates library metadata and immutable version 1 from an available private file owned by the actor. GLOBAL drafts are administrator-only.",
+      requestBody: jsonBody({ $ref: "#/components/schemas/LibraryCreateInput" }),
+      responses: { 201: { description: "Draft created", content: { "application/json": { schema: { $ref: "#/components/schemas/LibraryDocumentResponse" } } } }, ...errorResponses },
+    },
+  },
+  "/api/library/{id}": {
+    get: { tags: ["Library"], security: cookieSecurity, parameters: [libraryIdParameter], responses: { 200: { description: "Scoped document and version history", content: { "application/json": { schema: { $ref: "#/components/schemas/LibraryDocumentResponse" } } } }, ...errorResponses } },
+  },
+  "/api/library/{id}/versions": {
+    post: { tags: ["Library"], security: cookieSecurity, parameters: [libraryIdParameter], description: "Adds a new immutable draft version. Only one BORRADOR or EN_REVISION version may exist per document.", requestBody: jsonBody({ $ref: "#/components/schemas/LibraryVersionCreateInput" }), responses: { 201: { description: "Version created", content: { "application/json": { schema: { $ref: "#/components/schemas/LibraryVersionResponse" } } } }, ...errorResponses } },
+  },
+  "/api/library/{id}/archive": {
+    post: { tags: ["Library"], security: cookieSecurity, parameters: [libraryIdParameter], description: "Archives the entry and its non-archived versions. A reason is mandatory.", requestBody: jsonBody({ $ref: "#/components/schemas/LibraryArchiveInput" }), responses: { 200: { description: "Document archived", content: { "application/json": { schema: { $ref: "#/components/schemas/LibraryDocumentResponse" } } } }, ...errorResponses } },
+  },
+  "/api/library/versions/{id}/submit-review": {
+    post: { tags: ["Library"], security: cookieSecurity, parameters: [libraryIdParameter], description: "Moves a draft to EN_REVISION.", responses: { 200: { description: "Version submitted", content: { "application/json": { schema: { $ref: "#/components/schemas/LibraryVersionResponse" } } } }, ...errorResponses } },
+  },
+  "/api/library/versions/{id}/review": {
+    post: { tags: ["Library"], security: cookieSecurity, parameters: [libraryIdParameter], description: "Records an independent review. The author cannot review their own version; REQUEST_CHANGES returns it to BORRADOR.", requestBody: jsonBody({ $ref: "#/components/schemas/LibraryReviewInput" }), responses: { 200: { description: "Review recorded", content: { "application/json": { schema: { $ref: "#/components/schemas/LibraryVersionResponse" } } } }, ...errorResponses } },
+  },
+  "/api/library/versions/{id}/publish": {
+    post: { tags: ["Library"], security: cookieSecurity, parameters: [libraryIdParameter], description: "Publishes an independently reviewed version. Replacing the prior publication requires motivoSustitucion and archives it atomically.", requestBody: jsonBody({ $ref: "#/components/schemas/LibraryPublishInput" }), responses: { 200: { description: "Version published", content: { "application/json": { schema: { $ref: "#/components/schemas/LibraryVersionResponse" } } } }, ...errorResponses } },
+  },
+  "/api/library/versions/{id}/download": {
+    get: { tags: ["Library"], security: cookieSecurity, parameters: [libraryIdParameter], description: "Issues a short-lived private capability-bound URL for an effective publication or an authorized workflow participant.", responses: { 200: { description: "Private download URL", content: { "application/json": { schema: { $ref: "#/components/schemas/LibraryDownloadResponse" } } } }, ...errorResponses } },
+  },
+  "/api/library/versions/{id}/acknowledge": {
+    post: { tags: ["Library"], security: cookieSecurity, parameters: [libraryIdParameter], description: "Idempotently records user, version and timestamp for a publication that requires acknowledgement. It is not a signature, legal acceptance or notification read receipt.", responses: { 200: { description: "Acknowledgement recorded", content: { "application/json": { schema: { $ref: "#/components/schemas/LibraryAcknowledgementResponse" } } } }, ...errorResponses } },
+  },
+};
+
+const librarySchemas = {
+  LibraryCategory: { type: "string", enum: ["MANUAL","PROCEDIMIENTO","REGLAMENTO","FORMATO","INSTRUCTIVO","PROTOCOLO","CAPACITACION","PLANTILLA","COMUNICADO_PERMANENTE","POLITICA"] },
+  LibraryScope: { type: "string", enum: ["GLOBAL","SEDE","AREA","PROYECTO"] },
+  LibraryState: { type: "string", enum: ["BORRADOR","EN_REVISION","PUBLICADO","ARCHIVADO"] },
+  LibraryVersion: {
+    type: "object", additionalProperties: false,
+    required: ["id","documentoId","numero","estado","resumenCambios","autorId","createdAt"],
+    properties: {
+      id: { type: "string", pattern: "^c[a-z0-9]{20,30}$" }, documentoId: { type: "string", pattern: "^c[a-z0-9]{20,30}$" }, numero: { type: "integer", minimum: 1 }, estado: { $ref: "#/components/schemas/LibraryState" }, archivoId: { type: "string", pattern: "^[a-f0-9]{30}$" }, resumenCambios: { type: "string", maxLength: 2000 }, retroalimentacion: { type: ["string","null"], maxLength: 2000 }, motivoSustitucion: { type: ["string","null"], maxLength: 1000 }, vigenteDesde: { type: ["string","null"], format: "date-time" }, vigenteHasta: { type: ["string","null"], format: "date-time" }, autorId: { type: "integer" }, revisadoPorId: { type: ["integer","null"] }, publicadoPorId: { type: ["integer","null"] }, submittedAt: { type: ["string","null"], format: "date-time" }, reviewedAt: { type: ["string","null"], format: "date-time" }, publishedAt: { type: ["string","null"], format: "date-time" }, archivedAt: { type: ["string","null"], format: "date-time" }, createdAt: { type: "string", format: "date-time" }, updatedAt: { type: "string", format: "date-time" },
+    },
+  },
+  LibraryDocument: {
+    type: "object", additionalProperties: false,
+    required: ["id","titulo","categoria","alcance","estado","requiereAcuse","creadoPorId","createdAt","updatedAt"],
+    properties: {
+      id: { type: "string", pattern: "^c[a-z0-9]{20,30}$" }, titulo: { type: "string", maxLength: 191 }, descripcion: { type: ["string","null"], maxLength: 2000 }, categoria: { $ref: "#/components/schemas/LibraryCategory" }, alcance: { $ref: "#/components/schemas/LibraryScope" }, estado: { $ref: "#/components/schemas/LibraryState" }, requiereAcuse: { type: "boolean" }, sedeId: { type: ["integer","null"] }, areaId: { type: ["integer","null"] }, proyectoId: { type: ["string","null"] }, creadoPorId: { type: "integer" }, archivadoPorId: { type: ["integer","null"] }, motivoArchivo: { type: ["string","null"] }, archivadoAt: { type: ["string","null"], format: "date-time" }, createdAt: { type: "string", format: "date-time" }, updatedAt: { type: "string", format: "date-time" }, versiones: { type: "array", items: { $ref: "#/components/schemas/LibraryVersion" } },
+    },
+  },
+  LibraryCreateInput: {
+    type: "object", additionalProperties: false, required: ["titulo","categoria","alcance","archivoId","resumenCambios"],
+    properties: { titulo: { type: "string", minLength: 1, maxLength: 191 }, descripcion: { type: "string", maxLength: 2000 }, categoria: { $ref: "#/components/schemas/LibraryCategory" }, alcance: { $ref: "#/components/schemas/LibraryScope" }, sedeId: { type: "integer", minimum: 1 }, areaId: { type: "integer", minimum: 1 }, proyectoId: { type: "string", pattern: "^c[a-z0-9]{20,30}$" }, requiereAcuse: { type: "boolean", default: false }, archivoId: { type: "string", pattern: "^[a-f0-9]{30}$" }, resumenCambios: { type: "string", minLength: 1, maxLength: 2000 }, vigenteDesde: { type: "string", format: "date-time" }, vigenteHasta: { type: "string", format: "date-time" } },
+  },
+  LibraryVersionCreateInput: { type: "object", additionalProperties: false, required: ["archivoId","resumenCambios"], properties: { archivoId: { type: "string", pattern: "^[a-f0-9]{30}$" }, resumenCambios: { type: "string", minLength: 1, maxLength: 2000 }, vigenteDesde: { type: "string", format: "date-time" }, vigenteHasta: { type: "string", format: "date-time" } } },
+  LibraryReviewInput: { type: "object", additionalProperties: false, required: ["decision"], properties: { decision: { type: "string", enum: ["APPROVE","REQUEST_CHANGES"] }, retroalimentacion: { type: "string", maxLength: 2000 } } },
+  LibraryPublishInput: { type: "object", additionalProperties: false, properties: { motivoSustitucion: { type: "string", minLength: 1, maxLength: 1000 } } },
+  LibraryArchiveInput: { type: "object", additionalProperties: false, required: ["motivo"], properties: { motivo: { type: "string", minLength: 1, maxLength: 1000 } } },
+  LibraryDocumentResponse: { type: "object", required: ["data"], properties: { data: { $ref: "#/components/schemas/LibraryDocument" } } },
+  LibraryVersionResponse: { type: "object", required: ["data"], properties: { data: { $ref: "#/components/schemas/LibraryVersion" } } },
+  LibraryPageResponse: { type: "object", required: ["data"], properties: { data: { type: "object", required: ["items","page","pageSize","total"], properties: { items: { type: "array", items: { $ref: "#/components/schemas/LibraryDocument" } }, page: { type: "integer" }, pageSize: { type: "integer" }, total: { type: "integer" } } } } },
+  LibraryDownloadResponse: { type: "object", required: ["data"], properties: { data: { type: "object", required: ["url"], properties: { url: { type: "string", format: "uri" }, expiresIn: { type: "integer", maximum: 300 } } } } },
+  LibraryAcknowledgementResponse: { type: "object", required: ["data"], properties: { data: { type: "object", required: ["id","versionId","usuarioId","acknowledgedAt"], properties: { id: { type: "string", pattern: "^c[a-z0-9]{20,30}$" }, versionId: { type: "string", pattern: "^c[a-z0-9]{20,30}$" }, usuarioId: { type: "integer" }, acknowledgedAt: { type: "string", format: "date-time" } } } } },
+};
+
 const kairosPaths = {
   "/api/kairos/projects": {
     get: { tags: ["Kairos"], security: cookieSecurity, parameters: [
@@ -742,6 +825,7 @@ export function createOpenApiDocument() {
       ...storagePaths,
       ...directoryPaths,
       ...reportsPaths,
+      ...libraryPaths,
       "/api/academic/catalogs": {
         get: { tags: ["Academic"], security: cookieSecurity, parameters: [{ name: "page", in: "query", schema: { type: "integer", minimum: 1 } }, { name: "pageSize", in: "query", schema: { type: "integer", minimum: 1, maximum: 100 } }, { name: "search", in: "query", schema: { type: "string" } }], responses: { 200: { description: "Active academic catalogues with pagination", content: { "application/json": { schema: { $ref: "#/components/schemas/AcademicCatalogsResponse" } } } }, ...academicErrorResponses } },
       },
@@ -954,6 +1038,7 @@ export function createOpenApiDocument() {
         },
         ...identitySchemas,
         ...reportsSchemas,
+        ...librarySchemas,
       },
     },
   } as const;

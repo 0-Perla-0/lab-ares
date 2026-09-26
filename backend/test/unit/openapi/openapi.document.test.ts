@@ -37,6 +37,15 @@ describe("OpenAPI document", () => {
     "/api/reports/export",
     "/api/reports/export/{id}/status",
     "/api/reports/export/{id}/download",
+    "/api/library",
+    "/api/library/{id}",
+    "/api/library/{id}/versions",
+    "/api/library/{id}/archive",
+    "/api/library/versions/{id}/submit-review",
+    "/api/library/versions/{id}/review",
+    "/api/library/versions/{id}/publish",
+    "/api/library/versions/{id}/download",
+    "/api/library/versions/{id}/acknowledge",
   ])("documents %s", (path) => {
     expect(document.paths).toHaveProperty(path);
   });
@@ -110,5 +119,44 @@ describe("OpenAPI document", () => {
       document.components.schemas.ReportDownloadResponse.properties.data
         .properties.url.description,
     ).toContain("24-hour");
+  });
+
+  it("documents immutable library versions, scoped workflow and non-legal acknowledgements", () => {
+    const list = document.paths["/api/library"].get;
+    expect(list.description).toContain("active PROYECTO membership");
+    expect(list.parameters).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "categoria" }),
+        expect.objectContaining({ name: "alcance" }),
+        expect.objectContaining({ name: "estado" }),
+      ]),
+    );
+    expect(document.paths["/api/library"].post.description).toContain(
+      "immutable version 1",
+    );
+    expect(
+      document.paths["/api/library/versions/{id}/review"].post.description,
+    ).toContain("cannot review their own");
+    expect(
+      document.paths["/api/library/versions/{id}/publish"].post.description,
+    ).toContain("motivoSustitucion");
+    expect(
+      document.paths["/api/library/versions/{id}/acknowledge"].post.description,
+    ).toContain("not a signature");
+    expect(document.components.schemas.LibraryScope.enum).toEqual([
+      "GLOBAL",
+      "SEDE",
+      "AREA",
+      "PROYECTO",
+    ]);
+    expect(document.components.schemas.LibraryState.enum).toEqual([
+      "BORRADOR",
+      "EN_REVISION",
+      "PUBLICADO",
+      "ARCHIVADO",
+    ]);
+    expect(
+      document.components.schemas.LibraryCreateInput.properties.archivoId.pattern,
+    ).toBe("^[a-f0-9]{30}$");
   });
 });

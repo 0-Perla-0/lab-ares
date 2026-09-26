@@ -20,6 +20,12 @@ export enum Permission {
   DOCUMENTS_REVIEW = "documents:review",
   REPORTS_READ = "reports:read",
   REPORTS_EXPORT = "reports:export",
+  LIBRARY_READ = "library:read",
+  LIBRARY_DRAFT_CREATE = "library:draft:create",
+  LIBRARY_REVIEW = "library:review",
+  LIBRARY_PUBLISH = "library:publish",
+  LIBRARY_ARCHIVE = "library:archive",
+  LIBRARY_ACKNOWLEDGE = "library:acknowledge",
 }
 
 export enum AccessScope {
@@ -41,6 +47,8 @@ const commonUserGrants: RoleGrants = {
   // Organization data is a shared catalogue needed by authenticated flows.
   [Permission.ORGANIZATION_READ]: AccessScope.GLOBAL,
   [Permission.DIRECTORY_READ]: AccessScope.GLOBAL,
+  [Permission.LIBRARY_READ]: AccessScope.SELF,
+  [Permission.LIBRARY_ACKNOWLEDGE]: AccessScope.SELF,
 };
 
 const areaManagerGrants: RoleGrants = {
@@ -54,6 +62,8 @@ const areaManagerGrants: RoleGrants = {
   [Permission.DOCUMENTS_REVIEW]: AccessScope.AREA,
   [Permission.REPORTS_READ]: AccessScope.AREA,
   [Permission.REPORTS_EXPORT]: AccessScope.AREA,
+  [Permission.LIBRARY_READ]: AccessScope.AREA,
+  [Permission.LIBRARY_DRAFT_CREATE]: AccessScope.AREA,
 };
 
 const permissionsByRole: Record<RolUsuario, RoleGrants> = {
@@ -62,6 +72,9 @@ const permissionsByRole: Record<RolUsuario, RoleGrants> = {
   [RolUsuario.JEFE_AREA]: {
     ...areaManagerGrants,
     [Permission.HOURS_VALIDATE]: AccessScope.AREA,
+    [Permission.LIBRARY_REVIEW]: AccessScope.AREA,
+    [Permission.LIBRARY_PUBLISH]: AccessScope.AREA,
+    [Permission.LIBRARY_ARCHIVE]: AccessScope.AREA,
   },
   [RolUsuario.JEFE_SEDE]: {
     ...areaManagerGrants,
@@ -76,6 +89,11 @@ const permissionsByRole: Record<RolUsuario, RoleGrants> = {
     [Permission.DOCUMENTS_REVIEW]: AccessScope.SEDE,
     [Permission.REPORTS_READ]: AccessScope.SEDE,
     [Permission.REPORTS_EXPORT]: AccessScope.SEDE,
+    [Permission.LIBRARY_READ]: AccessScope.SEDE,
+    [Permission.LIBRARY_DRAFT_CREATE]: AccessScope.SEDE,
+    [Permission.LIBRARY_REVIEW]: AccessScope.SEDE,
+    [Permission.LIBRARY_PUBLISH]: AccessScope.SEDE,
+    [Permission.LIBRARY_ARCHIVE]: AccessScope.SEDE,
   },
   [RolUsuario.JEFE_COORDINADORES]: {
     ...areaManagerGrants,
@@ -90,6 +108,11 @@ const permissionsByRole: Record<RolUsuario, RoleGrants> = {
     [Permission.DOCUMENTS_REVIEW]: AccessScope.GLOBAL,
     [Permission.REPORTS_READ]: AccessScope.GLOBAL,
     [Permission.REPORTS_EXPORT]: AccessScope.GLOBAL,
+    [Permission.LIBRARY_READ]: AccessScope.GLOBAL,
+    [Permission.LIBRARY_DRAFT_CREATE]: AccessScope.GLOBAL,
+    [Permission.LIBRARY_REVIEW]: AccessScope.GLOBAL,
+    [Permission.LIBRARY_PUBLISH]: AccessScope.GLOBAL,
+    [Permission.LIBRARY_ARCHIVE]: AccessScope.GLOBAL,
   },
   [RolUsuario.ADMIN]: Object.fromEntries(
     Object.values(Permission).map((permission) => [

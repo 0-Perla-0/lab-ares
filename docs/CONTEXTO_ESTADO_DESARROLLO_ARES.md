@@ -58,6 +58,13 @@
 - OpenAPI y ambas colecciones/entornos de Postman quedaron actualizados; migración aplicada: `20260925240000_operational_reports`.
 - Gate verde: 513/513 pruebas, `check`, `build` y Prisma válido. Esta fase queda **COMPLETADA** en backend; frontend y pruebas E2E permanecen pendientes.
 
+### Cierre verificado: biblioteca operativa versionada
+
+- Categorías aprobadas y scopes `GLOBAL`/`SEDE`/`AREA`/`PROYECTO` quedan implementados con estados `BORRADOR`/`EN_REVISION`/`PUBLICADO`/`ARCHIVADO`; las versiones son inmutables, separan autor y revisor y exigen motivo de sustitución/archivo y vigencia.
+- Los archivos privados admiten PDF, DOCX, XLSX, PPTX, JPG y PNG hasta `LIBRARY_MAX_BYTES=25 MiB`, con validación OOXML estructural y scanner; la descarga exige capability.
+- El acuse por versión es idempotente y no constituye firma ni aceptación legal; notificaciones y auditoría quedan integradas. OpenAPI y ambas colecciones/entornos de Postman quedaron actualizados; migración aplicada: `20260925250000_operational_library`.
+- Gate verde: 552/552 pruebas, `check`, `build` y Prisma válido. Esta fase queda **COMPLETADA** en backend; frontend y pruebas E2E permanecen pendientes.
+
 ## 1. Alcance y criterio de comparación
 
 Este documento separa cinco capas de evidencia que no deben confundirse:
@@ -513,7 +520,7 @@ Como no se proporcionaron nombres, se usan identificadores de rol. El reparto si
 - Añadir soporte backend de Kanban como vistas/consultas sobre actividades, no como un dominio duplicado.
 - Implementar invitaciones de cuenta, recuperación con tokens independientes, administración/revocación de sesiones, TOTP opcional, códigos de recuperación, Argon2id/lista de bloqueo, centro de notificaciones, correo transaccional, exportaciones asíncronas y directorio interno por alcance.
 - Modelar catálogos académicos y adscripciones versionadas, completamente separados del alcance RBAC de sede/área.
-- Reutilizar almacenamiento, auditoría y notificaciones para la biblioteca operativa versionada, sin introducir edición colaborativa en línea.
+- **Implementado — biblioteca operativa versionada:** categorías aprobadas, scopes `GLOBAL`/`SEDE`/`AREA`/`PROYECTO`, estados `BORRADOR`/`EN_REVISION`/`PUBLICADO`/`ARCHIVADO`, versiones inmutables con separación autor-revisor, motivo de sustitución/archivo y vigencia; archivos privados PDF/DOCX/XLSX/PPTX/JPG/PNG hasta `LIBRARY_MAX_BYTES=25 MiB`, OOXML estructural, scanner, descarga por capability, acuse idempotente por versión sin firma/aceptación legal, notificaciones, auditoría, OpenAPI/Postman y migración `20260925250000_operational_library`. Gate 552/552, `check`, `build` y Prisma válido; frontend y E2E pendientes.
 - Implementar contenido público versionado con componentes permitidos y separación explícita entre archivos públicos y privados.
 - Preparar importadores idempotentes y reportes de conciliación sólo cuando exista una fuente heredada aprobada.
 - Implementar categorías/versiones de retención, bloqueo, retención legal, supresión/anonimización y reaplicación de supresiones después de restaurar respaldos.

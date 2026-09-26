@@ -22,6 +22,7 @@ import { DocumentsModule } from "./documents/documents.module";
 import { KairosModule } from "./kairos/kairos.module";
 import { DirectoryModule } from "./directory/directory.module";
 import { ReportsModule } from "./reports/reports.module";
+import { LibraryModule } from "./library/library.module";
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { ReportsModule } from "./reports/reports.module";
     KairosModule,
     DirectoryModule,
     ReportsModule,
+    LibraryModule,
     OpenApiModule,
   ],
   providers: [

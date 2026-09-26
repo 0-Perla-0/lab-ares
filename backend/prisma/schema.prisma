@@ -50,6 +50,7 @@ model Sede {
 
   areas    Area[]
   usuarios Usuario[]
+  bibliotecaDocumentos DocumentoBiblioteca[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -66,6 +67,7 @@ model Area {
 
   turnos   Turno[]
   usuarios Usuario[]
+  bibliotecaDocumentos DocumentoBiblioteca[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -151,6 +153,12 @@ model Usuario {
   archivosPropiedad Archivo[] @relation("ArchivoOwner")
   directorioPreferencia DirectorioPreferencia?
   reportExportsRequested ReporteExportacion[]
+  bibliotecaDocumentosCreados DocumentoBiblioteca[] @relation("LibraryDocumentCreator")
+  bibliotecaDocumentosArchivados DocumentoBiblioteca[] @relation("LibraryDocumentArchiver")
+  bibliotecaVersionesCreadas VersionBiblioteca[] @relation("LibraryVersionAuthor")
+  bibliotecaVersionesRevisadas VersionBiblioteca[] @relation("LibraryVersionReviewer")
+  bibliotecaVersionesPublicadas VersionBiblioteca[] @relation("LibraryVersionPublisher")
+  bibliotecaAcuses AcuseBiblioteca[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -464,6 +472,7 @@ model Archivo {
   documentoVersiones DocumentoVersion[]
   kairosEvidence EntregaEvidenciaKairos[]
   reportExports ReporteExportacion[]
+  bibliotecaVersion VersionBiblioteca?
 
   @@index([status, nextAttemptAt])
   @@index([leaseUntil])
@@ -566,6 +575,7 @@ model ProyectoKairos {
   miembros    MiembroProyectoKairos[]
   favoritos   FavoritoProyectoKairos[]
   activities ActividadKairos[]
+  bibliotecaDocumentos DocumentoBiblioteca[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -698,6 +708,105 @@ model HistorialActividadKairos {
   reviewer Usuario? @relation("KairosActivityReviewer", fields:[reviewerId], references:[id], onDelete: Restrict)
   createdAt DateTime @default(now())
   @@index([actividadId,createdAt])
+}
+
+enum CategoriaBiblioteca {
+  MANUAL
+  PROCEDIMIENTO
+  REGLAMENTO
+  FORMATO
+  INSTRUCTIVO
+  PROTOCOLO
+  CAPACITACION
+  PLANTILLA
+  COMUNICADO_PERMANENTE
+  POLITICA
+}
+
+enum AlcanceBiblioteca {
+  GLOBAL
+  SEDE
+  AREA
+  PROYECTO
+}
+
+enum EstadoBiblioteca {
+  BORRADOR
+  EN_REVISION
+  PUBLICADO
+  ARCHIVADO
+}
+
+model DocumentoBiblioteca {
+  id String @id @default(cuid()) @db.VarChar(30)
+  titulo String @db.VarChar(191)
+  descripcion String? @db.VarChar(2000)
+  categoria CategoriaBiblioteca
+  alcance AlcanceBiblioteca
+  estado EstadoBiblioteca @default(BORRADOR)
+  requiereAcuse Boolean @default(false)
+  sedeId Int?
+  sede Sede? @relation(fields:[sedeId], references:[id], onDelete:Restrict)
+  areaId Int?
+  area Area? @relation(fields:[areaId], references:[id], onDelete:Restrict)
+  proyectoId String? @db.VarChar(30)
+  proyecto ProyectoKairos? @relation(fields:[proyectoId], references:[id], onDelete:Restrict)
+  creadoPorId Int
+  creadoPor Usuario @relation("LibraryDocumentCreator", fields:[creadoPorId], references:[id], onDelete:Restrict)
+  archivadoPorId Int?
+  archivadoPor Usuario? @relation("LibraryDocumentArchiver", fields:[archivadoPorId], references:[id], onDelete:Restrict)
+  motivoArchivo String? @db.VarChar(1000)
+  archivadoAt DateTime?
+  versiones VersionBiblioteca[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([alcance,estado,updatedAt])
+  @@index([sedeId,estado,updatedAt])
+  @@index([areaId,estado,updatedAt])
+  @@index([proyectoId,estado,updatedAt])
+  @@index([categoria,estado,updatedAt])
+}
+
+model VersionBiblioteca {
+  id String @id @default(cuid()) @db.VarChar(30)
+  documentoId String @db.VarChar(30)
+  documento DocumentoBiblioteca @relation(fields:[documentoId], references:[id], onDelete:Restrict)
+  numero Int
+  estado EstadoBiblioteca @default(BORRADOR)
+  archivoId String @unique @db.VarChar(30)
+  archivo Archivo @relation(fields:[archivoId], references:[id], onDelete:Restrict)
+  autorId Int
+  autor Usuario @relation("LibraryVersionAuthor", fields:[autorId], references:[id], onDelete:Restrict)
+  revisadoPorId Int?
+  revisadoPor Usuario? @relation("LibraryVersionReviewer", fields:[revisadoPorId], references:[id], onDelete:Restrict)
+  publicadoPorId Int?
+  publicadoPor Usuario? @relation("LibraryVersionPublisher", fields:[publicadoPorId], references:[id], onDelete:Restrict)
+  resumenCambios String @db.VarChar(2000)
+  retroalimentacion String? @db.VarChar(2000)
+  motivoSustitucion String? @db.VarChar(1000)
+  vigenteDesde DateTime?
+  vigenteHasta DateTime?
+  submittedAt DateTime?
+  reviewedAt DateTime?
+  publishedAt DateTime?
+  archivedAt DateTime?
+  acuses AcuseBiblioteca[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([documentoId,numero])
+  @@index([documentoId,estado,numero])
+  @@index([estado,publishedAt])
+}
+
+model AcuseBiblioteca {
+  id String @id @default(cuid()) @db.VarChar(30)
+  versionId String @db.VarChar(30)
+  version VersionBiblioteca @relation(fields:[versionId], references:[id], onDelete:Restrict)
+  usuarioId Int
+  usuario Usuario @relation(fields:[usuarioId], references:[id], onDelete:Restrict)
+  acknowledgedAt DateTime @default(now())
+  @@unique([versionId,usuarioId])
+  @@index([usuarioId,acknowledgedAt])
 }
 
 model Asistencia {

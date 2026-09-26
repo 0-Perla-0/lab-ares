@@ -64,6 +64,7 @@ const environmentSchema = z
     S3_QUARANTINE_BUCKET: z.string().min(1).default("ares-quarantine"),
     S3_AVAILABLE_BUCKET: z.string().min(1).default("ares-available"),
     STORAGE_MAX_BYTES: z.coerce.number().int().positive().default(52428800),
+    LIBRARY_MAX_BYTES: z.coerce.number().int().positive().default(26214400),
     CLAMAV_HOST: z.string().min(1).default("localhost"),
     CLAMAV_PORT: z.coerce.number().int().positive().default(3310),
     STORAGE_SCANNER_ENABLED: z.coerce.boolean().default(false),

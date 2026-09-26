@@ -81,6 +81,10 @@
     ,{ "key": "evidenceId", "value": "", "type": "string" }
     ,{ "key": "activityFileId", "value": "", "type": "string" }
     ,{ "key": "reportJobId", "value": "", "type": "string" }
+    ,{ "key": "libraryDocumentId", "value": "", "type": "string" }
+    ,{ "key": "libraryVersionId", "value": "", "type": "string" }
+    ,{ "key": "libraryFileId", "value": "", "type": "string" }
+    ,{ "key": "libraryNextFileId", "value": "", "type": "string" }
     ,{ "key": "fixtureFilePath", "value": "", "type": "string" }
   ],
   "item": [
@@ -1867,6 +1871,22 @@
         { "name": "Exportar Kairos", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"type\":\"KAIROS\"}" }, "url": "{{baseUrl}}/reports/export" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,202]).to.include(pm.response.code);", "if(pm.response.code===202){const id=pm.response.json().data.id; pm.expect(id).to.match(/^[a-z0-9]{20,30}$/); pm.collectionVariables.set('reportJobId',id);}", "if(pm.response.code===200){pm.expect(pm.response.headers.get('Content-Type')).to.include('text/csv');}"] } }] },
         { "name": "Estado de exportación", "request": { "method": "GET", "url": "{{baseUrl}}/reports/export/{{reportJobId}}/status" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,400,404]).to.include(pm.response.code);", "if(pm.response.code===200){pm.expect(['PENDIENTE','PROCESANDO','COMPLETADO','FALLIDO','EXPIRADO']).to.include(pm.response.json().data.status);}"] } }] },
         { "name": "Descargar exportación", "request": { "method": "GET", "url": "{{baseUrl}}/reports/export/{{reportJobId}}/download" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,400,404]).to.include(pm.response.code);", "if(pm.response.code===200){pm.expect(pm.response.json().data.url).to.be.a('string').and.not.empty;}"] } }] }
+      ]
+    },
+    {
+      "name": "14 - Biblioteca operativa",
+      "description": "Versiones inmutables con archivos privados DISPONIBLE. Configura libraryFileId/libraryNextFileId y cambia de cuenta según el rol autor, revisor/publicador o lector.",
+      "item": [
+        { "name": "Listar biblioteca", "request": { "method": "GET", "url": "{{baseUrl}}/library?page=1&pageSize=20" }, "event": [{ "listen": "test", "script": { "exec": ["pm.response.to.have.status(200);", "pm.expect(pm.response.json().data).to.have.property('items');"] } }] },
+        { "name": "Crear documento", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"titulo\":\"Manual Postman\",\"categoria\":\"MANUAL\",\"alcance\":\"AREA\",\"sedeId\":{{sedeId}},\"areaId\":{{areaId}},\"requiereAcuse\":true,\"archivoId\":\"{{libraryFileId}}\",\"resumenCambios\":\"Versión inicial\"}" }, "url": "{{baseUrl}}/library" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([201,400,403,404,409]).to.include(pm.response.code);", "if(pm.response.code===201){const d=pm.response.json().data;pm.collectionVariables.set('libraryDocumentId',d.id);pm.collectionVariables.set('libraryVersionId',d.versiones[0].id);}"] } }] },
+        { "name": "Detalle", "request": { "method": "GET", "url": "{{baseUrl}}/library/{{libraryDocumentId}}" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,400,404]).to.include(pm.response.code);"] } }] },
+        { "name": "Nueva versión", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"archivoId\":\"{{libraryNextFileId}}\",\"resumenCambios\":\"Actualización controlada\"}" }, "url": "{{baseUrl}}/library/{{libraryDocumentId}}/versions" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([201,400,403,404,409]).to.include(pm.response.code);", "if(pm.response.code===201){pm.collectionVariables.set('libraryVersionId',pm.response.json().data.id);}"] } }] },
+        { "name": "Enviar a revisión", "request": { "method": "POST", "url": "{{baseUrl}}/library/versions/{{libraryVersionId}}/submit-review" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,400,403,404,409]).to.include(pm.response.code);"] } }] },
+        { "name": "Revisión independiente", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"decision\":\"APPROVE\"}" }, "url": "{{baseUrl}}/library/versions/{{libraryVersionId}}/review" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,400,403,404,409]).to.include(pm.response.code);"] } }] },
+        { "name": "Publicar", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{}" }, "url": "{{baseUrl}}/library/versions/{{libraryVersionId}}/publish" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,400,403,404,409]).to.include(pm.response.code);"] } }] },
+        { "name": "Descargar", "request": { "method": "GET", "url": "{{baseUrl}}/library/versions/{{libraryVersionId}}/download" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,400,404]).to.include(pm.response.code);", "if(pm.response.code===200){pm.expect(pm.response.json().data).to.have.property('url');}"] } }] },
+        { "name": "Acusar recepción", "request": { "method": "POST", "url": "{{baseUrl}}/library/versions/{{libraryVersionId}}/acknowledge" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,400,403,404]).to.include(pm.response.code);"] } }] },
+        { "name": "Archivar", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"motivo\":\"Fin de vigencia\"}" }, "url": "{{baseUrl}}/library/{{libraryDocumentId}}/archive" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,400,403,404,409]).to.include(pm.response.code);"] } }] }
       ]
     }
   ]
