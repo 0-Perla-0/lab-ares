@@ -190,6 +190,21 @@ administrador. Los puntos forman un ledger inmutable: una corrección agrega un
 reverso negativo y nunca modifica el evento original. No existe ranking
 público, moneda, tienda ni premios canjeables.
 
+## Impresión 3D privada
+
+La carpeta `17 - Impresión 3D privada` requiere sesión,
+`PRINTING_3D_ENABLED=true` y reiniciar el backend; el valor predeterminado es
+`false`. Antes de crear un trabajo, sube un STL con el solicitante y espera a
+que pase de cuarentena a `DISPONIBLE`. Copia su identificador a
+`printingFileId`, el usuario operador a `printingOperatorId` y deja que las
+pruebas guarden `printingJobId` y `printingExecutionId`.
+
+Alterna la sesión por rol: solicitante para crear, consultar y cancelar;
+operador o gestor para revisar, asignar y ejecutar. Todas las mutaciones usan
+una clave idempotente. Al finalizar una ejecución elige sólo la solicitud
+exitosa o la fallida; la fallida habilita el reintento. El flujo no hace
+slicing, no controla impresoras, no cotiza, no cobra y no admite 3MF.
+
 ## Respuestas y errores
 
 Las respuestas exitosas del dominio usan `{ "data": ... }`. Los errores usan

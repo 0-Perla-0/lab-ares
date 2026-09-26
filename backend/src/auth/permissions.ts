@@ -31,6 +31,9 @@ export enum Permission {
   PUBLIC_CONTENT_ARCHIVE = "public-content:archive",
   GAMIFICATION_READ = "gamification:read",
   GAMIFICATION_MANAGE = "gamification:manage",
+  PRINTING_3D_REQUEST = "printing-3d:request",
+  PRINTING_3D_OPERATE = "printing-3d:operate",
+  PRINTING_3D_MANAGE = "printing-3d:manage",
 }
 
 export enum AccessScope {
@@ -55,6 +58,7 @@ const commonUserGrants: RoleGrants = {
   [Permission.LIBRARY_READ]: AccessScope.SELF,
   [Permission.LIBRARY_ACKNOWLEDGE]: AccessScope.SELF,
   [Permission.GAMIFICATION_READ]: AccessScope.SELF,
+  [Permission.PRINTING_3D_REQUEST]: AccessScope.SELF,
 };
 
 const areaManagerGrants: RoleGrants = {
@@ -71,6 +75,8 @@ const areaManagerGrants: RoleGrants = {
   [Permission.LIBRARY_READ]: AccessScope.AREA,
   [Permission.LIBRARY_DRAFT_CREATE]: AccessScope.AREA,
   [Permission.PUBLIC_CONTENT_DRAFT]: AccessScope.GLOBAL,
+  [Permission.PRINTING_3D_OPERATE]: AccessScope.AREA,
+  [Permission.PRINTING_3D_MANAGE]: AccessScope.AREA,
 };
 
 const permissionsByRole: Record<RolUsuario, RoleGrants> = {
@@ -101,6 +107,8 @@ const permissionsByRole: Record<RolUsuario, RoleGrants> = {
     [Permission.LIBRARY_REVIEW]: AccessScope.SEDE,
     [Permission.LIBRARY_PUBLISH]: AccessScope.SEDE,
     [Permission.LIBRARY_ARCHIVE]: AccessScope.SEDE,
+    [Permission.PRINTING_3D_OPERATE]: AccessScope.SEDE,
+    [Permission.PRINTING_3D_MANAGE]: AccessScope.SEDE,
   },
   [RolUsuario.JEFE_COORDINADORES]: {
     ...areaManagerGrants,
@@ -120,6 +128,8 @@ const permissionsByRole: Record<RolUsuario, RoleGrants> = {
     [Permission.LIBRARY_REVIEW]: AccessScope.GLOBAL,
     [Permission.LIBRARY_PUBLISH]: AccessScope.GLOBAL,
     [Permission.LIBRARY_ARCHIVE]: AccessScope.GLOBAL,
+    [Permission.PRINTING_3D_OPERATE]: AccessScope.GLOBAL,
+    [Permission.PRINTING_3D_MANAGE]: AccessScope.GLOBAL,
   },
   [RolUsuario.ADMIN]: Object.fromEntries(
     Object.values(Permission).map((permission) => [

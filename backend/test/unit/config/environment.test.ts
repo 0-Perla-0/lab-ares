@@ -17,6 +17,7 @@ describe("validateEnvironment", () => {
       APP_TIME_ZONE: "America/Mexico_City",
       SESSION_SECRET: DEVELOPMENT_SESSION_SECRET,
       GAMIFICATION_ENABLED: false,
+      PRINTING_3D_ENABLED: false,
     });
   });
 
@@ -28,6 +29,17 @@ describe("validateEnvironment", () => {
     expect(
       validateEnvironment({ ...base, GAMIFICATION_ENABLED: "true" })
         .GAMIFICATION_ENABLED,
+    ).toBe(true);
+  });
+
+  it("parses the printing feature flag without treating the string false as true", () => {
+    expect(
+      validateEnvironment({ ...base, PRINTING_3D_ENABLED: "false" })
+        .PRINTING_3D_ENABLED,
+    ).toBe(false);
+    expect(
+      validateEnvironment({ ...base, PRINTING_3D_ENABLED: "true" })
+        .PRINTING_3D_ENABLED,
     ).toBe(true);
   });
 

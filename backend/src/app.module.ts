@@ -25,6 +25,7 @@ import { ReportsModule } from "./reports/reports.module";
 import { LibraryModule } from "./library/library.module";
 import { PublicContentModule } from "./public-content/public-content.module";
 import { GamificationModule } from "./gamification/gamification.module";
+import { Printing3dModule } from "./printing-3d/printing-3d.module";
 
 @Module({
   imports: [
@@ -50,6 +51,7 @@ import { GamificationModule } from "./gamification/gamification.module";
     LibraryModule,
     PublicContentModule,
     GamificationModule,
+    Printing3dModule,
     OpenApiModule,
   ],
   providers: [

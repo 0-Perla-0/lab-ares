@@ -71,6 +71,10 @@ const environmentSchema = z
       .transform((value) => value === true || value === "true" || value === "1")
       .default(false),
     GAMIFICATION_POINTS_PER_LEVEL: z.coerce.number().int().min(1).default(100),
+    PRINTING_3D_ENABLED: z
+      .union([z.boolean(), z.enum(["true", "false", "1", "0"])])
+      .transform((value) => value === true || value === "true" || value === "1")
+      .default(false),
     CLAMAV_HOST: z.string().min(1).default("localhost"),
     CLAMAV_PORT: z.coerce.number().int().positive().default(3310),
     STORAGE_SCANNER_ENABLED: z.coerce.boolean().default(false),

@@ -12,3 +12,13 @@ and a restart of the backend; the default is `false`. Set
 recognitions and reversals require an `ADMIN` session. The collection generates
 an `Idempotency-Key` for manual grants and reversals and verifies that profiles
 remain private and contain no ranking.
+
+The `Printing 3D - trabajos y ejecuciones` folder requires
+`PRINTING_3D_ENABLED=true` and a backend restart; the default is `false`.
+Upload an STL as the requester, wait until quarantine/scanning promotes it to
+`DISPONIBLE`, set `printingFileId` and `printingOperatorId`, and let the tests
+capture `printingJobId` and `printingExecutionId`. Switch sessions between the
+requester and the scoped operator/manager as each request describes. Mutations
+generate independent idempotency keys. Run only one finish variant per
+execution: the failed variant enables retry. The API intentionally excludes
+slicing, printer control, quoting, payment and 3MF.

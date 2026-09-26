@@ -518,6 +518,58 @@ const gamificationSchemas = {
   GamificationEventResponse: { type: "object", required: ["data"], properties: { data: { type: "object" } } },
 };
 
+const printing3dIdParameter = { name: "id", in: "path", required: true, schema: { type: "string", pattern: "^c[a-z0-9]{20,30}$" } };
+const printing3dExecutionIdParameter = { name: "executionId", in: "path", required: true, schema: { type: "string", pattern: "^c[a-z0-9]{20,30}$" } };
+const printing3dIdempotencyParameter = { name: "Idempotency-Key", in: "header", required: true, schema: { type: "string", minLength: 8, maxLength: 128, pattern: "^[A-Za-z0-9._:-]+$" }, description: "Stable key for one logical write; reusing it with another payload returns 409" };
+const printing3dUnavailableResponse = { 503: { description: "Printing 3D feature flag is disabled" } };
+const printing3dPaths = {
+  "/api/printing-3d/jobs": {
+    get: { tags: ["Printing 3D"], security: cookieSecurity, description: "Lists only jobs requested by or assigned to the actor, plus the actor's authorized organizational scope.", parameters: [{ name: "page", in: "query", schema: { type: "integer", minimum: 1, maximum: 10000, default: 1 } }, { name: "pageSize", in: "query", schema: { type: "integer", minimum: 1, maximum: 100, default: 20 } }, { name: "estado", in: "query", schema: { $ref: "#/components/schemas/Printing3dJobState" } }], responses: { 200: { description: "Scoped printing jobs", content: { "application/json": { schema: { $ref: "#/components/schemas/Printing3dJobPageResponse" } } } }, ...errorResponses, ...printing3dUnavailableResponse } },
+    post: { tags: ["Printing 3D"], security: cookieSecurity, description: "Creates a job from an STL owned by the requester and already promoted from private quarantine after structural and malware analysis.", parameters: [printing3dIdempotencyParameter], requestBody: jsonBody({ $ref: "#/components/schemas/Printing3dJobCreateInput" }), responses: { 201: { description: "Job created in SOLICITADO", content: { "application/json": { schema: { $ref: "#/components/schemas/Printing3dJobResponse" } } } }, ...errorResponses, ...printing3dUnavailableResponse } },
+  },
+  "/api/printing-3d/jobs/{id}": {
+    get: { tags: ["Printing 3D"], security: cookieSecurity, parameters: [printing3dIdParameter], description: "Returns a private job and its separate execution history when visible to the actor.", responses: { 200: { description: "Printing job detail", content: { "application/json": { schema: { $ref: "#/components/schemas/Printing3dJobResponse" } } } }, ...errorResponses, ...printing3dUnavailableResponse } },
+  },
+  "/api/printing-3d/jobs/{id}/review": {
+    post: { tags: ["Printing 3D"], security: cookieSecurity, parameters: [printing3dIdParameter, printing3dIdempotencyParameter], description: "Scoped manager starts review or resolves it by approving or rejecting; rejection requires a reason.", requestBody: jsonBody({ $ref: "#/components/schemas/Printing3dReviewInput" }), responses: { 201: { description: "Review transition confirmed" }, ...errorResponses, ...printing3dUnavailableResponse } },
+  },
+  "/api/printing-3d/jobs/{id}/assign": {
+    post: { tags: ["Printing 3D"], security: cookieSecurity, parameters: [printing3dIdParameter, printing3dIdempotencyParameter], description: "Assigns an active in-scope operator to an approved job and places it in EN_COLA.", requestBody: jsonBody({ $ref: "#/components/schemas/Printing3dAssignInput" }), responses: { 201: { description: "Operator assigned" }, ...errorResponses, ...printing3dUnavailableResponse } },
+  },
+  "/api/printing-3d/jobs/{id}/executions": {
+    post: { tags: ["Printing 3D"], security: cookieSecurity, parameters: [printing3dIdParameter, printing3dIdempotencyParameter], description: "The assigned operator starts a numbered execution and the job enters EN_IMPRESION.", requestBody: jsonBody({ $ref: "#/components/schemas/Printing3dExecutionStartInput" }), responses: { 201: { description: "Separate execution started", content: { "application/json": { schema: { $ref: "#/components/schemas/Printing3dExecutionMutationResponse" } } } }, ...errorResponses, ...printing3dUnavailableResponse } },
+  },
+  "/api/printing-3d/jobs/{id}/executions/{executionId}/finish": {
+    post: { tags: ["Printing 3D"], security: cookieSecurity, parameters: [printing3dIdParameter, printing3dExecutionIdParameter, printing3dIdempotencyParameter], description: "The assigned operator records server finish time, optional weight, result and observation. A failed result requires an observation.", requestBody: jsonBody({ $ref: "#/components/schemas/Printing3dExecutionFinishInput" }), responses: { 201: { description: "Execution finished", content: { "application/json": { schema: { $ref: "#/components/schemas/Printing3dExecutionMutationResponse" } } } }, ...errorResponses, ...printing3dUnavailableResponse } },
+  },
+  "/api/printing-3d/jobs/{id}/retry": {
+    post: { tags: ["Printing 3D"], security: cookieSecurity, parameters: [printing3dIdParameter, printing3dIdempotencyParameter], description: "Requeues a failed job while preserving every prior execution.", requestBody: jsonBody({ $ref: "#/components/schemas/Printing3dReasonInput" }), responses: { 201: { description: "Failed job returned to EN_COLA" }, ...errorResponses, ...printing3dUnavailableResponse } },
+  },
+  "/api/printing-3d/jobs/{id}/cancel": {
+    post: { tags: ["Printing 3D"], security: cookieSecurity, parameters: [printing3dIdParameter, printing3dIdempotencyParameter], description: "Cancels with a reason. A requester may cancel only before printing; an authorized operator/manager can close an active execution as CANCELADA.", requestBody: jsonBody({ $ref: "#/components/schemas/Printing3dReasonInput" }), responses: { 201: { description: "Job cancelled" }, ...errorResponses, ...printing3dUnavailableResponse } },
+  },
+  "/api/printing-3d/jobs/{id}/download": {
+    get: { tags: ["Printing 3D"], security: cookieSecurity, parameters: [printing3dIdParameter], description: "Issues a short-lived capability-bound URL for the private analyzed STL after revalidating job scope and file availability.", responses: { 200: { description: "Private STL download URL", content: { "application/json": { schema: { $ref: "#/components/schemas/Printing3dDownloadResponse" } } } }, ...errorResponses, ...printing3dUnavailableResponse } },
+  },
+};
+
+const printing3dSchemas = {
+  Printing3dJobState: { type: "string", enum: ["SOLICITADO", "EN_REVISION", "APROBADO", "EN_COLA", "EN_IMPRESION", "COMPLETADO", "RECHAZADO", "CANCELADO", "FALLIDO"] },
+  Printing3dExecutionResult: { type: "string", enum: ["COMPLETADA", "FALLIDA", "CANCELADA"] },
+  Printing3dJobCreateInput: { type: "object", additionalProperties: false, required: ["archivoId", "descripcion"], properties: { archivoId: { type: "string", pattern: "^c[a-z0-9]{20,30}$" }, descripcion: { type: "string", minLength: 1, maxLength: 2000 } } },
+  Printing3dReviewInput: { type: "object", additionalProperties: false, required: ["decision"], properties: { decision: { type: "string", enum: ["START", "APPROVE", "REJECT"] }, motivo: { type: "string", minLength: 1, maxLength: 1000, description: "Required for REJECT" } } },
+  Printing3dAssignInput: { type: "object", additionalProperties: false, required: ["operadorId"], properties: { operadorId: { type: "integer", minimum: 1 } } },
+  Printing3dExecutionStartInput: { type: "object", additionalProperties: false, required: ["material"], properties: { material: { type: "string", minLength: 1, maxLength: 120 } } },
+  Printing3dExecutionFinishInput: { type: "object", additionalProperties: false, required: ["resultado"], properties: { resultado: { type: "string", enum: ["COMPLETADA", "FALLIDA"] }, pesoGramos: { type: "integer", minimum: 1, maximum: 100000 }, observacion: { type: "string", minLength: 1, maxLength: 2000, description: "Required for FALLIDA" } } },
+  Printing3dReasonInput: { type: "object", additionalProperties: false, required: ["motivo"], properties: { motivo: { type: "string", minLength: 1, maxLength: 1000 } } },
+  Printing3dExecution: { type: "object", additionalProperties: false, required: ["id", "numero", "startedAt", "material", "operador"], properties: { id: { type: "string", pattern: "^c[a-z0-9]{20,30}$" }, numero: { type: "integer", minimum: 1 }, startedAt: { type: "string", format: "date-time" }, finishedAt: { type: ["string", "null"], format: "date-time" }, material: { type: "string" }, pesoGramos: { type: ["integer", "null"] }, resultado: { anyOf: [{ $ref: "#/components/schemas/Printing3dExecutionResult" }, { type: "null" }] }, observacion: { type: ["string", "null"] }, operador: { type: "object", additionalProperties: false, required: ["id", "codigo"], properties: { id: { type: "integer" }, codigo: { type: "string" } } } } },
+  Printing3dJob: { type: "object", additionalProperties: false, required: ["id", "descripcion", "estado", "solicitante", "archivo", "ejecuciones", "createdAt", "updatedAt"], properties: { id: { type: "string", pattern: "^c[a-z0-9]{20,30}$" }, descripcion: { type: "string" }, estado: { $ref: "#/components/schemas/Printing3dJobState" }, sedeId: { type: ["integer", "null"] }, areaId: { type: ["integer", "null"] }, motivoRevision: { type: ["string", "null"] }, reviewedAt: { type: ["string", "null"], format: "date-time" }, assignedAt: { type: ["string", "null"], format: "date-time" }, motivoCancelacion: { type: ["string", "null"] }, cancelledAt: { type: ["string", "null"], format: "date-time" }, solicitante: { type: "object", additionalProperties: false, required: ["id", "codigo"], properties: { id: { type: "integer" }, codigo: { type: "string" } } }, operadorAsignado: { type: ["object", "null"] }, revisadoPor: { type: ["object", "null"] }, archivo: { type: "object", additionalProperties: false, required: ["id", "originalName", "detectedMime", "status"], properties: { id: { type: "string" }, originalName: { type: "string" }, detectedMime: { const: "model/stl" }, status: { const: "DISPONIBLE" } } }, ejecuciones: { type: "array", items: { $ref: "#/components/schemas/Printing3dExecution" } }, createdAt: { type: "string", format: "date-time" }, updatedAt: { type: "string", format: "date-time" } } },
+  Printing3dJobResponse: { type: "object", required: ["data"], properties: { data: { $ref: "#/components/schemas/Printing3dJob" } } },
+  Printing3dJobPageResponse: { type: "object", required: ["data"], properties: { data: { type: "object", required: ["items", "total", "page", "pageSize"], properties: { items: { type: "array", items: { $ref: "#/components/schemas/Printing3dJob" } }, total: { type: "integer", minimum: 0 }, page: { type: "integer", minimum: 1 }, pageSize: { type: "integer", minimum: 1, maximum: 100 } } } } },
+  Printing3dExecutionMutationResponse: { type: "object", required: ["data"], properties: { data: { type: "object", required: ["trabajo", "ejecucion"], properties: { trabajo: { $ref: "#/components/schemas/Printing3dJob" }, ejecucion: { $ref: "#/components/schemas/Printing3dExecution" } } } } },
+  Printing3dDownloadResponse: { type: "object", required: ["data"], properties: { data: { type: "string", format: "uri" } } },
+};
+
 const kairosPaths = {
   "/api/kairos/projects": {
     get: { tags: ["Kairos"], security: cookieSecurity, parameters: [
@@ -870,6 +922,7 @@ export function createOpenApiDocument() {
       { name: "Files", description: "Private multipart uploads and asynchronous malware analysis status" },
       { name: "Public Content", description: "Versioned public CMS with controlled blocks and isolated public assets" },
       { name: "Gamification", description: "Feature-flagged private points ledger, derived levels and limited badges; no public ranking or redeemable value" },
+      { name: "Printing 3D", description: "Feature-flagged private STL job workflow and separate operator executions; no slicing, printer control or commerce" },
     ],
     paths: {
       "/api/health": {
@@ -943,6 +996,7 @@ export function createOpenApiDocument() {
       ...libraryPaths,
       ...publicContentPaths,
       ...gamificationPaths,
+      ...printing3dPaths,
       "/api/academic/catalogs": {
         get: { tags: ["Academic"], security: cookieSecurity, parameters: [{ name: "page", in: "query", schema: { type: "integer", minimum: 1 } }, { name: "pageSize", in: "query", schema: { type: "integer", minimum: 1, maximum: 100 } }, { name: "search", in: "query", schema: { type: "string" } }], responses: { 200: { description: "Active academic catalogues with pagination", content: { "application/json": { schema: { $ref: "#/components/schemas/AcademicCatalogsResponse" } } } }, ...academicErrorResponses } },
       },
@@ -1158,6 +1212,7 @@ export function createOpenApiDocument() {
         ...librarySchemas,
         ...publicContentSchemas,
         ...gamificationSchemas,
+        ...printing3dSchemas,
       },
     },
   } as const;

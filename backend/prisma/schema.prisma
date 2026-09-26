@@ -168,6 +168,12 @@ model Usuario {
   insigniasGamificacionCreadas InsigniaGamificacion[] @relation("GamificationBadgeCreator")
   eventosGamificacion EventoGamificacion[] @relation("GamificationSubject")
   eventosGamificacionActuados EventoGamificacion[] @relation("GamificationActor")
+  trabajosImpresion3DSolicitados TrabajoImpresion3D[] @relation("Printing3DRequester")
+  trabajosImpresion3DAsignados TrabajoImpresion3D[] @relation("Printing3DOperator")
+  trabajosImpresion3DRevisados TrabajoImpresion3D[] @relation("Printing3DReviewer")
+  trabajosImpresion3DCancelados TrabajoImpresion3D[] @relation("Printing3DCanceller")
+  ejecucionesImpresion3D EjecucionImpresion3D[] @relation("Printing3DExecutionOperator")
+  operacionesImpresion3D OperacionImpresion3D[] @relation("Printing3DOperationActor")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -483,6 +489,7 @@ model Archivo {
   reportExports ReporteExportacion[]
   bibliotecaVersion VersionBiblioteca?
   activoPublico ActivoPublico?
+  trabajosImpresion3D TrabajoImpresion3D[]
 
   @@index([status, nextAttemptAt])
   @@index([leaseUntil])
@@ -973,6 +980,103 @@ model EventoGamificacion {
   @@index([usuarioId,createdAt])
   @@index([actividadId,tipo,createdAt])
   @@index([actorId,createdAt])
+}
+
+enum EstadoTrabajoImpresion3D {
+  SOLICITADO
+  EN_REVISION
+  APROBADO
+  EN_COLA
+  EN_IMPRESION
+  COMPLETADO
+  RECHAZADO
+  CANCELADO
+  FALLIDO
+}
+
+enum ResultadoEjecucionImpresion3D {
+  COMPLETADA
+  FALLIDA
+  CANCELADA
+}
+
+enum TipoOperacionImpresion3D {
+  CREAR_TRABAJO
+  INICIAR_REVISION
+  RESOLVER_REVISION
+  ASIGNAR_OPERADOR
+  INICIAR_EJECUCION
+  FINALIZAR_EJECUCION
+  REENCOLAR
+  CANCELAR
+}
+
+model TrabajoImpresion3D {
+  id String @id @default(cuid()) @db.VarChar(30)
+  solicitanteId Int
+  solicitante Usuario @relation("Printing3DRequester", fields:[solicitanteId], references:[id], onDelete:Restrict)
+  archivoId String @db.VarChar(30)
+  archivo Archivo @relation(fields:[archivoId], references:[id], onDelete:Restrict)
+  descripcion String @db.VarChar(2000)
+  estado EstadoTrabajoImpresion3D @default(SOLICITADO)
+  sedeId Int?
+  areaId Int?
+  operadorAsignadoId Int?
+  operadorAsignado Usuario? @relation("Printing3DOperator", fields:[operadorAsignadoId], references:[id], onDelete:Restrict)
+  revisadoPorId Int?
+  revisadoPor Usuario? @relation("Printing3DReviewer", fields:[revisadoPorId], references:[id], onDelete:Restrict)
+  motivoRevision String? @db.VarChar(1000)
+  reviewedAt DateTime?
+  assignedAt DateTime?
+  canceladoPorId Int?
+  canceladoPor Usuario? @relation("Printing3DCanceller", fields:[canceladoPorId], references:[id], onDelete:Restrict)
+  motivoCancelacion String? @db.VarChar(1000)
+  cancelledAt DateTime?
+  ejecuciones EjecucionImpresion3D[]
+  operaciones OperacionImpresion3D[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([solicitanteId,createdAt])
+  @@index([estado,sedeId,areaId,createdAt])
+  @@index([operadorAsignadoId,estado,createdAt])
+  @@index([archivoId])
+}
+
+model EjecucionImpresion3D {
+  id String @id @default(cuid()) @db.VarChar(30)
+  trabajoId String @db.VarChar(30)
+  trabajo TrabajoImpresion3D @relation(fields:[trabajoId], references:[id], onDelete:Restrict)
+  operadorId Int
+  operador Usuario @relation("Printing3DExecutionOperator", fields:[operadorId], references:[id], onDelete:Restrict)
+  numero Int
+  startedAt DateTime @default(now())
+  finishedAt DateTime?
+  material String @db.VarChar(120)
+  pesoGramos Int?
+  resultado ResultadoEjecucionImpresion3D?
+  observacion String? @db.VarChar(2000)
+  operaciones OperacionImpresion3D[]
+  createdAt DateTime @default(now())
+  @@unique([trabajoId,numero])
+  @@index([operadorId,startedAt])
+  @@index([trabajoId,finishedAt])
+}
+
+model OperacionImpresion3D {
+  id String @id @default(cuid()) @db.VarChar(30)
+  actorId Int
+  actor Usuario @relation("Printing3DOperationActor", fields:[actorId], references:[id], onDelete:Restrict)
+  key String @db.VarChar(128)
+  requestHash String @db.Char(64)
+  tipo TipoOperacionImpresion3D
+  trabajoId String? @db.VarChar(30)
+  trabajo TrabajoImpresion3D? @relation(fields:[trabajoId], references:[id], onDelete:Restrict)
+  ejecucionId String? @db.VarChar(30)
+  ejecucion EjecucionImpresion3D? @relation(fields:[ejecucionId], references:[id], onDelete:Restrict)
+  createdAt DateTime @default(now())
+  @@unique([actorId,key])
+  @@index([trabajoId,createdAt])
+  @@index([ejecucionId])
 }
 
 model Asistencia {

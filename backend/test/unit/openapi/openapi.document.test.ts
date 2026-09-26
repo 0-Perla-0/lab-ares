@@ -212,4 +212,19 @@ describe("OpenAPI document", () => {
     expect(document.components.schemas.GamificationRuleOrigin.enum).toEqual(["KAIROS_TERMINADA"]);
     expect(document.components.schemas.GamificationProfileResponse.properties.data.properties.privado.const).toBe(true);
   });
+
+  it("documents the private idempotent printing workflow and its exclusions", () => {
+    const create = document.paths["/api/printing-3d/jobs"].post;
+    expect(create.description).toContain("private quarantine");
+    expect(create.parameters).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: "Idempotency-Key", required: true }),
+    ]));
+    expect(create.responses[503]).toBeDefined();
+    expect(document.paths["/api/printing-3d/jobs/{id}/retry"].post.description).toContain("preserving every prior execution");
+    expect(document.paths["/api/printing-3d/jobs/{id}/download"].get.description).toContain("capability-bound");
+    expect(document.components.schemas.Printing3dJobState.enum).toEqual([
+      "SOLICITADO", "EN_REVISION", "APROBADO", "EN_COLA", "EN_IMPRESION", "COMPLETADO", "RECHAZADO", "CANCELADO", "FALLIDO",
+    ]);
+    expect(document.tags.find((tag) => tag.name === "Printing 3D")?.description).toContain("no slicing");
+  });
 });
