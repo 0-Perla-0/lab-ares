@@ -9,6 +9,17 @@
   --ares-lime-deep: #95c62d;
   --ares-orange: #f4834f;
   --ares-muted: #66736d;
+  --ares-surface: #ffffff;
+  --ares-surface-subtle: #f7f7f3;
+  --ares-border: rgba(18, 34, 27, 0.12);
+  --ares-border-strong: rgba(18, 34, 27, 0.24);
+  --ares-focus: #769a27;
+  --ares-danger: #b91c1c;
+  --ares-warning: #92400e;
+  --ares-success: #166534;
+  --ares-info: #075985;
+  --ares-motion-fast: 150ms;
+  --ares-motion-standard: 250ms;
 }
 
 * {
@@ -39,6 +50,19 @@ a {
   -webkit-tap-highlight-color: transparent;
 }
 
+button,
+[role="button"],
+a {
+  touch-action: manipulation;
+}
+
+button:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled {
+  cursor: not-allowed;
+}
+
 ::selection {
   background: var(--ares-lime);
   color: var(--ares-ink);
@@ -66,8 +90,50 @@ a {
 }
 
 .focus-ring:focus-visible {
-  outline: 3px solid rgba(149, 198, 45, 0.45);
+  outline: 3px solid var(--ares-focus);
   outline-offset: 2px;
+}
+
+.file-upload-trigger:focus-within {
+  outline: 3px solid var(--ares-focus);
+  outline-offset: 2px;
+}
+
+.tap-target {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+}
+
+.safe-area-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.ares-progress {
+  width: 100%;
+  height: 0.5rem;
+  overflow: hidden;
+  border: 0;
+  border-radius: 999px;
+  accent-color: var(--ares-focus);
+}
+
+.ares-progress::-webkit-progress-bar {
+  background: #e4e7e2;
+  border-radius: 999px;
+}
+
+.ares-progress::-webkit-progress-value {
+  background: var(--ares-focus);
+  border-radius: 999px;
+}
+
+.ares-progress::-moz-progress-bar {
+  background: var(--ares-focus);
+  border-radius: 999px;
 }
 
 .portal-background {
@@ -112,5 +178,11 @@ a {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .focus-ring:focus-visible {
+    outline: 2px solid CanvasText;
   }
 }

@@ -5,7 +5,7 @@
 | Dato                        | Valor                                                                                                             |
 | --------------------------- | ----------------------------------------------------------------------------------------------------------------- |
 | Fecha de revisión           | 25 de septiembre de 2026                                                                                          |
-| Rama de trabajo             | `feature/backend/backend2-full-scope`                                                                             |
+| Rama de trabajo             | `feature/frontend/backend2-full-scope`                                                                            |
 | Commit base revisado        | `cae5a0d` (storage seguro), `1fb0a27` (identidad e invitaciones), `60dcfc0` (MFA/notificaciones/outbox-SMTP/OpenAPI-Postman) |
 | Sistema actual              | Monorepo con Next.js App Router, NestJS, Prisma y MariaDB                                                         |
 | Fuentes funcionales         | Cinco PDF del sistema heredado: plan, análisis integral, reporte de estado, documento técnico y manual de usuario |
@@ -19,6 +19,16 @@
 - Los reportes operativos quedan **COMPLETADOS y verificados en backend**; frontend y E2E permanecen pendientes.
 - La matriz de retención/supresión queda **COMPLETADA y verificada en backend**; la migración fue creada y validada, pero no aplicada a un entorno real.
 - Los dominios de Backend 1 quedan excluidos de este bloque.
+
+### Cierre frontend e integración de Backend 2
+
+- La rama `feature/frontend/backend2-full-scope` integra las interfaces frontend para los diez dominios asignados a Backend 2: perfil académico, expediente documental, directorio, Kairos/Kanban/evidencias, reportes, biblioteca, CMS público y administrativo, gamificación, impresión 3D y retención. La navegación canónica está en [`frontend/lib/backend2/navigation.ts`](../frontend/lib/backend2/navigation.ts).
+- La integración consume la base accesible de Ares y conserva la autoridad del backend: `/auth/me` expone los grants efectivos sin ampliar autorizaciones en cliente.
+- Los flujos de archivos utilizan la API multipart existente; no se aplicaron migraciones reales durante esta fase.
+- La cobertura E2E usa Playwright 1.63 con Chromium y APIs interceptadas de forma determinista para validar navegación, permisos, formularios, carga/escaneo, exportaciones síncronas y asíncronas, estados deshabilitados, confirmaciones administrativas, accesibilidad de teclado y comportamiento móvil; la configuración y los escenarios están en [`frontend/playwright.config.ts`](../frontend/playwright.config.ts) y [`frontend/e2e/`](../frontend/e2e/).
+- Gates del corte: 37/37 pruebas Vitest frontend, 13/13 pruebas E2E, 672/672 pruebas backend, además de `check`, `build`, Prisma y diff-check aprobados. El formato del corte también quedó aprobado.
+- La deuda global previa de 80 archivos backend fuera del diff queda registrada como deuda técnica no bloqueante.
+- Al reanudar el trabajo backend quedan como siguiente bloque la operación/auditoría y la recuperación/reconciliación.
 
 ### Cierre verificado: perfil académico y adscripción histórica
 
@@ -116,15 +126,13 @@ Las instrucciones o recomendaciones contenidas en los PDF se trataron como mater
 
 ## 2. Resumen ejecutivo
 
-Ares ya cuenta con una base administrativa sólida y verificable, pero todavía no es funcionalmente equivalente al sistema documentado. El desarrollo actual cubre infraestructura, identidad core Backend 2, autenticación con sesiones, autorización centralizada, usuarios, catálogos de organización y el incremento 1 de asistencia en backend y frontend: check-in/check-out, historial propio, bolsa de horas por estado, cola jerárquica de sesiones abiertas y cierre manual con motivo. Los documentos, su flujo funcional y **Kairos** siguen pendientes.
+Ares ya cuenta con una base administrativa sólida y verificable, aunque todavía no es funcionalmente equivalente a todo el sistema documentado. Además de infraestructura, identidad, autenticación, organización y el incremento 1 de asistencia, los diez dominios de Backend 2 enumerados en el cierre anterior ya tienen backend, interfaz e integración E2E. Esto incluye el expediente documental y el recorrido de Kairos hasta Kanban y evidencias.
 
-El siguiente objetivo no debería ser migrar pantallas aisladas. Debe construirse primero un recorrido vertical completo de Servicio Social:
+Las brechas principales restantes pertenecen al recorrido de Servicio Social asignado a Backend 1 y a la operación transversal pendiente. El siguiente objetivo de producto sigue siendo completar este recorrido vertical:
 
 `check-in -> check-out -> bolsa de horas -> validación -> faltas/calendario -> documentos`
 
-Después puede abordarse Kairos en este orden:
-
-`proyecto -> miembros -> actividades -> evidencia -> validación -> Kanban`
+El recorrido de Kairos `proyecto -> miembros -> actividades -> evidencia -> validación -> Kanban` ya quedó integrado para el alcance de Backend 2.
 
 El cierre funcional incorpora versiones pequeñas pero completas de gamificación, impresión 3D, inventario y visitas porque deben estar presentes en Ares. Tienda/recompensas, capacitación RV y subtareas avanzadas continúan fuera del alcance inicial; los catálogos académicos se limitan a la procedencia aprobada en 19B.
 
@@ -230,31 +238,15 @@ Todavía no están implementados la validación individual o masiva, las ausenci
 
 ### 3.5 Frontend disponible
 
-El frontend contiene diez rutas de página:
+El frontend conserva el sitio público, login, resumen protegido, organización, usuarios y asistencia, y añade las interfaces completas de los diez dominios Backend 2: académico, expediente, directorio, Kairos, reportes, biblioteca, contenido público, gamificación, impresión 3D y retención.
 
-- Sitio público institucional.
-- Login.
-- Resumen protegido.
-- Sedes.
-- Áreas.
-- Turnos.
-- Listado de usuarios.
-- Alta de usuario.
-- Edición de usuario.
-- Asistencia.
-
-Las pantallas incluyen navegación adaptable, estados de carga y error, confirmación de bajas y visibilidad de acciones basada en rol.
+Las pantallas incluyen navegación adaptable, estados de carga/error/vacío, acciones condicionadas por grants efectivos, formularios accesibles y recorridos móviles. La visibilidad en cliente no reemplaza la autorización del backend.
 
 ### 3.6 Backend y calidad
 
-El backend expone 32 operaciones HTTP si se cuentan salud, autenticación, OpenAPI, organización, usuarios y las cinco operaciones de asistencia. El esquema actual contiene nueve modelos Prisma; a los seis iniciales se añadieron `Asistencia`, `AsistenciaEvento` y `AsistenciaSolicitud`.
+El backend cubre salud, autenticación, organización, usuarios, asistencia y los dominios Backend 2 documentados en este corte mediante contratos OpenAPI/Postman y esquema Prisma versionado.
 
-En esta revisión se ejecutó la suite no integrada del backend:
-
-- 279 pruebas aprobadas, incluyendo MFA/TOTP y replay protection, códigos de recuperación one-use, notificaciones, outbox/leases/backoff, SMTP/Mailpit/EmailDelivery, limpieza, invitaciones, recuperación, sesiones y auditoría.
-- Cobertura funcional de autenticación, permisos, sesiones, usuarios, organización, asistencia, OpenAPI, configuración, salud y bootstrap.
-
-La verificación local completó formato, validación y generación de Prisma, pruebas, tipos y builds de producción; la cifra de esta entrega es la suite backend de 279 pruebas aprobadas. La cobertura frontend previa no se presenta como evidencia de estos recorridos de identidad.
+La verificación actual aprobó 672/672 pruebas backend, 37/37 pruebas Vitest frontend y 13/13 pruebas E2E Chromium, además de check, build, validación/generación Prisma, formato del corte y diff-check. Las migraciones de esta fase fueron creadas y validadas, pero no se aplicaron a un entorno real durante el cierre frontend.
 
 ### 3.7 Diferencia entre el sitio viejo y la reconstrucción
 
@@ -263,8 +255,8 @@ La verificación local completó formato, validación y generación de Prisma, p
 | Arquitectura     | Next.js 15 monolítico: páginas, endpoints y dominio en el mismo proyecto                                                          | Next.js 16 para UI y NestJS 11 como backend independiente                                                                            |
 | Autenticación    | NextAuth 5 con JWT, middleware y verificaciones distribuidas                                                                      | Sesión persistente server-side, cookie HTTP-only y guards globales NestJS                                                            |
 | Acceso a datos   | Prisma 6 desde rutas y utilidades del monolito                                                                                    | Prisma 7 encapsulado en repositorios/servicios del backend                                                                           |
-| Alcance de datos | Decenas de modelos para asistencia, documentos, Kairos, gamificación, laboratorio y contenido                                     | Nueve modelos para organización, usuarios, sesiones y asistencia; los demás dominios aún no existen                                  |
-| API              | Aproximadamente 103 archivos `route.ts` reportados, con duplicados y endpoints sin consumidor detectados por el análisis integral | 32 operaciones HTTP intencionales y documentadas en OpenAPI para el alcance actual                                                   |
+| Alcance de datos | Decenas de modelos para asistencia, documentos, Kairos, gamificación, laboratorio y contenido                                     | Esquema versionado para organización, identidad, asistencia y los dominios Backend 2 cerrados en este corte                           |
+| API              | Aproximadamente 103 archivos `route.ts` reportados, con duplicados y endpoints sin consumidor detectados por el análisis integral | Operaciones NestJS intencionales y documentadas en OpenAPI/Postman para el alcance implementado                                       |
 | Calidad          | El documento de marzo menciona Jest/ESLint; el análisis integral encontró pruebas y CI inefectivos                                | Vitest, pruebas unitarias/E2E/integración, typecheck, build y CI                                                                     |
 | Despliegue       | Desarrollo local y previews de Vercel; sin evidencia consistente de producción estable                                            | Docker/CI reproducibles; modelo administrado y liberación por anillos aprobados, todavía sin proveedor, entornos ni piloto ejecutado |
 
@@ -932,17 +924,17 @@ La migración 16B se ejecutará sólo si aparecen fuentes del sistema anterior, 
 
 ## 12. Próximo paso recomendado
 
-El perfil académico/adscripción histórica, el expediente documental funcional, el directorio interno, la base de proyectos/membresías y actividades/evidencias de Kairos, los reportes, la biblioteca, el CMS público, la gamificación privada, la impresión 3D privada y la retención/supresión ya están cerrados y verificados en backend. Por instrucción de trabajo, backend se pausa en este corte para pasar a frontend, integración y E2E de lo ya desarrollado. Después quedan operación/auditoría y recuperación/reconciliación del alcance de Backend 2. Los dominios de Backend 1 están fuera de este bloque.
+El perfil académico/adscripción histórica, el expediente documental, el directorio interno, Kairos/Kanban/evidencias, los reportes, la biblioteca, el CMS público y administrativo, la gamificación privada, la impresión 3D privada y la retención/supresión ya están cerrados en backend, frontend e integración E2E dentro de `feature/frontend/backend2-full-scope`. Los dominios de Backend 1 permanecen fuera de este bloque.
 
 El contrato funcional principal ya produjo el primer recorrido backend implementable. El orden recomendado desde este corte es:
 
 **Decisiones funcionales pendientes: ninguna.** Las decisiones externas al control del repositorio se omiten de esta secuencia y se resolverán por separado cuando corresponda; no bloquean los contratos ni la implementación local.
 
-1. Crear la rama Git Flow de frontend e integrar las funcionalidades ya desarrolladas por Backend 2, con sus pruebas de integración y E2E, sin incorporar dominios de Backend 1.
-2. Reanudar backend para completar operación/auditoría, integridad, salud/correlación/alertas y recuperación/reconciliación del alcance de Backend 2.
+1. Reanudar backend para completar operación/auditoría, integridad, salud/correlación/alertas y recuperación/reconciliación del alcance de Backend 2.
+2. Ensayar y aplicar migraciones sólo en el entorno autorizado, con respaldo, validación y conciliación; este corte no aplicó migraciones reales.
 3. Mantener la documentación de importadores legacy como pendiente hasta recibir fuentes aprobadas e identificables.
 
-El Incremento 1 quedó integrado en `develop`. Backend 1 y Frontend 1 deben continuar con validación, ausencias y calendario sin duplicar las reglas ya centralizadas. En paralelo, Backend 2 puede preparar almacenamiento/documentos y Frontend 2 los componentes de estados y navegación de Kairos. Los cuatro MVP P3 siguen comprometidos, pero comienzan después de estabilizar sus dependencias y no desplazan el núcleo de Servicio Social.
+El Incremento 1 quedó integrado en `develop`. Backend 1 y Frontend 1 deben continuar con validación, ausencias y calendario sin duplicar las reglas ya centralizadas. Backend 2 retoma ahora los bloques transversales anteriores; los flujos de almacenamiento/documentos, Kairos, gamificación e impresión 3D ya cuentan con sus consumidores frontend y E2E en esta rama.
 
 ## 13. Referencias del repositorio actual
 

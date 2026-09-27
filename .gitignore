@@ -3,6 +3,10 @@ dist/
 **/dist/
 .next/
 **/.next/
+
+# Playwright output (specs under frontend/e2e remain tracked)
+/frontend/test-results/
+/frontend/playwright-report/
 # generated types
 *.tsbuildinfo
 

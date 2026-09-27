@@ -158,6 +158,11 @@ export function getAccessScope(
   return user ? (permissionsByRole[user.rol][permission] ?? null) : null;
 }
 
+/** Materializes the effective grants for client-side capability discovery. */
+export function permissionGrants(user: AuthUser): RoleGrants {
+  return { ...permissionsByRole[user.rol] };
+}
+
 export function can(
   user: AuthUser | null | undefined,
   permission: Permission,

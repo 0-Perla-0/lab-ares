@@ -8,6 +8,7 @@ import {
   canAccessSede,
   getAccessScope,
   Permission,
+  permissionGrants,
 } from "../../../src/auth/permissions";
 import { EstadoUsuario, RolUsuario } from "../../../src/generated/prisma/enums";
 
@@ -100,6 +101,15 @@ describe("can", () => {
 
   it("denies anonymous users", () => {
     expect(can(null, Permission.ORGANIZATION_READ)).toBe(false);
+  });
+
+  it("materializes the same effective scoped grants used by guards", () => {
+    const user = createUser(RolUsuario.COORDINADOR);
+    const grants = permissionGrants(user);
+    expect(grants[Permission.ACADEMIC_PROFILE_READ]).toBe(AccessScope.AREA);
+    expect(grants[Permission.DOCUMENTS_UPLOAD]).toBe(AccessScope.SELF);
+    expect(grants[Permission.RETENTION_EXECUTE]).toBeUndefined();
+    expect(grants).not.toBe(permissionGrants(user));
   });
 });
 
