@@ -17,6 +17,7 @@
 - El perfil académico/adscripción histórica, el expediente documental funcional, la base de proyectos/membresías y las actividades/evidencias de Kairos de Backend 2 quedan cerrados y verificados.
 - Kanban queda implementado y verificado en backend como proyección de las actividades; después seguirán frontend e integración E2E.
 - Los reportes operativos quedan **COMPLETADOS y verificados en backend**; frontend y E2E permanecen pendientes.
+- La matriz de retención/supresión queda **COMPLETADA y verificada en backend**; la migración fue creada y validada, pero no aplicada a un entorno real.
 - Los dominios de Backend 1 quedan excluidos de este bloque.
 
 ### Cierre verificado: perfil académico y adscripción histórica
@@ -89,6 +90,17 @@
 - El dominio integra idempotencia, auditoría, notificaciones y descarga protegida por capability. La funcionalidad está detrás de `PRINTING_3D_ENABLED=false` por defecto.
 - Migración creada y validada: `20260925290000_printing_3d`. OpenAPI y ambas colecciones de Postman quedaron actualizados con 12 solicitudes.
 - Gate verde: 52 archivos y 620 pruebas, además de typecheck, build, validación Prisma y contrato Postman. Esta fase queda **COMPLETADA en backend**; frontend, integración y E2E permanecen pendientes.
+
+### Cierre verificado: retención y supresión
+
+- Se implementaron modelos y migración para reglas versionadas, registros con snapshot inmutable de la regla aplicable, retenciones legales, solicitudes, lotes, elementos de lote, ledger de supresión y operaciones idempotentes. La migración `20260925300000_retention_suppression` fue creada y validada, pero **no se aplicó a un entorno real**.
+- Las retenciones legales exigen motivo, responsable y fecha de revisión; pausan la supresión hasta su liberación autorizada. Las solicitudes de cancelación/supresión abren un expediente y nunca borran datos inmediatamente.
+- Los lotes separan `preview`, autorización, pausa, ejecución y reintento. La ejecución usa leases con propietario, recuperación de leases vencidos, intentos acotados y backoff; cada elemento vuelve a validar retenciones legales y el estado del lote.
+- Los adaptadores automáticos se limitan a recursos provisionales seguros: sesiones/tokens/desafíos, notificaciones, exportaciones y archivos rechazados. No existe supresión automática de datos de negocio sin política institucional aprobada ni un adaptador explícito.
+- El ledger conserva una huella SHA-256 del recurso y metadatos mínimos, sin identificadores crudos eliminados. El flujo `reapply` permite reaplicar supresiones registradas antes de habilitar un entorno restaurado.
+- Se agregaron permisos separados de solicitud, consulta, gestión y ejecución. El worker permanece desactivado por defecto mediante flags de entorno, junto con el bloqueo de políticas institucionales no aprobadas.
+- OpenAPI y ambas colecciones de Postman documentan las 21 rutas/solicitudes del dominio.
+- Gate verde: 53 archivos de prueba y 671/671 pruebas aprobadas, además de typecheck, build, validación/generación Prisma, parseo de Postman y diff-check. Esta fase queda **COMPLETADA en backend**; ahora se pausa backend para abordar frontend, integración y E2E.
 
 ## 1. Alcance y criterio de comparación
 
@@ -289,7 +301,7 @@ La estrategia correcta es reconstruir contratos de negocio sobre esta arquitectu
 | Usuarios                        | CRUD, aprobación, estados, baja segura y cambios sensibles auditados                        | Parcial avanzado                                             | Flujo de activación/rechazo, historial de email/rol/credenciales, perfil académico y filtros/paginación                                             | P1                    |
 | Sedes, áreas, turnos y academia | Organización operativa más procedencia académica del prestador                              | Organización operativa implementada; academia pendiente      | Mantener permisos por sede/área y añadir institución, unidad académica, programa, cohorte y adscripción histórica como dimensión independiente      | P1                    |
 | Auditoría transversal           | Quién cambió, aprobó o rechazó qué y cuándo                                                 | Parcial; base append-only usada por check-in/check-out       | Ampliar catálogo, hashes/manifiestos de integridad, consulta por alcance y retención; integrar los demás dominios                                   | P0                    |
-| Conservación y supresión        | Conservar historial necesario sin retener indefinidamente datos personales temporales       | Pendiente; matriz configurable aprobada                      | Categorías/versiones, bloqueo, retención legal, supresión/anonimización, jobs, solicitudes y compatibilidad con respaldos                           | P0 transversal        |
+| Conservación y supresión        | Conservar historial necesario sin retener indefinidamente datos personales temporales       | Implementado y verificado en backend                         | Integrar interfaz administrativa, pruebas E2E y aplicar la migración validada en el entorno autorizado; mantener bloqueada la supresión institucional no aprobada | P0 transversal        |
 | Check-in/check-out              | Una sesión abierta, cierre propio, cierre manual autorizado y alertas de sesiones anormales | Incremento 1 implementado en backend y frontend              | Validación, ausencias y política definitiva de riesgo                                                                                               | P0                    |
 | Bolsa de horas y riesgo         | Horas autorizadas, pendientes y rechazadas; semáforo verde/amarillo/rojo                    | Bolsa por estado implementada; semáforo definitivo pendiente | Definir umbrales, comentarios del validador e historial inmutable                                                                                   | P0                    |
 | Validación de horas             | Revisión individual y masiva, filtros por sede/área/usuario/estado y rechazo comentado      | Pendiente; contrato jerárquico aprobado                      | Implementar separación de funciones, alcance organizacional y lotes verdes de máximo 100 registros                                                  | P0                    |
@@ -920,16 +932,15 @@ La migración 16B se ejecutará sólo si aparecen fuentes del sistema anterior, 
 
 ## 12. Próximo paso recomendado
 
-El perfil académico/adscripción histórica, el expediente documental funcional, el directorio interno, la base de proyectos/membresías y actividades/evidencias de Kairos, los reportes, la biblioteca, el CMS público, la gamificación privada y la impresión 3D privada ya están cerrados y verificados en backend. Permanecen pendientes para Backend 2 la retención/supresión, operación/auditoría y la recuperación/reconciliación que le corresponde; después deben abordarse frontend, integración y E2E. Los dominios de Backend 1 están fuera de este bloque.
+El perfil académico/adscripción histórica, el expediente documental funcional, el directorio interno, la base de proyectos/membresías y actividades/evidencias de Kairos, los reportes, la biblioteca, el CMS público, la gamificación privada, la impresión 3D privada y la retención/supresión ya están cerrados y verificados en backend. Por instrucción de trabajo, backend se pausa en este corte para pasar a frontend, integración y E2E de lo ya desarrollado. Después quedan operación/auditoría y recuperación/reconciliación del alcance de Backend 2. Los dominios de Backend 1 están fuera de este bloque.
 
 El contrato funcional principal ya produjo el primer recorrido backend implementable. El orden recomendado desde este corte es:
 
 **Decisiones funcionales pendientes: ninguna.** Las decisiones externas al control del repositorio se omiten de esta secuencia y se resolverán por separado cuando corresponda; no bloquean los contratos ni la implementación local.
 
-1. Implementar primero la matriz de retención/supresión y sus jobs idempotentes, con bloqueo de periodos institucionales hasta contar con aprobación.
-2. Completar operación/auditoría, integridad, salud/correlación/alertas y recuperación/reconciliación del alcance de Backend 2.
+1. Crear la rama Git Flow de frontend e integrar las funcionalidades ya desarrolladas por Backend 2, con sus pruebas de integración y E2E, sin incorporar dominios de Backend 1.
+2. Reanudar backend para completar operación/auditoría, integridad, salud/correlación/alertas y recuperación/reconciliación del alcance de Backend 2.
 3. Mantener la documentación de importadores legacy como pendiente hasta recibir fuentes aprobadas e identificables.
-4. Crear la rama Git Flow de frontend para integrar gamificación e impresión 3D y cerrar las pruebas E2E, sin incorporar dominios de Backend 1.
 
 El Incremento 1 quedó integrado en `develop`. Backend 1 y Frontend 1 deben continuar con validación, ausencias y calendario sin duplicar las reglas ya centralizadas. En paralelo, Backend 2 puede preparar almacenamiento/documentos y Frontend 2 los componentes de estados y navegación de Kairos. Los cuatro MVP P3 siguen comprometidos, pero comienzan después de estabilizar sus dependencias y no desplazan el núcleo de Servicio Social.
 

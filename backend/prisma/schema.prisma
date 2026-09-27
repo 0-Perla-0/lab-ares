@@ -174,6 +174,17 @@ model Usuario {
   trabajosImpresion3DCancelados TrabajoImpresion3D[] @relation("Printing3DCanceller")
   ejecucionesImpresion3D EjecucionImpresion3D[] @relation("Printing3DExecutionOperator")
   operacionesImpresion3D OperacionImpresion3D[] @relation("Printing3DOperationActor")
+  reglasRetencionCreadas ReglaRetencion[] @relation("RetentionRuleCreator")
+  reglasRetencionAprobadas ReglaRetencion[] @relation("RetentionRuleApprover")
+  registrosRetencion RegistroRetencion[] @relation("RetentionSubject")
+  retencionesLegalesCreadas RetencionLegal[] @relation("LegalHoldCreator")
+  retencionesLegalesLiberadas RetencionLegal[] @relation("LegalHoldReleaser")
+  solicitudesSupresion SolicitudSupresion[] @relation("SuppressionRequester")
+  solicitudesSupresionResueltas SolicitudSupresion[] @relation("SuppressionResolver")
+  lotesSupresionCreados LoteSupresion[] @relation("SuppressionBatchCreator")
+  lotesSupresionAutorizados LoteSupresion[] @relation("SuppressionBatchAuthorizer")
+  registrosSupresionEjecutados RegistroSupresion[] @relation("SuppressionExecutor")
+  operacionesRetencion OperacionRetencion[] @relation("RetentionOperationActor")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1077,6 +1088,254 @@ model OperacionImpresion3D {
   @@unique([actorId,key])
   @@index([trabajoId,createdAt])
   @@index([ejecucionId])
+}
+
+enum CategoriaRetencion {
+  IDENTIDAD_CUENTA
+  PERFIL_ACADEMICO
+  ASISTENCIA_HORAS
+  AUSENCIAS_JUSTIFICANTES
+  EXPEDIENTE
+  KAIROS_EVIDENCIAS
+  BIBLIOTECA
+  AUDITORIA
+  NOTIFICACIONES_CORREO
+  SESIONES_TOKENS
+  LOGS
+  EXPORTACIONES
+  ARCHIVOS_RECHAZADOS
+}
+
+enum AccionFinalRetencion {
+  ELIMINAR
+  ANONIMIZAR
+}
+
+enum EstadoReglaRetencion {
+  BORRADOR
+  APROBADA
+  SUSTITUIDA
+}
+
+enum EstadoRegistroRetencion {
+  ACTIVO
+  BLOQUEADO_ARCHIVADO
+  SUPRESION_PROGRAMADA
+  SUPRIMIDO
+  ANONIMIZADO
+}
+
+enum EstadoRetencionLegal {
+  ACTIVA
+  LIBERADA
+}
+
+enum EstadoSolicitudSupresion {
+  ABIERTA
+  EN_REVISION
+  APROBADA
+  RECHAZADA
+  EJECUTADA
+}
+
+enum EstadoLoteSupresion {
+  BORRADOR
+  AUTORIZADO
+  EN_EJECUCION
+  PAUSADO
+  COMPLETADO
+  FALLIDO
+}
+
+enum EstadoElementoSupresion {
+  PENDIENTE
+  PROCESANDO
+  OMITIDO_RETENCION_LEGAL
+  EJECUTADO
+  FALLIDO
+}
+
+enum TipoOperacionRetencion {
+  CREAR_REGLA
+  APROBAR_REGLA
+  REGISTRAR_ELEMENTO
+  CREAR_RETENCION_LEGAL
+  LIBERAR_RETENCION_LEGAL
+  CREAR_SOLICITUD
+  RESOLVER_SOLICITUD
+  CREAR_LOTE
+  AUTORIZAR_LOTE
+  PAUSAR_LOTE
+  EJECUTAR_LOTE
+  REAPLICAR_SUPRESIONES
+}
+
+model ReglaRetencion {
+  id String @id @default(cuid()) @db.VarChar(30)
+  categoria CategoriaRetencion
+  version Int
+  finalidad String @db.VarChar(1000)
+  responsable String @db.VarChar(191)
+  eventoInicio String @db.VarChar(191)
+  periodoActivoDias Int
+  periodoBloqueadoDias Int
+  accionFinal AccionFinalRetencion
+  fundamento String @db.VarChar(2000)
+  provisional Boolean @default(false)
+  automatica Boolean @default(false)
+  estado EstadoReglaRetencion @default(BORRADOR)
+  referenciaAprobacion String? @db.VarChar(500)
+  approvedAt DateTime?
+  creadoPorId Int?
+  creadoPor Usuario? @relation("RetentionRuleCreator", fields:[creadoPorId], references:[id], onDelete:Restrict)
+  aprobadoPorId Int?
+  aprobadoPor Usuario? @relation("RetentionRuleApprover", fields:[aprobadoPorId], references:[id], onDelete:Restrict)
+  registros RegistroRetencion[]
+  createdAt DateTime @default(now())
+  @@unique([categoria,version])
+  @@index([categoria,estado,version])
+}
+
+model RegistroRetencion {
+  id String @id @default(cuid()) @db.VarChar(30)
+  categoria CategoriaRetencion
+  resourceType String @db.VarChar(100)
+  resourceId String @db.VarChar(191)
+  subjectId Int?
+  subject Usuario? @relation("RetentionSubject", fields:[subjectId], references:[id], onDelete:SetNull)
+  reglaId String @db.VarChar(30)
+  regla ReglaRetencion @relation(fields:[reglaId], references:[id], onDelete:Restrict)
+  estado EstadoRegistroRetencion @default(ACTIVO)
+  triggeredAt DateTime
+  archiveDueAt DateTime
+  actionDueAt DateTime
+  blockedAt DateTime?
+  scheduledAt DateTime?
+  processedAt DateTime?
+  retencionesLegales RetencionLegal[]
+  elementosLote ElementoLoteSupresion[]
+  registrosSupresion RegistroSupresion[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([categoria,resourceType,resourceId])
+  @@index([estado,actionDueAt])
+  @@index([subjectId,estado,createdAt])
+  @@index([reglaId,estado])
+}
+
+model RetencionLegal {
+  id String @id @default(cuid()) @db.VarChar(30)
+  registroId String @db.VarChar(30)
+  registro RegistroRetencion @relation(fields:[registroId], references:[id], onDelete:Restrict)
+  motivo String @db.VarChar(2000)
+  responsable String @db.VarChar(191)
+  reviewAt DateTime
+  endsAt DateTime?
+  estado EstadoRetencionLegal @default(ACTIVA)
+  creadoPorId Int
+  creadoPor Usuario @relation("LegalHoldCreator", fields:[creadoPorId], references:[id], onDelete:Restrict)
+  liberadoPorId Int?
+  liberadoPor Usuario? @relation("LegalHoldReleaser", fields:[liberadoPorId], references:[id], onDelete:Restrict)
+  motivoLiberacion String? @db.VarChar(2000)
+  releasedAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([registroId,estado,reviewAt])
+}
+
+model SolicitudSupresion {
+  id String @id @default(cuid()) @db.VarChar(30)
+  solicitanteId Int
+  solicitante Usuario @relation("SuppressionRequester", fields:[solicitanteId], references:[id], onDelete:Restrict)
+  motivo String @db.VarChar(2000)
+  estado EstadoSolicitudSupresion @default(ABIERTA)
+  clasificacion Json?
+  resolucion String? @db.VarChar(2000)
+  resueltoPorId Int?
+  resueltoPor Usuario? @relation("SuppressionResolver", fields:[resueltoPorId], references:[id], onDelete:Restrict)
+  resolvedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([solicitanteId,createdAt])
+  @@index([estado,createdAt])
+}
+
+model LoteSupresion {
+  id String @id @default(cuid()) @db.VarChar(30)
+  categoria CategoriaRetencion?
+  estado EstadoLoteSupresion @default(BORRADOR)
+  cutoffAt DateTime
+  totalElementos Int @default(0)
+  ejecutados Int @default(0)
+  omitidos Int @default(0)
+  fallidos Int @default(0)
+  creadoPorId Int
+  creadoPor Usuario @relation("SuppressionBatchCreator", fields:[creadoPorId], references:[id], onDelete:Restrict)
+  autorizadoPorId Int?
+  autorizadoPor Usuario? @relation("SuppressionBatchAuthorizer", fields:[autorizadoPorId], references:[id], onDelete:Restrict)
+  authorizedAt DateTime?
+  pausedAt DateTime?
+  motivoPausa String? @db.VarChar(1000)
+  startedAt DateTime?
+  finishedAt DateTime?
+  elementos ElementoLoteSupresion[]
+  operaciones OperacionRetencion[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([estado,createdAt])
+  @@index([categoria,estado,createdAt])
+}
+
+model ElementoLoteSupresion {
+  id String @id @default(cuid()) @db.VarChar(30)
+  loteId String @db.VarChar(30)
+  lote LoteSupresion @relation(fields:[loteId], references:[id], onDelete:Restrict)
+  registroId String @db.VarChar(30)
+  registro RegistroRetencion @relation(fields:[registroId], references:[id], onDelete:Restrict)
+  estado EstadoElementoSupresion @default(PENDIENTE)
+  attempts Int @default(0)
+  nextAttemptAt DateTime?
+  leaseUntil DateTime?
+  leaseOwner String? @db.VarChar(80)
+  errorCode String? @db.VarChar(100)
+  processedAt DateTime?
+  createdAt DateTime @default(now())
+  @@unique([loteId,registroId])
+  @@index([loteId,estado])
+  @@index([estado,nextAttemptAt,leaseUntil])
+}
+
+model RegistroSupresion {
+  id String @id @default(cuid()) @db.VarChar(30)
+  registroId String @db.VarChar(30)
+  registro RegistroRetencion @relation(fields:[registroId], references:[id], onDelete:Restrict)
+  categoria CategoriaRetencion
+  resourceType String @db.VarChar(100)
+  resourceFingerprint String @db.Char(64)
+  accion AccionFinalRetencion
+  policyVersion Int
+  loteId String @db.VarChar(30)
+  ejecutadoPorId Int?
+  ejecutadoPor Usuario? @relation("SuppressionExecutor", fields:[ejecutadoPorId], references:[id], onDelete:Restrict)
+  occurredAt DateTime @default(now())
+  lastReappliedAt DateTime?
+  @@unique([registroId,accion])
+  @@index([categoria,occurredAt])
+  @@index([loteId,occurredAt])
+}
+
+model OperacionRetencion {
+  id String @id @default(cuid()) @db.VarChar(30)
+  actorId Int
+  actor Usuario @relation("RetentionOperationActor", fields:[actorId], references:[id], onDelete:Restrict)
+  key String @db.VarChar(128)
+  requestHash String @db.Char(64)
+  tipo TipoOperacionRetencion
+  loteId String? @db.VarChar(30)
+  lote LoteSupresion? @relation(fields:[loteId], references:[id], onDelete:Restrict)
+  response Json?
+  createdAt DateTime @default(now())
+  @@unique([actorId,key])
+  @@index([loteId,createdAt])
 }
 
 model Asistencia {

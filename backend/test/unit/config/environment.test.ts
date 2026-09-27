@@ -43,6 +43,21 @@ describe("validateEnvironment", () => {
     ).toBe(true);
   });
 
+  it.each([
+    ["RETENTION_INSTITUTIONAL_POLICIES_APPROVED", "false", false],
+    ["RETENTION_INSTITUTIONAL_POLICIES_APPROVED", "true", true],
+    ["RETENTION_INSTITUTIONAL_POLICIES_APPROVED", "0", false],
+    ["RETENTION_INSTITUTIONAL_POLICIES_APPROVED", "1", true],
+    ["RETENTION_WORKER_ENABLED", "false", false],
+    ["RETENTION_WORKER_ENABLED", "true", true],
+    ["RETENTION_WORKER_ENABLED", "0", false],
+    ["RETENTION_WORKER_ENABLED", "1", true],
+  ])("coerces %s=%s safely", (flag, raw, expected) => {
+    expect(validateEnvironment({ ...base, [flag]: raw })).toMatchObject({
+      [flag]: expected,
+    });
+  });
+
   it("rejects an invalid application time zone", () => {
     expect(() =>
       validateEnvironment({ ...base, APP_TIME_ZONE: "Mars/Olympus" }),

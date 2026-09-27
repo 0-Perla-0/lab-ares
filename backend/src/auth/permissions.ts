@@ -34,6 +34,10 @@ export enum Permission {
   PRINTING_3D_REQUEST = "printing-3d:request",
   PRINTING_3D_OPERATE = "printing-3d:operate",
   PRINTING_3D_MANAGE = "printing-3d:manage",
+  RETENTION_REQUEST = "retention:request",
+  RETENTION_READ = "retention:read",
+  RETENTION_MANAGE = "retention:manage",
+  RETENTION_EXECUTE = "retention:execute",
 }
 
 export enum AccessScope {
@@ -59,6 +63,7 @@ const commonUserGrants: RoleGrants = {
   [Permission.LIBRARY_ACKNOWLEDGE]: AccessScope.SELF,
   [Permission.GAMIFICATION_READ]: AccessScope.SELF,
   [Permission.PRINTING_3D_REQUEST]: AccessScope.SELF,
+  [Permission.RETENTION_REQUEST]: AccessScope.SELF,
 };
 
 const areaManagerGrants: RoleGrants = {

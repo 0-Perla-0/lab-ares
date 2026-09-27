@@ -226,3 +226,29 @@ su detalle estructurado.
 
 La colección hace borrados lógicos; los registros quedan en la base con
 `activa`/`activo` en `false` o, para usuarios, con `estado = BAJA`.
+
+## Retención y supresión
+
+La carpeta `18 - Retención y supresión privada` requiere sesión `ADMIN` para
+las operaciones administrativas. `/retention/requests/me` sólo permite al
+usuario autenticado crear y consultar sus solicitudes. Define
+`retentionSyntheticResourceId` como un recurso descartable de prueba existente
+y `retentionSubjectId` como una cuenta de pruebas; no registres recursos de
+negocio. Las variables `retentionRuleId`, `retentionRecordId`,
+`retentionHoldId`, `retentionRequestId` y `retentionBatchId` se capturan de las
+respuestas. Para probar pausa usa un lote separado y asigna su id a
+`retentionPauseBatchId`. La petición de creación de hold calcula
+automáticamente `reviewAt` a +7 días y `endsAt` a +14 días.
+
+Las escrituras requieren una clave `Idempotency-Key` propia. Las reglas
+provisionales son temporales; aprobar reglas no provisionales y ejecutar esas
+políticas depende de `RETENTION_INSTITUTIONAL_POLICIES_APPROVED=true`. El worker
+de sondeo se inicia apagado con `RETENTION_WORKER_ENABLED=false`; la petición
+explícita de ejecución procesa el lote de forma síncrona. Preview sólo crea una
+instantánea; autorizar y ejecutar son pasos separados. Ejecutar puede eliminar
+o anonimizar los recursos registrados, así que limita la prueba a datos
+sintéticos. `Reintentar o reanudar lote` sólo acepta lotes `PAUSADO` o
+`FALLIDO`, reinicia sus elementos fallidos y reanuda el procesamiento. El
+acuse idempotente incluye `resetFailures`; consulta el detalle del lote para
+ver el resultado final. El registry devuelve fingerprints, no identificadores
+de negocio.

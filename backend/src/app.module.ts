@@ -26,6 +26,7 @@ import { LibraryModule } from "./library/library.module";
 import { PublicContentModule } from "./public-content/public-content.module";
 import { GamificationModule } from "./gamification/gamification.module";
 import { Printing3dModule } from "./printing-3d/printing-3d.module";
+import { RetentionModule } from "./retention/retention.module";
 
 @Module({
   imports: [
@@ -52,6 +53,7 @@ import { Printing3dModule } from "./printing-3d/printing-3d.module";
     PublicContentModule,
     GamificationModule,
     Printing3dModule,
+    RetentionModule,
     OpenApiModule,
   ],
   providers: [
