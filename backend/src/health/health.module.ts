@@ -8,5 +8,6 @@ import { StorageModule } from "../storage/storage.module";
   controllers: [HealthController],
   providers: [HealthService],
   imports: [StorageModule],
+  exports: [HealthService],
 })
 export class HealthModule {}

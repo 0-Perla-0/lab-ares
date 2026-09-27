@@ -207,6 +207,28 @@ slicing, no controla impresoras, no cotiza, no cobra y no admite 3MF.
 
 ## Respuestas y errores
 
+## Auditoría, integridad y operación
+
+La carpeta `19 - Auditoría y operación` usa la misma cookie de sesión. Todos
+los usuarios autenticados pueden consultar `/audit/me`; las consultas y
+exportaciones administrativas respetan el alcance efectivo `AREA`, `SEDE` o
+`GLOBAL`. Las pantallas operativas, jobs, alertas, incidentes y la creación de
+manifiestos requieren un permiso global (`JEFE_COORDINADORES` o `ADMIN`).
+
+Configura `auditPeriod` con un día UTC ya cerrado. El manifiesto es inmutable,
+se ancla en almacenamiento privado y su verificación detecta alteraciones o
+pérdidas; es una comprobación técnica de integridad, no una firma legal. El
+worker permanece apagado salvo que se establezca
+`AUDIT_MANIFEST_WORKER_ENABLED=true`.
+
+`operationsJobId`, `operationsAlertId` y `operationsIncidentId` identifican
+fixtures descartables. El dueño de un lease manual se deriva de la sesión y no
+se acepta desde el cuerpo. Los incidentes sólo guardan una referencia al ticket
+externo: no sustituyen el sistema de ticketing. Los estados son `ABIERTO`,
+`RECONOCIDO`, `INVESTIGANDO`, `MITIGANDO`, `MONITOREANDO`, `RESUELTO` y
+`CERRADO`; cambiar estado o severidad exige motivo y responsable. S1 y S2
+repetido generan revisión con vencimiento a dos días hábiles.
+
 Las respuestas exitosas del dominio usan `{ "data": ... }`. Los errores usan
 principalmente `{ "error": "CODIGO" }`; una validación inválida devuelve además
 su detalle estructurado.

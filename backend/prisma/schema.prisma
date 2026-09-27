@@ -417,9 +417,182 @@ model AuditEvent {
   resource String @db.VarChar(100)
   correlationId String? @db.VarChar(100)
   metadata Json?
-  occurredAt DateTime @default(now())
+  actorType String @default("HUMAN") @db.VarChar(20)
+  actorRole String? @db.VarChar(40)
+  accessScope String? @db.VarChar(20)
+  module String @default("LEGACY") @db.VarChar(60)
+  objectType String? @db.VarChar(100)
+  objectId String? @db.VarChar(100)
+  result String @default("SUCCESS") @db.VarChar(30)
+  reason String? @db.VarChar(500)
+  diff Json?
+  policyVersion String? @db.VarChar(50)
+  batchId String? @db.VarChar(100)
+  jobId String? @db.VarChar(100)
+  sedeId Int?
+  areaId Int?
+  periodKey String? @db.Char(10)
+  chainIndex Int?
+  previousHash String? @db.Char(64)
+  eventHash String? @db.Char(64)
+  occurredAt DateTime @default(now()) @db.DateTime(3)
   @@index([resource, subjectId, occurredAt])
   @@index([actorId, occurredAt])
+  @@unique([periodKey, chainIndex])
+  @@index([module, action, occurredAt])
+  @@index([correlationId])
+  @@index([sedeId, areaId, occurredAt])
+}
+
+model AuditManifest {
+  id String @id @default(cuid()) @db.VarChar(30)
+  periodKey String @unique @db.Char(10)
+  eventCount Int
+  firstHash String? @db.Char(64)
+  lastHash String? @db.Char(64)
+  manifestHash String @db.Char(64)
+  storageRef String? @db.VarChar(255)
+  verifiedAt DateTime? @db.DateTime(3)
+  createdAt DateTime @default(now()) @db.DateTime(3)
+}
+
+model AuditChainHead {
+  periodKey String @id @db.Char(10)
+  lastIndex Int @default(0)
+  lastHash String? @db.Char(64)
+  updatedAt DateTime @updatedAt @db.DateTime(3)
+}
+
+enum OperationalJobState {
+  PENDING
+  RUNNING
+  RETRY_SCHEDULED
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+enum OperationalAttemptResult {
+  RUNNING
+  SUCCEEDED
+  FAILED
+  LEASE_LOST
+}
+
+enum OperationalAlertState {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+enum OperationalSeverity {
+  S1
+  S2
+  S3
+  S4
+}
+
+enum OperationalIncidentState {
+  ABIERTO
+  RECONOCIDO
+  INVESTIGANDO
+  MITIGANDO
+  MONITOREANDO
+  RESUELTO
+  CERRADO
+}
+
+model OperationalJobExecution {
+  id String @id @default(cuid()) @db.VarChar(30)
+  name String @db.VarChar(100)
+  idempotencyKey String @unique @db.VarChar(191)
+  state OperationalJobState @default(PENDING)
+  actorType String @default("SYSTEM") @db.VarChar(20)
+  correlationId String? @db.VarChar(100)
+  payload Json?
+  result Json?
+  errorCode String? @db.VarChar(100)
+  attempts Int @default(0)
+  maxAttempts Int @default(3)
+  nextAttemptAt DateTime @default(now()) @db.DateTime(3)
+  leaseOwner String? @db.VarChar(100)
+  leaseUntil DateTime? @db.DateTime(3)
+  startedAt DateTime? @db.DateTime(3)
+  completedAt DateTime? @db.DateTime(3)
+  createdAt DateTime @default(now()) @db.DateTime(3)
+  updatedAt DateTime @updatedAt @db.DateTime(3)
+  attemptHistory OperationalJobAttempt[]
+  alerts OperationalAlert[]
+  @@index([state,nextAttemptAt])
+  @@index([name,createdAt])
+  @@index([leaseUntil])
+}
+
+model OperationalJobAttempt {
+  id String @id @default(cuid()) @db.VarChar(30)
+  executionId String @db.VarChar(30)
+  execution OperationalJobExecution @relation(fields:[executionId], references:[id], onDelete:Restrict)
+  number Int
+  owner String @db.VarChar(100)
+  result OperationalAttemptResult @default(RUNNING)
+  errorCode String? @db.VarChar(100)
+  startedAt DateTime @default(now()) @db.DateTime(3)
+  completedAt DateTime? @db.DateTime(3)
+  @@unique([executionId,number])
+  @@index([result,startedAt])
+}
+
+model OperationalAlert {
+  id String @id @default(cuid()) @db.VarChar(30)
+  severity OperationalSeverity
+  state OperationalAlertState @default(OPEN)
+  source String @db.VarChar(100)
+  code String @db.VarChar(100)
+  message String @db.VarChar(500)
+  jobExecutionId String? @db.VarChar(30)
+  jobExecution OperationalJobExecution? @relation(fields:[jobExecutionId], references:[id], onDelete:Restrict)
+  acknowledgedById Int?
+  acknowledgedAt DateTime? @db.DateTime(3)
+  resolvedById Int?
+  resolvedAt DateTime? @db.DateTime(3)
+  resolution String? @db.VarChar(500)
+  createdAt DateTime @default(now()) @db.DateTime(3)
+  updatedAt DateTime @updatedAt @db.DateTime(3)
+  @@index([state,severity,createdAt])
+  @@index([jobExecutionId])
+}
+
+model OperationalIncident {
+  id String @id @default(cuid()) @db.VarChar(30)
+  externalTicketRef String @unique @db.VarChar(191)
+  severity OperationalSeverity
+  state OperationalIncidentState @default(ABIERTO)
+  ownerId Int?
+  reason String @db.VarChar(1000)
+  communications Json?
+  repeatedS2 Boolean @default(false)
+  postmortemDueAt DateTime? @db.DateTime(3)
+  resolvedAt DateTime? @db.DateTime(3)
+  createdAt DateTime @default(now()) @db.DateTime(3)
+  updatedAt DateTime @updatedAt @db.DateTime(3)
+  history OperationalIncidentEvent[]
+  @@index([state,severity,createdAt])
+  @@index([ownerId,state])
+}
+
+model OperationalIncidentEvent {
+  id String @id @default(cuid()) @db.VarChar(30)
+  incidentId String @db.VarChar(30)
+  incident OperationalIncident @relation(fields:[incidentId], references:[id], onDelete:Restrict)
+  actorId Int
+  previousState OperationalIncidentState?
+  nextState OperationalIncidentState?
+  previousSeverity OperationalSeverity?
+  nextSeverity OperationalSeverity?
+  ownerId Int?
+  reason String @db.VarChar(1000)
+  occurredAt DateTime @default(now()) @db.DateTime(3)
+  @@index([incidentId,occurredAt])
 }
 
 enum TipoReporteExportacion {

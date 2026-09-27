@@ -1,22 +1,26 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Optional } from "@nestjs/common";
 import { PrismaService } from "../database/prisma.service";
 import { conflict, invalidInput, notFound } from "../common/errors/domain-error";
 import { Permission, getAccessScope } from "../auth/permissions";
 import type { AuthUser } from "../auth/auth-user";
 import type { ProjectInput, ProjectUpdate } from "./kairos.schemas";
 import { EstadoProyectoKairos, EstadoUsuario, RolMiembroProyectoKairos } from "../generated/prisma/enums";
+import { AuditService } from "../auth/audit.service";
 
 const projectSelect = { id: true, nombre: true, descripcion: true, estado: true, prioridad: true, creadoPorId: true, createdAt: true, updatedAt: true } as const;
 
 @Injectable()
 export class KairosService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly auditService?: AuditService,
+  ) {}
 
   private assertActive(actor: AuthUser) { if (actor.estado !== EstadoUsuario.ACTIVA) throw notFound("KAIROS_PROJECT_NOT_FOUND"); }
   private async membership(projectId: string, actorId: number) { return this.prisma.miembroProyectoKairos.findFirst({ where: { proyectoId: projectId, usuarioId: actorId, removedAt: null } }); }
   private async requireMember(projectId: string, actor: AuthUser) { this.assertActive(actor); const m = await this.membership(projectId, actor.id); if (!m) throw notFound("KAIROS_PROJECT_NOT_FOUND"); return m; }
   private canManage(role: RolMiembroProyectoKairos) { return role === RolMiembroProyectoKairos.PROPIETARIO || role === RolMiembroProyectoKairos.SUBLIDER; }
-  private async audit(tx: any, actorId: number, action: string, subjectId: string, metadata?: unknown) { await tx.auditEvent.create({ data: { actorId, action, resource: "KAIROS_PROJECT", correlationId: subjectId, metadata: metadata as any } }); }
+  private async audit(tx: any, actorId: number, action: string, subjectId: string, metadata?: unknown) { await (this.auditService ?? new AuditService(this.prisma)).append({ actorId, action, resource: "KAIROS_PROJECT", module: "KAIROS", objectType: "PROJECT", objectId: subjectId, metadata: metadata as Record<string, unknown> | undefined }, tx); }
 
   async create(actor: AuthUser, input: ProjectInput) {
     this.assertActive(actor); const scope = getAccessScope(actor, Permission.KAIROS_PROJECT_CREATE); if (!scope) throw notFound("KAIROS_PROJECT_NOT_FOUND");

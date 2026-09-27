@@ -38,6 +38,11 @@ export enum Permission {
   RETENTION_READ = "retention:read",
   RETENTION_MANAGE = "retention:manage",
   RETENTION_EXECUTE = "retention:execute",
+  AUDIT_SELF_READ = "audit:self:read",
+  AUDIT_READ = "audit:read",
+  AUDIT_EXPORT = "audit:export",
+  OPERATIONS_READ = "operations:read",
+  OPERATIONS_MANAGE = "operations:manage",
 }
 
 export enum AccessScope {
@@ -64,6 +69,7 @@ const commonUserGrants: RoleGrants = {
   [Permission.GAMIFICATION_READ]: AccessScope.SELF,
   [Permission.PRINTING_3D_REQUEST]: AccessScope.SELF,
   [Permission.RETENTION_REQUEST]: AccessScope.SELF,
+  [Permission.AUDIT_SELF_READ]: AccessScope.SELF,
 };
 
 const areaManagerGrants: RoleGrants = {
@@ -93,6 +99,8 @@ const permissionsByRole: Record<RolUsuario, RoleGrants> = {
     [Permission.LIBRARY_REVIEW]: AccessScope.AREA,
     [Permission.LIBRARY_PUBLISH]: AccessScope.AREA,
     [Permission.LIBRARY_ARCHIVE]: AccessScope.AREA,
+    [Permission.AUDIT_READ]: AccessScope.AREA,
+    [Permission.AUDIT_EXPORT]: AccessScope.AREA,
   },
   [RolUsuario.JEFE_SEDE]: {
     ...areaManagerGrants,
@@ -114,6 +122,8 @@ const permissionsByRole: Record<RolUsuario, RoleGrants> = {
     [Permission.LIBRARY_ARCHIVE]: AccessScope.SEDE,
     [Permission.PRINTING_3D_OPERATE]: AccessScope.SEDE,
     [Permission.PRINTING_3D_MANAGE]: AccessScope.SEDE,
+    [Permission.AUDIT_READ]: AccessScope.SEDE,
+    [Permission.AUDIT_EXPORT]: AccessScope.SEDE,
   },
   [RolUsuario.JEFE_COORDINADORES]: {
     ...areaManagerGrants,
@@ -135,6 +145,10 @@ const permissionsByRole: Record<RolUsuario, RoleGrants> = {
     [Permission.LIBRARY_ARCHIVE]: AccessScope.GLOBAL,
     [Permission.PRINTING_3D_OPERATE]: AccessScope.GLOBAL,
     [Permission.PRINTING_3D_MANAGE]: AccessScope.GLOBAL,
+    [Permission.AUDIT_READ]: AccessScope.GLOBAL,
+    [Permission.AUDIT_EXPORT]: AccessScope.GLOBAL,
+    [Permission.OPERATIONS_READ]: AccessScope.GLOBAL,
+    [Permission.OPERATIONS_MANAGE]: AccessScope.GLOBAL,
   },
   [RolUsuario.ADMIN]: Object.fromEntries(
     Object.values(Permission).map((permission) => [

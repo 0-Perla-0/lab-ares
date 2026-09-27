@@ -4,21 +4,23 @@
 
 | Dato                        | Valor                                                                                                             |
 | --------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| Fecha de revisión           | 25 de septiembre de 2026                                                                                          |
+| Fecha de revisión           | 27 de septiembre de 2026                                                                                          |
 | Rama de trabajo             | `feature/backend/backend2-full-scope`                                                                             |
-| Commit base revisado        | `cae5a0d` (storage seguro), `1fb0a27` (identidad e invitaciones), `60dcfc0` (MFA/notificaciones/outbox-SMTP/OpenAPI-Postman) |
+| Commit base revisado        | `0c390be` (corte previo al cierre de operación/auditoría), además de los cortes históricos ya documentados        |
 | Sistema actual              | Monorepo con Next.js App Router, NestJS, Prisma y MariaDB                                                         |
 | Fuentes funcionales         | Cinco PDF del sistema heredado: plan, análisis integral, reporte de estado, documento técnico y manual de usuario |
 | Evidencia de implementación | Código, esquema Prisma, migraciones, OpenAPI, pruebas, CI, Docker y Postman del repositorio actual                |
 
-### Checkpoint del 25 de septiembre de 2026
+### Checkpoint del 27 de septiembre de 2026
 
 - Docker local quedó reparado y verificado con MinIO compatible, MariaDB en el host `3307`, 11/11 migraciones y respuestas HTTP 200 de backend, frontend, MinIO y Mailpit.
 - El perfil académico/adscripción histórica, el expediente documental funcional, la base de proyectos/membresías y las actividades/evidencias de Kairos de Backend 2 quedan cerrados y verificados.
-- Kanban queda implementado y verificado en backend como proyección de las actividades; después seguirán frontend e integración E2E.
-- Los reportes operativos quedan **COMPLETADOS y verificados en backend**; frontend y E2E permanecen pendientes.
+- Kanban queda implementado y verificado como proyección de las actividades, incluido su frontend e integración E2E.
+- Los reportes operativos quedan **COMPLETADOS y verificados** de extremo a extremo.
 - La matriz de retención/supresión queda **COMPLETADA y verificada en backend**; la migración fue creada y validada, pero no aplicada a un entorno real.
+- Operación, auditoría, integridad y observabilidad de Backend 2 quedan **COMPLETADAS y verificadas en backend**; la migración fue creada y validada, pero no aplicada a un entorno real.
 - Los dominios de Backend 1 quedan excluidos de este bloque.
+- Este checkpoint sustituye las menciones históricas de “frontend/E2E pendiente” conservadas en los cierres incrementales inferiores: el único bloque funcional pendiente de Backend 2 es recuperación/reconciliación.
 
 ### Cierre verificado: perfil académico y adscripción histórica
 
@@ -102,6 +104,20 @@
 - OpenAPI y ambas colecciones de Postman documentan las 21 rutas/solicitudes del dominio.
 - Gate verde: 53 archivos de prueba y 671/671 pruebas aprobadas, además de typecheck, build, validación/generación Prisma, parseo de Postman y diff-check. Esta fase queda **COMPLETADA en backend**; ahora se pausa backend para abordar frontend, integración y E2E.
 
+### Cierre verificado: operación, auditoría, integridad y observabilidad
+
+- Se amplió de forma compatible `AuditEvent` y se añadieron `AuditChainHead`, `AuditManifest`, ejecuciones/intentos de jobs, alertas e incidentes con historial. La migración [`20260927010000_operations_audit_integrity`](../backend/prisma/migrations/20260927010000_operations_audit_integrity/migration.sql) fue creada y validada, pero **no se aplicó a un entorno real**.
+- La correlación HTTP usa `AsyncLocalStorage`: acepta un `X-Correlation-Id` válido o genera uno, lo devuelve en la respuesta y lo reutiliza por defecto al auditar. Los logs técnicos HTTP son JSON separados de la bitácora funcional y no registran cuerpo, query ni secretos.
+- La cadena usa SHA-256 determinista por periodo UTC, cabeza transaccional, índice único y reintento acotado. El manifiesto diario es inmutable, se ancla como JSON en almacenamiento privado y verifica continuidad, hashes, conteo, pérdida y ancla privada. Es una comprobación técnica de integridad, **no** una firma electrónica, garantía de no repudio ni firma legal.
+- La vista propia y las consultas administrativas respetan `SELF`/`AREA`/`SEDE`/`GLOBAL`; filtran por fecha, actor, afectado, módulo, acción, objeto, resultado, sede/área y correlación. Consultar o exportar CSV también genera auditoría. Los permisos añadidos son `AUDIT_SELF_READ`, `AUDIT_READ`, `AUDIT_EXPORT`, `OPERATIONS_READ` y `OPERATIONS_MANAGE`; la consola operativa queda limitada a alcance global.
+- Rutas de auditoría: `GET /api/audit/me`, `GET /api/audit/events`, `GET /api/audit/export`, `POST /api/audit/manifests/:period` y `GET /api/audit/manifests/:period/verify`.
+- Los jobs son durables e idempotentes, con lease, compare-and-swap, intentos, reintento exponencial y alerta terminal. El worker del manifiesto reutiliza ese mecanismo y permanece desactivado por defecto mediante `AUDIT_MANIFEST_WORKER_ENABLED=false`. Las alertas admiten reconocimiento y resolución con transición condicional.
+- Los incidentes sólo almacenan una referencia a un ticket externo; no construyen un sistema de ticketing. Admiten severidad `S1`–`S4`, los siete estados aprobados, responsable, motivo, comunicaciones sin secretos e historial durable. Cambiar estado/severidad exige motivo y responsable; S1 y S2 repetido generan vencimiento de revisión posterior a dos días hábiles.
+- El estado operativo privado diferencia MariaDB, almacenamiento y scanner, y agrega métricas de jobs, alertas e incidentes. Rutas: `GET /api/operations/status`, `GET|POST /api/operations/jobs`, `POST /api/operations/jobs/:id/claim|complete|fail`, `GET /api/operations/alerts`, `POST /api/operations/alerts/:id/acknowledge|resolve`, `GET|POST /api/operations/incidents` y `PATCH /api/operations/incidents/:id`.
+- El contrato se documentó en [`operations.openapi.ts`](../backend/src/openapi/operations.openapi.ts) y en la carpeta 19 de [`Ares-Backend.postman_collection.json`](../postman/Ares-Backend.postman_collection.json), con 15 solicitudes; el JSON de Postman quedó parseado correctamente.
+- Gate verde del corte: Prisma `generate`/`validate`, typecheck, build, formato focal y diff-check aprobados; 58 archivos y 690/690 pruebas backend aprobadas.
+- Riesgos residuales: los eventos históricos previos al encadenamiento requieren backfill controlado y un manifiesto se bloquea si el periodo contiene eventos legacy sin cadena; el ancla privada no usa WORM/object-lock y no se presenta como firma legal; no se ejecutaron pruebas contra MariaDB, MinIO o ClamAV reales ni Newman en este corte.
+
 ## 1. Alcance y criterio de comparación
 
 Este documento separa cinco capas de evidencia que no deben confundirse:
@@ -116,7 +132,7 @@ Las instrucciones o recomendaciones contenidas en los PDF se trataron como mater
 
 ## 2. Resumen ejecutivo
 
-Ares ya cuenta con una base administrativa sólida y verificable, pero todavía no es funcionalmente equivalente al sistema documentado. El desarrollo actual cubre infraestructura, identidad core Backend 2, autenticación con sesiones, autorización centralizada, usuarios, catálogos de organización y el incremento 1 de asistencia en backend y frontend: check-in/check-out, historial propio, bolsa de horas por estado, cola jerárquica de sesiones abiertas y cierre manual con motivo. Los documentos, su flujo funcional y **Kairos** siguen pendientes.
+Ares ya cuenta con una base administrativa sólida y verificable, aunque todavía no es funcionalmente equivalente a todo el sistema legado documentado. El alcance asignado a Backend 2 ya cubre backend, frontend, integración y E2E de perfil académico, expediente, directorio, Kairos, reportes, biblioteca, CMS público, gamificación, impresión 3D y retención/supresión; operación, auditoría, integridad y observabilidad también quedaron cerradas en backend en este corte. Para Backend 2 sólo permanece pendiente recuperación/reconciliación. Los dominios asignados a Backend 1 conservan su propio estado y no se contabilizan como deuda de este bloque.
 
 El siguiente objetivo no debería ser migrar pantallas aisladas. Debe construirse primero un recorrido vertical completo de Servicio Social:
 
@@ -300,8 +316,8 @@ La estrategia correcta es reconstruir contratos de negocio sobre esta arquitectu
 | Roles y permisos                | Seis roles de plataforma y permisos por operación/alcance                                   | Implementado para módulos actuales                           | Extender permisos por dominio, incluyendo cierre manual, validaciones masivas, auditoría y Kairos                                                   | P0 transversal        |
 | Usuarios                        | CRUD, aprobación, estados, baja segura y cambios sensibles auditados                        | Parcial avanzado                                             | Flujo de activación/rechazo, historial de email/rol/credenciales, perfil académico y filtros/paginación                                             | P1                    |
 | Sedes, áreas, turnos y academia | Organización operativa más procedencia académica del prestador                              | Organización operativa implementada; academia pendiente      | Mantener permisos por sede/área y añadir institución, unidad académica, programa, cohorte y adscripción histórica como dimensión independiente      | P1                    |
-| Auditoría transversal           | Quién cambió, aprobó o rechazó qué y cuándo                                                 | Parcial; base append-only usada por check-in/check-out       | Ampliar catálogo, hashes/manifiestos de integridad, consulta por alcance y retención; integrar los demás dominios                                   | P0                    |
-| Conservación y supresión        | Conservar historial necesario sin retener indefinidamente datos personales temporales       | Implementado y verificado en backend                         | Integrar interfaz administrativa, pruebas E2E y aplicar la migración validada en el entorno autorizado; mantener bloqueada la supresión institucional no aprobada | P0 transversal        |
+| Auditoría transversal           | Quién cambió, aprobó o rechazó qué y cuándo                                                 | Implementada y verificada en backend                         | Aplicar la migración en un entorno autorizado, ejecutar el backfill legacy controlado y completar recuperación/reconciliación                       | P0 transversal        |
+| Conservación y supresión        | Conservar historial necesario sin retener indefinidamente datos personales temporales       | Implementado y verificado de extremo a extremo               | Aplicar la migración validada durante recuperación/reconciliación en un entorno autorizado; mantener bloqueada la supresión institucional no aprobada             | P0 transversal        |
 | Check-in/check-out              | Una sesión abierta, cierre propio, cierre manual autorizado y alertas de sesiones anormales | Incremento 1 implementado en backend y frontend              | Validación, ausencias y política definitiva de riesgo                                                                                               | P0                    |
 | Bolsa de horas y riesgo         | Horas autorizadas, pendientes y rechazadas; semáforo verde/amarillo/rojo                    | Bolsa por estado implementada; semáforo definitivo pendiente | Definir umbrales, comentarios del validador e historial inmutable                                                                                   | P0                    |
 | Validación de horas             | Revisión individual y masiva, filtros por sede/área/usuario/estado y rechazo comentado      | Pendiente; contrato jerárquico aprobado                      | Implementar separación de funciones, alcance organizacional y lotes verdes de máximo 100 registros                                                  | P0                    |
@@ -932,17 +948,16 @@ La migración 16B se ejecutará sólo si aparecen fuentes del sistema anterior, 
 
 ## 12. Próximo paso recomendado
 
-El perfil académico/adscripción histórica, el expediente documental funcional, el directorio interno, la base de proyectos/membresías y actividades/evidencias de Kairos, los reportes, la biblioteca, el CMS público, la gamificación privada, la impresión 3D privada y la retención/supresión ya están cerrados y verificados en backend. Por instrucción de trabajo, backend se pausa en este corte para pasar a frontend, integración y E2E de lo ya desarrollado. Después quedan operación/auditoría y recuperación/reconciliación del alcance de Backend 2. Los dominios de Backend 1 están fuera de este bloque.
+El perfil académico/adscripción histórica, el expediente documental funcional, el directorio interno, la base de proyectos/membresías y actividades/evidencias de Kairos, los reportes, la biblioteca, el CMS público, la gamificación privada, la impresión 3D privada, la retención/supresión y el bloque de operación/auditoría/integridad/observabilidad ya están cerrados y verificados. También quedaron cerrados el frontend, la integración y los E2E del alcance desarrollado de Backend 2. El único bloque funcional pendiente de Backend 2 es **recuperación/reconciliación**. Los dominios de Backend 1 están fuera de este bloque.
 
 El contrato funcional principal ya produjo el primer recorrido backend implementable. El orden recomendado desde este corte es:
 
 **Decisiones funcionales pendientes: ninguna.** Las decisiones externas al control del repositorio se omiten de esta secuencia y se resolverán por separado cuando corresponda; no bloquean los contratos ni la implementación local.
 
-1. Crear la rama Git Flow de frontend e integrar las funcionalidades ya desarrolladas por Backend 2, con sus pruebas de integración y E2E, sin incorporar dominios de Backend 1.
-2. Reanudar backend para completar operación/auditoría, integridad, salud/correlación/alertas y recuperación/reconciliación del alcance de Backend 2.
-3. Mantener la documentación de importadores legacy como pendiente hasta recibir fuentes aprobadas e identificables.
+1. Completar recuperación/reconciliación de Backend 2: restauración coordinada de base y objetos, verificación de scanner/jobs, conciliación de auditoría y supresiones y estados degradados seguros.
+2. Validar ese recorrido con servicios reales y un ejercicio de restauración antes de aplicar las migraciones pendientes en el entorno autorizado.
 
-El Incremento 1 quedó integrado en `develop`. Backend 1 y Frontend 1 deben continuar con validación, ausencias y calendario sin duplicar las reglas ya centralizadas. En paralelo, Backend 2 puede preparar almacenamiento/documentos y Frontend 2 los componentes de estados y navegación de Kairos. Los cuatro MVP P3 siguen comprometidos, pero comienzan después de estabilizar sus dependencias y no desplazan el núcleo de Servicio Social.
+El Incremento 1 quedó integrado en `develop`. Backend 1 y Frontend 1 deben continuar con validación, ausencias y calendario sin duplicar las reglas ya centralizadas. Backend 2 queda concentrado exclusivamente en recuperación y reconciliación: restauración coordinada de base de datos y objetos, validación del scanner y de los jobs, reconciliación de auditoría y supresión, y estados degradados seguros. Visitas e inventario permanecen dentro del alcance de Backend 1 y no deben incorporarse a este frente.
 
 ## 13. Referencias del repositorio actual
 

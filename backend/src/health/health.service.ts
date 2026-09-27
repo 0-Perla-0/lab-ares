@@ -8,21 +8,64 @@ import type { Environment } from "../config/environment";
 
 @Injectable()
 export class HealthService {
-  constructor(private readonly prisma: PrismaService, private readonly storage?: S3Storage, private readonly scanner?: ClamAvScanner, private readonly config?: ConfigService<Environment, true>) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storage?: S3Storage,
+    private readonly scanner?: ClamAvScanner,
+    private readonly config?: ConfigService<Environment, true>,
+  ) {}
 
   liveness() {
     return { status: "ok" };
   }
 
-  async readiness() {
+  async dependencies() {
+    let database: "connected" | "disconnected" = "disconnected";
+    let storage: "connected" | "disconnected" | "not-configured" =
+      "not-configured";
+    let scanner: "connected" | "disconnected" | "disabled" | "not-configured" =
+      "not-configured";
     try {
       await this.prisma.$queryRaw`SELECT 1`;
-      if (!this.storage || !this.scanner || !this.config) return { status: "ok", database: "connected" }; const buckets = await this.storage.health(); const scanner = !this.config.get("STORAGE_SCANNER_ENABLED") || await this.scanner.health(); if (!buckets || !scanner) throw new Error("storage unavailable"); return { status: "ok", database: "connected", storage: "connected", scanner: scanner ? "connected" : "disabled" };
-    } catch {
+      database = "connected";
+    } catch {}
+    if (this.storage) {
+      try {
+        storage = (await this.storage.health()) ? "connected" : "disconnected";
+      } catch {
+        storage = "disconnected";
+      }
+    }
+    if (this.config && !this.config.get("STORAGE_SCANNER_ENABLED"))
+      scanner = "disabled";
+    else if (this.scanner) {
+      try {
+        scanner = (await this.scanner.health()) ? "connected" : "disconnected";
+      } catch {
+        scanner = "disconnected";
+      }
+    }
+    return { database, storage, scanner };
+  }
+
+  async readiness() {
+    const dependencies = await this.dependencies();
+    if (!this.storage && !this.scanner && !this.config) {
+      if (dependencies.database === "connected")
+        return { status: "ok", database: "connected" };
       throw new ServiceUnavailableException({
         status: "error",
         database: "disconnected",
       });
     }
+    const status =
+      dependencies.database === "connected" &&
+      !["disconnected"].includes(dependencies.storage) &&
+      !["disconnected"].includes(dependencies.scanner)
+        ? "ok"
+        : "error";
+    const result = { status, ...dependencies, dependencies };
+    if (status === "error") throw new ServiceUnavailableException(result);
+    return result;
   }
 }

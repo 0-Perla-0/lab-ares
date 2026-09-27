@@ -104,6 +104,10 @@
     ,{ "key": "retentionPauseBatchId", "value": "", "type": "string" }
     ,{ "key": "retentionSubjectId", "value": "1", "type": "string" }
     ,{ "key": "retentionSyntheticResourceId", "value": "", "type": "string" }
+    ,{ "key": "auditPeriod", "value": "2026-09-26", "type": "string" }
+    ,{ "key": "operationsJobId", "value": "", "type": "string" }
+    ,{ "key": "operationsAlertId", "value": "", "type": "string" }
+    ,{ "key": "operationsIncidentId", "value": "", "type": "string" }
   ],
   "item": [
     {
@@ -130,7 +134,7 @@
                 "exec": [
                   "pm.test(\"Backend y base de datos disponibles\", function () {",
                   "    pm.response.to.have.status(200);",
-                  "    pm.expect(pm.response.json()).to.eql({ status: \"ok\", database: \"connected\" });",
+                  "    pm.expect(pm.response.json()).to.include({ status: \"ok\", database: \"connected\" });",
                   "});"
                 ]
               }
@@ -1978,6 +1982,23 @@
       {"name":"Reintentar o reanudar lote","event":[{"listen":"test","script":{"exec":["pm.expect([200,404,409]).to.include(pm.response.code);","if(pm.response.code===200){const receipt=pm.response.json().data;pm.expect(receipt.accepted).to.eql(true);pm.expect(receipt.resetFailures).to.be.a('number');}"]}}],"request":{"method":"POST","header":[{"key":"Idempotency-Key","value":"ret-retry-{{$timestamp}}"}],"url":"{{baseUrl}}/retention/batches/{{retentionPauseBatchId}}/retry","description":"Sólo para lotes PAUSADO o FALLIDO. Reinicia los elementos fallidos y devuelve un acuse idempotente con resetFailures; consulta el detalle del lote para conocer el resultado final. Otros estados devuelven 409."}},
       {"name":"Consultar registry de supresión","request":{"method":"GET","header":[],"url":"{{baseUrl}}/retention/suppression-registry?page=1&pageSize=20","description":"El registry expone fingerprint y metadatos, no resourceId."},"event":[{"listen":"test","script":{"exec":["pm.expect([200,403]).to.include(pm.response.code);"]}}]},
       {"name":"Reaplicar supresiones (ADMIN)","request":{"method":"POST","header":[{"key":"Idempotency-Key","value":"ret-reapply-{{$timestamp}}"}],"url":"{{baseUrl}}/retention/suppression-registry/reapply?limit=20"},"event":[{"listen":"test","script":{"exec":["pm.expect([201,400,403,409]).to.include(pm.response.code);"]}}]}
+    ]},
+    {"name":"19 - Auditoría y operación","description":"Rutas privadas del bloque Backend 2. Las vistas operativas, jobs, alertas, incidentes y manifiestos requieren alcance GLOBAL. La verificación de integridad no es una firma legal.","item":[
+      {"name":"Mi auditoría limitada","request":{"method":"GET","header":[{"key":"X-Correlation-Id","value":"postman-audit-self-{{$timestamp}}"}],"url":"{{baseUrl}}/audit/me?page=1&pageSize=25"},"event":[{"listen":"test","script":{"exec":["pm.response.to.have.status(200);","pm.expect(pm.response.headers.get('X-Correlation-Id')).to.be.a('string').and.not.empty;","pm.expect(pm.response.json().data.items).to.be.an('array');"]}}]},
+      {"name":"Auditoría por alcance","request":{"method":"GET","url":"{{baseUrl}}/audit/events?page=1&pageSize=25&module=OPERATIONS"},"event":[{"listen":"test","script":{"exec":["pm.expect([200,403]).to.include(pm.response.code);"]}}]},
+      {"name":"Exportar auditoría CSV","request":{"method":"GET","url":"{{baseUrl}}/audit/export?from=2026-09-01T00:00:00.000Z&to=2026-09-30T23:59:59.999Z"},"event":[{"listen":"test","script":{"exec":["pm.expect([200,403]).to.include(pm.response.code);","if(pm.response.code===200)pm.expect(pm.response.headers.get('Content-Type')).to.include('text/csv');"]}}]},
+      {"name":"Crear manifiesto diario inmutable","request":{"method":"POST","url":"{{baseUrl}}/audit/manifests/{{auditPeriod}}","description":"Usa un periodo UTC cerrado. Un segundo intento responde 409; el ancla privada no se sobrescribe."},"event":[{"listen":"test","script":{"exec":["pm.expect([201,403,409]).to.include(pm.response.code);"]}}]},
+      {"name":"Verificar manifiesto","request":{"method":"GET","url":"{{baseUrl}}/audit/manifests/{{auditPeriod}}/verify"},"event":[{"listen":"test","script":{"exec":["pm.expect([200,403]).to.include(pm.response.code);","if(pm.response.code===200){const d=pm.response.json().data;pm.expect(d).to.have.property('valid');pm.expect(d.assurance).to.eql('integrity-check-not-legal-signature');}"]}}]},
+      {"name":"Estado operativo","request":{"method":"GET","url":"{{baseUrl}}/operations/status"},"event":[{"listen":"test","script":{"exec":["pm.expect([200,403]).to.include(pm.response.code);","if(pm.response.code===200)pm.expect(pm.response.json().data.dependencies).to.have.all.keys('database','storage','scanner');"]}}]},
+      {"name":"Crear job idempotente","request":{"method":"POST","header":[{"key":"Content-Type","value":"application/json"}],"body":{"mode":"raw","raw":"{\"name\":\"postman-integrity-check\",\"idempotencyKey\":\"postman-integrity-{{$timestamp}}\",\"maxAttempts\":3}"},"url":"{{baseUrl}}/operations/jobs"},"event":[{"listen":"test","script":{"exec":["pm.expect([201,403]).to.include(pm.response.code);","if(pm.response.code===201)pm.collectionVariables.set('operationsJobId',pm.response.json().data.id);"]}}]},
+      {"name":"Listar jobs sin payload sensible","request":{"method":"GET","url":"{{baseUrl}}/operations/jobs?page=1&pageSize=25"},"event":[{"listen":"test","script":{"exec":["pm.expect([200,403]).to.include(pm.response.code);","if(pm.response.code===200&&pm.response.json().data.items.length){const j=pm.response.json().data.items[0];pm.expect(j).not.to.have.property('payload');pm.expect(j).not.to.have.property('result');pm.expect(j).not.to.have.property('leaseOwner');}"]}}]},
+      {"name":"Reclamar job manualmente","request":{"method":"POST","header":[{"key":"Content-Type","value":"application/json"}],"body":{"mode":"raw","raw":"{\"leaseMs\":120000}"},"url":"{{baseUrl}}/operations/jobs/{{operationsJobId}}/claim","description":"El owner se deriva de la sesión; el cliente no puede elegirlo."},"event":[{"listen":"test","script":{"exec":["pm.expect([201,403,409]).to.include(pm.response.code);"]}}]},
+      {"name":"Completar job","request":{"method":"POST","header":[{"key":"Content-Type","value":"application/json"}],"body":{"mode":"raw","raw":"{\"result\":{\"status\":\"ok\"}}"},"url":"{{baseUrl}}/operations/jobs/{{operationsJobId}}/complete"},"event":[{"listen":"test","script":{"exec":["pm.expect([201,403,409]).to.include(pm.response.code);"]}}]},
+      {"name":"Listar alertas","request":{"method":"GET","url":"{{baseUrl}}/operations/alerts?page=1&pageSize=25"},"event":[{"listen":"test","script":{"exec":["pm.expect([200,403]).to.include(pm.response.code);"]}}]},
+      {"name":"Reconocer alerta","request":{"method":"POST","url":"{{baseUrl}}/operations/alerts/{{operationsAlertId}}/acknowledge"},"event":[{"listen":"test","script":{"exec":["pm.expect([201,403,404,409]).to.include(pm.response.code);"]}}]},
+      {"name":"Resolver alerta","request":{"method":"POST","header":[{"key":"Content-Type","value":"application/json"}],"body":{"mode":"raw","raw":"{\"resolution\":\"Dependencia restablecida y verificada\"}"},"url":"{{baseUrl}}/operations/alerts/{{operationsAlertId}}/resolve"},"event":[{"listen":"test","script":{"exec":["pm.expect([201,403,404,409]).to.include(pm.response.code);"]}}]},
+      {"name":"Crear referencia de incidente","request":{"method":"POST","header":[{"key":"Content-Type","value":"application/json"}],"body":{"mode":"raw","raw":"{\"externalTicketRef\":\"OPS-{{$timestamp}}\",\"severity\":\"S2\",\"ownerId\":{{userId}},\"reason\":\"Interrupción de dependencia observada\",\"repeatedS2\":true}"},"url":"{{baseUrl}}/operations/incidents","description":"Sólo guarda la referencia al ticket externo; no implementa ticketing."},"event":[{"listen":"test","script":{"exec":["pm.expect([201,400,403,409]).to.include(pm.response.code);","if(pm.response.code===201)pm.collectionVariables.set('operationsIncidentId',pm.response.json().data.id);"]}}]},
+      {"name":"Actualizar incidente con historial","request":{"method":"PATCH","header":[{"key":"Content-Type","value":"application/json"}],"body":{"mode":"raw","raw":"{\"state\":\"RECONOCIDO\",\"ownerId\":{{userId}},\"reason\":\"Responsable asignado y análisis iniciado\"}"},"url":"{{baseUrl}}/operations/incidents/{{operationsIncidentId}}"},"event":[{"listen":"test","script":{"exec":["pm.expect([200,400,403,404]).to.include(pm.response.code);"]}}]}
     ]}
   ]
 }

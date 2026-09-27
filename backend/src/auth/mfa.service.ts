@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Optional } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../database/prisma.service";
 import type { Environment } from "../config/environment";
@@ -11,6 +11,7 @@ import {
 } from "node:crypto";
 import { hashPassword, verifyPassword } from "./password";
 import { ApiException } from "../common/errors/api.exception";
+import { AuditService } from "./audit.service";
 
 const stepSeconds = 30;
 const window = 1;
@@ -30,6 +31,7 @@ export class MfaService {
   constructor(
     private readonly prisma: PrismaService,
     config: ConfigService<Environment, true>,
+    @Optional() private readonly audit?: AuditService,
   ) {
     const raw = config.get("MFA_ENCRYPTION_KEY", { infer: true });
     if (!raw) throw new Error("MFA_ENCRYPTION_KEY must be configured");
@@ -121,13 +123,17 @@ export class MfaService {
       await tx.mfaRecoveryCode.createMany({
         data: codes.map((c) => ({ userId, codeHash: digest(c) })),
       });
-      await tx.auditEvent.create({
-        data: {
+      await (this.audit ?? new AuditService(this.prisma)).append(
+        {
           subjectId: userId,
           action: "MFA_ENABLED",
           resource: "identity",
+          module: "IDENTITY",
+          objectType: "MFA",
+          objectId: String(userId),
         },
-      });
+        tx,
+      );
       await tx.notification.create({
         data: { userId, type: "MFA_ENABLED", payload: { enabled: true } },
       });
@@ -140,14 +146,18 @@ export class MfaService {
     await this.prisma.$transaction(async (tx) => {
       await tx.userMfa.update({ where: { userId }, data: { enabledAt: null } });
       await tx.mfaRecoveryCode.deleteMany({ where: { userId } });
-      await tx.auditEvent.create({
-        data: {
+      await (this.audit ?? new AuditService(this.prisma)).append(
+        {
           actorId: userId,
           subjectId: userId,
           action: "MFA_DISABLED",
           resource: "identity",
+          module: "IDENTITY",
+          objectType: "MFA",
+          objectId: String(userId),
         },
-      });
+        tx,
+      );
       await tx.notification.create({
         data: { userId, type: "MFA_DISABLED", payload: { enabled: false } },
       });

@@ -8,6 +8,8 @@ import { PermissionsGuard } from "./auth/permissions.guard";
 import { SessionAuthGuard } from "./auth/session-auth.guard";
 import { ApiExceptionFilter } from "./common/errors/api-exception.filter";
 import { NoStoreInterceptor } from "./common/http/no-store.interceptor";
+import { CorrelationInterceptor } from "./common/http/correlation.interceptor";
+import { CorrelationModule } from "./common/http/correlation.module";
 import { validateEnvironment } from "./config/environment";
 import { DatabaseModule } from "./database/database.module";
 import { HealthModule } from "./health/health.module";
@@ -27,6 +29,7 @@ import { PublicContentModule } from "./public-content/public-content.module";
 import { GamificationModule } from "./gamification/gamification.module";
 import { Printing3dModule } from "./printing-3d/printing-3d.module";
 import { RetentionModule } from "./retention/retention.module";
+import { OperationsModule } from "./operations/operations.module";
 
 @Module({
   imports: [
@@ -36,6 +39,7 @@ import { RetentionModule } from "./retention/retention.module";
       validate: validateEnvironment,
     }),
     DatabaseModule,
+    CorrelationModule,
     AuthModule,
     AttendanceModule,
     HealthModule,
@@ -54,10 +58,12 @@ import { RetentionModule } from "./retention/retention.module";
     GamificationModule,
     Printing3dModule,
     RetentionModule,
+    OperationsModule,
     OpenApiModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: ApiExceptionFilter },
+    { provide: APP_INTERCEPTOR, useClass: CorrelationInterceptor },
     { provide: APP_INTERCEPTOR, useClass: NoStoreInterceptor },
     { provide: APP_GUARD, useClass: SessionAuthGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },

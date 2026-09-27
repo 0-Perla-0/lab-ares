@@ -1,5 +1,6 @@
 import { attendancePaths, attendanceSchemas } from "./attendance.openapi";
 import { identityPaths, identitySchemas } from "./identity.openapi";
+import { operationsPaths, operationsSchemas } from "./operations.openapi";
 
 const cookieSecurity = [{ cookieAuth: [] }];
 
@@ -991,6 +992,8 @@ export function createOpenApiDocument() {
       { name: "Gamification", description: "Feature-flagged private points ledger, derived levels and limited badges; no public ranking or redeemable value" },
       { name: "Printing 3D", description: "Feature-flagged private STL job workflow and separate operator executions; no slicing, printer control or commerce" },
       { name: "Retention & Suppression", description: "ADMIN-only retention policy and suppression operations; requester endpoints reveal only the authenticated actor's own requests. Provisional policies are temporary and background worker polling is disabled by default." },
+      { name: "Audit", description: "Append-only scoped audit queries, CSV export, and deterministic daily integrity manifests; integrity checks are not legal signatures" },
+      { name: "Operations", description: "GLOBAL-only dependency health, durable jobs, alerts, and external-ticket incident references" },
     ],
     paths: {
       "/api/health": {
@@ -998,8 +1001,8 @@ export function createOpenApiDocument() {
           tags: ["Health"],
           security: [],
           responses: {
-            200: { description: "Service and database are available" },
-            503: { description: "Database is unavailable" },
+            200: { description: "Service and required dependencies are available" },
+            503: { description: "Database, private storage, or enabled scanner is unavailable; response attributes the dependency" },
           },
         },
       },
@@ -1016,7 +1019,7 @@ export function createOpenApiDocument() {
           security: [],
           responses: {
             200: { description: "Backend is ready to receive traffic" },
-            503: { description: "Database is unavailable" },
+            503: { description: "A required dependency is unavailable; response attributes the dependency" },
           },
         },
       },
@@ -1066,6 +1069,7 @@ export function createOpenApiDocument() {
       ...gamificationPaths,
       ...printing3dPaths,
       ...retentionPaths,
+      ...operationsPaths,
       "/api/academic/catalogs": {
         get: { tags: ["Academic"], security: cookieSecurity, parameters: [{ name: "page", in: "query", schema: { type: "integer", minimum: 1 } }, { name: "pageSize", in: "query", schema: { type: "integer", minimum: 1, maximum: 100 } }, { name: "search", in: "query", schema: { type: "string" } }], responses: { 200: { description: "Active academic catalogues with pagination", content: { "application/json": { schema: { $ref: "#/components/schemas/AcademicCatalogsResponse" } } } }, ...academicErrorResponses } },
       },
@@ -1283,6 +1287,7 @@ export function createOpenApiDocument() {
         ...gamificationSchemas,
         ...printing3dSchemas,
         ...retentionSchemas,
+        ...operationsSchemas,
       },
     },
   } as const;

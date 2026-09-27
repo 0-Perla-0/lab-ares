@@ -91,11 +91,28 @@ const environmentSchema = z
     RETENTION_BATCH_SIZE: z.coerce.number().int().min(1).max(100).default(20),
     RETENTION_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(20).default(3),
     RETENTION_LEASE_MS: z.coerce.number().int().min(10000).default(120000),
-    RETENTION_RETRY_BASE_MS: z.coerce
+    RETENTION_RETRY_BASE_MS: z.coerce.number().int().min(1000).default(60000),
+    AUDIT_MANIFEST_WORKER_ENABLED: z
+      .union([z.boolean(), z.enum(["true", "false", "1", "0"])])
+      .transform((value) => value === true || value === "true" || value === "1")
+      .default(false),
+    AUDIT_MANIFEST_WORKER_INTERVAL_MS: z.coerce
       .number()
       .int()
-      .min(1000)
-      .default(60000),
+      .min(60_000)
+      .default(3_600_000),
+    OPERATIONS_JOB_MAX_ATTEMPTS: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(20)
+      .default(3),
+    OPERATIONS_JOB_LEASE_MS: z.coerce
+      .number()
+      .int()
+      .min(10_000)
+      .default(120_000),
+    OPERATIONS_RETRY_BASE_MS: z.coerce.number().int().min(1000).default(60_000),
     CLAMAV_HOST: z.string().min(1).default("localhost"),
     CLAMAV_PORT: z.coerce.number().int().positive().default(3310),
     STORAGE_SCANNER_ENABLED: z.coerce.boolean().default(false),
