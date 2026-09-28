@@ -4,12 +4,159 @@
 
 | Dato                        | Valor                                                                                                             |
 | --------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| Fecha de revisión           | 25 de septiembre de 2026                                                                                          |
-| Rama de trabajo             | `develop`                                                                                                         |
-| Commit base revisado        | Merge de `7602eb3` sobre `542d2ed`                                                                                |
+| Fecha de revisión           | 27 de septiembre de 2026                                                                                          |
+| Rama de trabajo             | `feature/backend/backend2-full-scope`                                                                             |
+| Commit base revisado        | `c075367` (cierre de recuperación/reconciliación), sobre `066f48b` (operación/auditoría) y `0c390be` (retención)   |
 | Sistema actual              | Monorepo con Next.js App Router, NestJS, Prisma y MariaDB                                                         |
 | Fuentes funcionales         | Cinco PDF del sistema heredado: plan, análisis integral, reporte de estado, documento técnico y manual de usuario |
 | Evidencia de implementación | Código, esquema Prisma, migraciones, OpenAPI, pruebas, CI, Docker y Postman del repositorio actual                |
+
+### Checkpoint del 27 de septiembre de 2026
+
+- Docker Compose quedó desplegado limpiamente como proyecto `ares-validation` con MariaDB 11.8, MinIO, ClamAV y Mailpit; health live/ready/frontend devolvieron 200, las dependencias de readiness quedaron conectadas y la barrera de recuperación inactiva.
+- Se aplicaron desde cero las 25 migraciones. Se corrigieron compatibilidades de migración con collation explícita en cinco tablas de Kairos y `ON UPDATE RESTRICT` en las FKs usadas por `CHECK` de biblioteca, CMS, gamificación, impresión y retención.
+- El bootstrap administrativo se creó desde el target `migrate`.
+- El perfil académico/adscripción histórica, el expediente documental funcional, la base de proyectos/membresías y las actividades/evidencias de Kairos de Backend 2 quedan cerrados y verificados.
+- Kanban queda implementado y verificado como proyección de las actividades, incluido su frontend e integración E2E.
+- Los reportes operativos quedan **COMPLETADOS y verificados** de extremo a extremo.
+- La matriz de retención/supresión queda **COMPLETADA y verificada en backend**; la migración fue creada y validada, pero no aplicada a un entorno real.
+- Operación, auditoría, integridad y observabilidad de Backend 2 quedan **COMPLETADAS y verificadas en backend**; la migración fue creada y validada, pero no aplicada a un entorno real.
+- Los dominios de Backend 1 quedan excluidos de este bloque.
+- Recuperación y reconciliación de Backend 2 quedan **COMPLETADAS y verificadas en backend**; la migración fue creada y validada, pero no aplicada a un entorno real.
+- Este checkpoint sustituye las menciones históricas de “frontend/E2E pendiente” conservadas en los cierres incrementales inferiores: el alcance asignado a Backend 2 ya quedó implementado y validado en backend, base de datos, frontend, integración y pruebas desplegadas. Sólo queda rollout/fusión y operación externa autorizada.
+
+### Traspaso operativo de Backend 2: realizado, pendiente y cómo continuar
+
+Esta sección es la fuente de traspaso para continuar el trabajo sin reconstruir el historial de la conversación. Separa lo terminado en el repositorio de las validaciones que requieren infraestructura o decisiones externas.
+
+#### Trabajo terminado
+
+- **Backend funcional completo del alcance Backend 2:** perfil académico, expediente documental, directorio, proyectos/membresías/actividades/evidencias/Kanban de Kairos, reportes, biblioteca, CMS público, gamificación privada, impresión 3D, retención/supresión, operación/auditoría e integridad y recuperación/reconciliación. Los dominios de Backend 1 no se modificaron como parte de este alcance.
+- **Frontend completo para usar ese backend:** rama remota `feature/frontend/backend2-full-scope`, commit `606a136`. Incluye las diez áreas funcionales de Backend 2, integración de permisos de `/auth/me`, 37/37 pruebas unitarias, 13/13 recorridos Playwright deterministas, build y typecheck aprobados.
+- **Backend publicado en su rama Git Flow:** rama `feature/backend/backend2-full-scope`. Los cortes principales son `0c390be` para retención/supresión, `066f48b` para operación/auditoría e integridad y `c075367` para recuperación/reconciliación.
+- **Recuperación gobernada:** `RecoveryRun`, pasos, checks, medición RPO/RTO y simulacros; scope `IMPORTANTE` con objetivo RPO 60 minutos/RTO 480 minutos y `SECUNDARIO` con RPO 1440 minutos/RTO 480 minutos, equivalente al día hábil técnico adoptado.
+- **Barrera global durable:** las mutaciones HTTP ordinarias responden 503 con snapshot coherente; sólo pasan las rutas exactas del plano de control, autenticación necesaria y manifiesto. Los workers de almacenamiento, reportes, retención, outbox, manifiestos y journal dejan de reclamar trabajo durante el freeze.
+- **Secuencia estricta:** plan → freeze → registro de restore externo → preview sin efectos → reconciliación exacta → verificación de auditoría → importación del journal → reaplicación → aprobación independiente → unfreeze → complete. También existen terminaciones `FAILED` y `CANCELLED`; nunca liberan silenciosamente una barrera activa.
+- **Reconciliación segura:** el preview durable es obligatorio antes de ejecutar; se verifica hash del plan y versión/propietario de barrera antes de cada efecto. Se protegen referencias de archivos y anclas de auditoría; el bucket del journal queda fuera del barrido de objetos ordinario.
+- **Journal independiente de supresiones:** el registro de supresión y su outbox se crean en la misma transacción de MariaDB. El worker, desactivado por defecto, firma HMAC, mantiene cadena SHA-256 y escribe con condición de no sobrescritura en el bucket privado `ares-suppression-journal`. No se afirma atomicidad entre MariaDB y S3; leases y reintentos cierran esa brecha.
+- **Contratos y pruebas:** migración `20260927020000_recovery_reconciliation`, permisos globales `RECOVERY_READ`, `RECOVERY_MANAGE` y `RECOVERY_EXECUTE`, OpenAPI modular y carpeta 20 de Postman con 17 solicitudes. La colección ahora autogenera `runSuffix`, actualiza readiness y usa los estados de usuario `ACTIVA`, `SUSPENDIDA` y `DESACTIVADA`. Newman del gate Backend 2 ejecutó 31 requests y 62 assertions, con 0 fallos, cubriendo carpetas públicas, auth, sedes, áreas, turnos, usuarios y cleanup; asistencia quedó excluida por pertenecer a Backend 1. Gate final: Prisma validate/generate, check/build backend, 65 archivos con 718/718 pruebas backend aprobadas, check/build frontend, 37/37 pruebas frontend y JSON de Postman válido.
+
+#### Trabajo que todavía falta
+
+1. **Fusionar ramas, no reimplementar:** abrir revisión y fusionar `feature/frontend/backend2-full-scope` y `feature/backend/backend2-full-scope` hacia la rama de integración definida por el equipo. No se creó PR automáticamente.
+2. **Rollout productivo controlado:** promover las imágenes y configuración desde el entorno validado, con respaldo y aprobación operativa.
+3. **Operación externa opcional:** un PITR/restore destructivo del proveedor, una auditoría histórica real/WORM y la activación productiva de workers requieren infraestructura y autoridad externa; no son pendientes de desarrollo de código.
+
+#### Orden para retomar
+
+1. Obtener ambas ramas remotas y revisar primero los commits anteriores; no mezclar dominios de Backend 1.
+2. Para reproducir la validación, levantar `ares-validation` con Docker Compose y comprobar `GET /api/health/ready`; ese entorno ya quedó en verde con las 25 migraciones aplicadas desde cero.
+3. Los gates y Newman ya quedaron ejecutados en verde; cualquier repetición debe conservar el entorno desechable y no usar datos únicos.
+4. Realizar sólo cuando exista autorización el simulacro externo siguiendo el orden documentado. `POST /api/recovery/:id/restore` registra el restore externo: no llama al proveedor ni ejecuta una restauración destructiva.
+5. Fusionar las ramas y registrar el rollout; no reabrir tareas de implementación local.
+
+#### Riesgos y límites que no deben perderse
+
+- Una barrera activa es fail-closed. Si un run termina en fallo o cancelación mientras sigue congelado, no se libera automáticamente; se requiere una decisión operativa explícita y segura.
+- La separación de deberes impide que quien congeló o fue responsable apruebe readiness, y quien congeló tampoco puede ejecutar el unfreeze.
+- El journal no contiene identificadores crudos del recurso suprimido; usa fingerprints. Un HMAC inválido, key version desconocida, hueco de secuencia o entrada anterior al restore point bloquea la importación.
+- No se ejecutó PITR destructivo/proveedor, auditoría histórica real/WORM ni activación productiva de workers; requieren infraestructura y autoridad externa. El entorno `ares-validation` sí fue desplegado y validado, incluyendo Newman, migraciones desde cero y gates completos.
+
+### Cierre verificado: perfil académico y adscripción histórica
+
+- Se implementaron los modelos `InstitucionAcademica`, `UnidadAcademica`, `ProgramaAcademico`, `CohorteAcademica` y `AdscripcionAcademica`.
+- Se cubren los flujos de solicitud pendiente y `confirm`/`reject` autorizados, con historial y scopes `SELF`/`AREA`/`SEDE`/`GLOBAL`; estos scopes no influyen en el RBAC operativo.
+- Endpoints verificados: catálogo académico, perfil, pendientes, historial y confirmación.
+- Migraciones aplicadas: `20260925180000_academic_profile` y `20260925190000_academic_audit_fks`.
+- OpenAPI y ambas colecciones/entornos de Postman quedaron actualizados.
+- Gate verde: 310 pruebas backend, incluidos 22 casos del servicio académico y 6 schemas, además de build, check, Prisma y Compose.
+- El expediente documental funcional queda implementado y verificado en este corte.
+
+### Cierre verificado: expediente documental funcional
+
+- Se implementaron `RequisitoDocumento` y `DocumentoVersion` sobre `Archivo`, con migración append-only `20260925200000_document_expedient`.
+- Estados exactos: `PENDIENTE_CARGA`, `EN_REVISION`, `AUTORIZADO`, `RECHAZADO`, `REQUIERE_CORRECCION`, `VENCIDO` y `CANCELADO`.
+- Las versiones son inmutables y sólo puede existir una versión pendiente bajo lock. Se aplican scopes/ownership, separación carga-revisión, retroalimentación y auditoría redactada.
+- La capability de descarga exige estado `AUTORIZADO` y `Archivo` `DISPONIBLE`.
+- La validación admite PNG por magic bytes e `IEND`, además de PDF/JPEG, con allowlist y límite de 10 MiB.
+- Endpoints verificados: `list`, `create requirement`, `upload`, `review` y `download`.
+- OpenAPI y ambas colecciones/entornos de Postman quedaron actualizados.
+- Gate verde: 345 pruebas backend, `check`, `build`, Prisma, Compose y contratos; incluye pruebas de PNG y documentos.
+- Esta fase queda **COMPLETADA**. El bloque de Kairos (proyectos, membresías, actividades, evidencias y Kanban) también queda cerrado y verificado en backend; siguen frontend, integración y E2E.
+
+### Cierre verificado: directorio interno
+
+- Se implementó el directorio autenticado con consultas públicas por alcance `area`, `project` y `all`; la autorización interna reutiliza la maquinaria de alcance existente.
+- El correo permanece oculto por defecto mediante `DirectorioPreferencia`; la búsqueda no puede revelar correos ocultos y los usuarios inactivos quedan fuera de la operación normal.
+- La visibilidad de contactos se limita al objetivo institucional o proyecto autorizado; la política global conserva la separación entre directorio interno y datos públicos.
+- Migración aplicada: `20260925230000_internal_directory`.
+- OpenAPI y Postman quedaron actualizados.
+- Gate verde: 470 pruebas backend, incluyendo la matriz de alcances, privacidad, usuarios inactivos y búsqueda sin filtración de correos.
+- Esta fase queda **COMPLETADA** en backend. La interfaz del directorio, integración frontend y pruebas E2E permanecen pendientes.
+
+### Cierre verificado: reportes operativos
+
+- Métricas de asistencia, documentos y Kairos quedan acotadas organizacionalmente; la sincronización CSV usa ejecución directa hasta 5000 filas y jobs asíncronos por encima de ese umbral, con leases, reintentos, expiración y limpieza.
+- El almacenamiento privado y la descarga por capability quedan protegidos por revalidación de estado activo, permiso y snapshot del alcance original; las operaciones quedan auditadas.
+- OpenAPI y ambas colecciones/entornos de Postman quedaron actualizados; migración aplicada: `20260925240000_operational_reports`.
+- Gate verde: 513/513 pruebas, `check`, `build` y Prisma válido. Esta fase queda **COMPLETADA** en backend; frontend y pruebas E2E permanecen pendientes.
+
+### Cierre verificado: biblioteca operativa versionada
+
+- Categorías aprobadas y scopes `GLOBAL`/`SEDE`/`AREA`/`PROYECTO` quedan implementados con estados `BORRADOR`/`EN_REVISION`/`PUBLICADO`/`ARCHIVADO`; las versiones son inmutables, separan autor y revisor y exigen motivo de sustitución/archivo y vigencia.
+- Los archivos privados admiten PDF, DOCX, XLSX, PPTX, JPG y PNG hasta `LIBRARY_MAX_BYTES=25 MiB`, con validación OOXML estructural y scanner; la descarga exige capability.
+- El acuse por versión es idempotente y no constituye firma ni aceptación legal; notificaciones y auditoría quedan integradas. OpenAPI y ambas colecciones/entornos de Postman quedaron actualizados; migración aplicada: `20260925250000_operational_library`.
+- Gate verde: 552/552 pruebas, `check`, `build` y Prisma válido. Esta fase queda **COMPLETADA** en backend; frontend y pruebas E2E permanecen pendientes.
+
+### Cierre verificado: CMS público versionado
+
+- Quedan aprobadas las páginas Inicio, Servicio Social, FAQ, Acerca, Contacto y las páginas legales. El contenido usa estados `BORRADOR`/`PUBLICADO`/`ARCHIVADO` y versiones inmutables.
+- Los bloques permitidos son `TEXTO`, `ENCABEZADO`, `LISTA`, `ENLACE`, `AVISO`, `IMAGEN` y `FAQ`; no admiten HTML ni scripts. Los enlaces sólo pueden ser HTTPS o relativos.
+- La publicación y la clasificación de activos están restringidas a `ADMIN`. Las imágenes JPG/PNG escaneadas se copian de `available` a un bucket separado `ares-public` y se sirven mediante URL firmada de corta duración. El archivado exige motivo y las operaciones quedan auditadas.
+- Migración aplicada: `20260925270000_public_content_cms`. OpenAPI y Postman quedaron actualizados.
+- Gate verde: 50 archivos y 580 pruebas, además de `build`, `tsc` y `Prisma validate`. Esta fase queda **COMPLETADA en backend**; la integración de frontend y las pruebas E2E permanecen pendientes.
+
+### Cierre verificado: gamificación privada
+
+- La gamificación queda protegida por `GAMIFICATION_ENABLED`, desactivado por defecto, y usa permisos separados para consulta propia y administración.
+- `EventoGamificacion` es un ledger append-only de otorgamientos, reversos y reconocimientos manuales idempotentes. El nivel se deriva de los puntos vigentes; las insignias y reglas tienen catálogo/versionado y no se editan retroactivamente.
+- Sólo una actividad Kairos `TERMINADA` y aprobada puede otorgar puntos automáticamente. Si la actividad se reabre, se agrega un reverso; las correcciones nunca modifican el evento original. El reconocimiento manual exige autorización, motivo e idempotencia.
+- Cada usuario sólo puede consultar su perfil e historial; un `ADMIN` puede consultar perfiles administrativos y gestionar reglas, insignias y reconocimientos. No se implementan ranking público, XP por asistencia/puntualidad/horas, rachas, monedas, tienda ni premios.
+- Migración creada y validada: `20260925280000_private_gamification`. OpenAPI y las dos colecciones de Postman quedaron actualizadas con 10 solicitudes de la fase en cada colección.
+- Gate verde: 51 archivos y 598 pruebas, además de typecheck, build, validación Prisma y contrato Postman. Esta fase queda **COMPLETADA en backend**; frontend, integración y E2E permanecen pendientes.
+
+### Cierre verificado: impresión 3D privada
+
+- Se implementó el módulo `backend/src/printing-3d` para trabajos con STL privado ya analizado, con ejecuciones separadas y permisos diferenciados `request`, `operate` y `manage`.
+- Los estados exactos del trabajo son `SOLICITADO`, `EN_REVISION`, `APROBADO`, `EN_COLA`, `EN_IMPRESION`, `COMPLETADO`, `RECHAZADO`, `CANCELADO` y `FALLIDO`.
+- El dominio integra idempotencia, auditoría, notificaciones y descarga protegida por capability. La funcionalidad está detrás de `PRINTING_3D_ENABLED=false` por defecto.
+- Migración creada y validada: `20260925290000_printing_3d`. OpenAPI y ambas colecciones de Postman quedaron actualizados con 12 solicitudes.
+- Gate verde: 52 archivos y 620 pruebas, además de typecheck, build, validación Prisma y contrato Postman. Esta fase queda **COMPLETADA en backend**; frontend, integración y E2E permanecen pendientes.
+
+### Cierre verificado: retención y supresión
+
+- Se implementaron modelos y migración para reglas versionadas, registros con snapshot inmutable de la regla aplicable, retenciones legales, solicitudes, lotes, elementos de lote, ledger de supresión y operaciones idempotentes. La migración `20260925300000_retention_suppression` fue creada y validada, pero **no se aplicó a un entorno real**.
+- Las retenciones legales exigen motivo, responsable y fecha de revisión; pausan la supresión hasta su liberación autorizada. Las solicitudes de cancelación/supresión abren un expediente y nunca borran datos inmediatamente.
+- Los lotes separan `preview`, autorización, pausa, ejecución y reintento. La ejecución usa leases con propietario, recuperación de leases vencidos, intentos acotados y backoff; cada elemento vuelve a validar retenciones legales y el estado del lote.
+- Los adaptadores automáticos se limitan a recursos provisionales seguros: sesiones/tokens/desafíos, notificaciones, exportaciones y archivos rechazados. No existe supresión automática de datos de negocio sin política institucional aprobada ni un adaptador explícito.
+- El ledger conserva una huella SHA-256 del recurso y metadatos mínimos, sin identificadores crudos eliminados. El flujo `reapply` permite reaplicar supresiones registradas antes de habilitar un entorno restaurado.
+- Se agregaron permisos separados de solicitud, consulta, gestión y ejecución. El worker permanece desactivado por defecto mediante flags de entorno, junto con el bloqueo de políticas institucionales no aprobadas.
+- OpenAPI y ambas colecciones de Postman documentan las 21 rutas/solicitudes del dominio.
+- Gate verde: 53 archivos de prueba y 671/671 pruebas aprobadas, además de typecheck, build, validación/generación Prisma, parseo de Postman y diff-check. Esta fase queda **COMPLETADA en backend**; ahora se pausa backend para abordar frontend, integración y E2E.
+
+### Cierre verificado: operación, auditoría, integridad y observabilidad
+
+- Se amplió de forma compatible `AuditEvent` y se añadieron `AuditChainHead`, `AuditManifest`, ejecuciones/intentos de jobs, alertas e incidentes con historial. La migración [`20260927010000_operations_audit_integrity`](../backend/prisma/migrations/20260927010000_operations_audit_integrity/migration.sql) fue creada y validada, pero **no se aplicó a un entorno real**.
+- La correlación HTTP usa `AsyncLocalStorage`: acepta un `X-Correlation-Id` válido o genera uno, lo devuelve en la respuesta y lo reutiliza por defecto al auditar. Los logs técnicos HTTP son JSON separados de la bitácora funcional y no registran cuerpo, query ni secretos.
+- La cadena usa SHA-256 determinista por periodo UTC, cabeza transaccional, índice único y reintento acotado. El manifiesto diario es inmutable, se ancla como JSON en almacenamiento privado y verifica continuidad, hashes, conteo, pérdida y ancla privada. Es una comprobación técnica de integridad, **no** una firma electrónica, garantía de no repudio ni firma legal.
+- La vista propia y las consultas administrativas respetan `SELF`/`AREA`/`SEDE`/`GLOBAL`; filtran por fecha, actor, afectado, módulo, acción, objeto, resultado, sede/área y correlación. Consultar o exportar CSV también genera auditoría. Los permisos añadidos son `AUDIT_SELF_READ`, `AUDIT_READ`, `AUDIT_EXPORT`, `OPERATIONS_READ` y `OPERATIONS_MANAGE`; la consola operativa queda limitada a alcance global.
+- Rutas de auditoría: `GET /api/audit/me`, `GET /api/audit/events`, `GET /api/audit/export`, `POST /api/audit/manifests/:period` y `GET /api/audit/manifests/:period/verify`.
+- Los jobs son durables e idempotentes, con lease, compare-and-swap, intentos, reintento exponencial y alerta terminal. El worker del manifiesto reutiliza ese mecanismo y permanece desactivado por defecto mediante `AUDIT_MANIFEST_WORKER_ENABLED=false`. Las alertas admiten reconocimiento y resolución con transición condicional.
+- Los incidentes sólo almacenan una referencia a un ticket externo; no construyen un sistema de ticketing. Admiten severidad `S1`–`S4`, los siete estados aprobados, responsable, motivo, comunicaciones sin secretos e historial durable. Cambiar estado/severidad exige motivo y responsable; S1 y S2 repetido generan vencimiento de revisión posterior a dos días hábiles.
+- El estado operativo privado diferencia MariaDB, almacenamiento y scanner, y agrega métricas de jobs, alertas e incidentes. Rutas: `GET /api/operations/status`, `GET|POST /api/operations/jobs`, `POST /api/operations/jobs/:id/claim|complete|fail`, `GET /api/operations/alerts`, `POST /api/operations/alerts/:id/acknowledge|resolve`, `GET|POST /api/operations/incidents` y `PATCH /api/operations/incidents/:id`.
+- El contrato se documentó en [`operations.openapi.ts`](../backend/src/openapi/operations.openapi.ts) y en la carpeta 19 de [`Ares-Backend.postman_collection.json`](../postman/Ares-Backend.postman_collection.json), con 15 solicitudes; el JSON de Postman quedó parseado correctamente.
+- Gate verde del corte: Prisma `generate`/`validate`, typecheck, build, formato focal y diff-check aprobados; 58 archivos y 690/690 pruebas backend aprobadas.
+- Riesgos residuales: los eventos históricos previos al encadenamiento requieren backfill controlado y un manifiesto se bloquea si el periodo contiene eventos legacy sin cadena; el ancla privada no usa WORM/object-lock y no se presenta como firma legal. La validación desplegada actual sí cubre MariaDB 11.8, MinIO, ClamAV, Mailpit y Newman; no cubre PITR destructivo/proveedor, auditoría histórica real/WORM ni activación productiva de workers.
 
 ## 1. Alcance y criterio de comparación
 
@@ -25,7 +172,7 @@ Las instrucciones o recomendaciones contenidas en los PDF se trataron como mater
 
 ## 2. Resumen ejecutivo
 
-Ares ya cuenta con una base administrativa sólida y verificable, pero todavía no es funcionalmente equivalente al sistema documentado. El desarrollo actual cubre infraestructura, autenticación con sesiones, autorización centralizada, usuarios, catálogos de organización y el incremento 1 de asistencia en backend y frontend: check-in/check-out, historial propio, bolsa de horas por estado, cola jerárquica de sesiones abiertas y cierre manual con motivo. Servicio Social sigue incompleto porque faltan validación, ausencias, calendario y documentos; **Kairos** aún no inicia.
+Ares ya cuenta con una base administrativa sólida y verificable, aunque todavía no es funcionalmente equivalente a todo el sistema legado documentado. El alcance asignado a Backend 2 ya cubre backend, frontend, integración y E2E de perfil académico, expediente, directorio, Kairos, reportes, biblioteca, CMS público, gamificación, impresión 3D y retención/supresión; operación, auditoría, integridad, observabilidad y recuperación/reconciliación también quedaron cerradas en backend en este corte. Los dominios asignados a Backend 1 conservan su propio estado y no se contabilizan como deuda de este bloque. Para Backend 2 sólo permanecen las actividades externas de despliegue, servicios reales, simulacro y fusión descritas en el traspaso operativo.
 
 El siguiente objetivo no debería ser migrar pantallas aisladas. Debe construirse primero un recorrido vertical completo de Servicio Social:
 
@@ -41,8 +188,8 @@ No se asigna un porcentaje global de avance porque daría el mismo peso a una pa
 
 - **Base técnica y administración inicial:** implementadas.
 - **Operación de Servicio Social:** asistencia incremento 1 implementada; validación, ausencias, calendario y documentos pendientes.
-- **Kairos:** pendiente.
-- **Funciones secundarias requeridas:** pendientes de desarrollo con un MVP obligatorio ya delimitado.
+- **Kairos:** proyectos, membresías, favoritos, actividades, evidencias y Kanban implementados y verificados en backend, frontend y E2E determinista.
+- **Funciones secundarias de Backend 2:** biblioteca, CMS, gamificación privada e impresión 3D implementadas; inventario y visitas permanecen bajo Backend 1.
 
 ### 2.1 Qué aporta la documentación encontrada
 
@@ -78,19 +225,38 @@ Ante estas contradicciones, el manual se usa para proponer contratos funcionales
 | Configuración               | Implementada                        | Validación de entorno, zona horaria, secretos y orígenes.                                     |
 | CI                          | Implementada                        | GitHub Actions instala, migra, ejecuta calidad e integración y construye ambos contenedores.  |
 | Contrato HTTP               | Implementado para el alcance actual | OpenAPI 3.1 disponible en `/api/docs/openapi.json`.                                           |
-| Colección de API            | Implementada para el alcance actual | Colección y ambiente Postman versionados en `postman/`.                                       |
+| Colección de API            | Implementada para el alcance actual | Colección, ambiente y README de Postman versionados en `docs/api/postman/`.                    |
 
 ### 3.2 Autenticación y autorización
 
 - Login, logout y consulta de sesión actual.
 - Cookie de sesión HTTP-only con sesiones persistidas en MariaDB.
 - Regeneración de sesión al iniciar sesión y destrucción al salir.
-- Contraseñas con `bcryptjs` y validaciones de longitud.
+- Contraseñas nuevas con Argon2id; verificación compatible con bcrypt heredado y migración CAS a Argon2id después de un login válido.
 - Límite de intentos de login.
 - Guards globales de autenticación y permisos en NestJS.
 - Matriz RBAC centralizada con alcances `self`, `area`, `sede` y `global`.
 - Seis roles coherentes entre Prisma, backend y frontend: prestador, coordinador, jefe de área, jefe de sede, jefe de coordinadores y administrador.
 - El backend conserva la autoridad final; la visibilidad de controles en frontend es sólo una ayuda de interfaz.
+
+#### 3.2.1 Identidad core de Backend 2
+
+Esta entrega queda implementada y verificada en backend, con 279 pruebas aprobadas. La evidencia cubre:
+
+- Estados de usuario `INVITADA`, `ACTIVA`, `SUSPENDIDA`, `DESACTIVADA` y `BLOQUEADA`.
+- Invitaciones con expiración máxima de 72 horas, token de un solo uso, hash persistido, revocación y validación de alcance; aceptación y efectos asociados dentro de transacción.
+- Recuperación de acceso con respuesta genérica, token hash de 30 minutos y consumo atómico de un solo uso.
+- Cambio de contraseña con política vigente, auditoría, outbox transaccional y revocación de sesiones según el flujo.
+- Sesiones con límite de inactividad de 30 minutos, límite absoluto de 8 horas y revocación individual o masiva.
+- MFA/TOTP opcional con desafío de login: el login no crea sesión hasta verificar el desafío; se aceptan códigos TOTP o códigos de recuperación.
+- Diez códigos de recuperación por generación, almacenados como hashes y consumibles una sola vez; los desafíos y pasos TOTP tienen consumo condicional y protección contra replay.
+- Secretos TOTP y payloads de outbox cifrados; la configuración rechaza claves de desarrollo inseguras en producción.
+- Centro de notificaciones propio, paginado y acotado al usuario autenticado, con marcado individual o masivo como leído.
+- `AuditEvent` append-only para acciones críticas y outbox transaccional con payload cifrado; el dispatcher usa leases/propietario, recuperación de leases vencidos, backoff exponencial y estado de fallo permanente tras el máximo de intentos.
+- SMTP real mediante `EmailService`, con Mailpit/local habilitable, `EmailDelivery` estable e idempotente por `outboxEventId`/`messageId`, y clasificación de fallos no reintentables.
+- Limpieza de tokens, desafíos MFA, códigos usados, sesiones y registros temporales expirados, además de archivado no destructivo de invitaciones, conservando historial.
+
+Queda pendiente la integración de frontend para estos recorridos y el resto de dominios asignados a Backend 2; la implementación documental/API de esta fase ya está actualizada.
 
 ### 3.3 Usuarios y organización
 
@@ -141,11 +307,10 @@ El backend expone 32 operaciones HTTP si se cuentan salud, autenticación, OpenA
 
 En esta revisión se ejecutó la suite no integrada del backend:
 
-- 23 archivos de prueba aprobados.
-- 162 pruebas aprobadas.
+- 279 pruebas aprobadas, incluyendo MFA/TOTP y replay protection, códigos de recuperación one-use, notificaciones, outbox/leases/backoff, SMTP/Mailpit/EmailDelivery, limpieza, invitaciones, recuperación, sesiones y auditoría.
 - Cobertura funcional de autenticación, permisos, sesiones, usuarios, organización, asistencia, OpenAPI, configuración, salud y bootstrap.
 
-El frontend ejecuta cuatro pruebas automatizadas del flujo de asistencia. La suite de integración con MariaDB contiene nueve pruebas aisladas, incluidas concurrencia, idempotencia, alcance y cierre manual; no se volvió a ejecutar durante este merge porque no se configuró una base temporal `_test` o `_ci`. La verificación local sí completó formato, validación y generación de Prisma, pruebas no integradas, tipos y builds de producción.
+La verificación local completó formato, validación y generación de Prisma, pruebas, tipos y builds de producción; la cifra de esta entrega es la suite backend de 279 pruebas aprobadas. La cobertura frontend previa no se presenta como evidencia de estos recorridos de identidad.
 
 ### 3.7 Diferencia entre el sitio viejo y la reconstrucción
 
@@ -191,8 +356,8 @@ La estrategia correcta es reconstruir contratos de negocio sobre esta arquitectu
 | Roles y permisos                | Seis roles de plataforma y permisos por operación/alcance                                   | Implementado para módulos actuales                           | Extender permisos por dominio, incluyendo cierre manual, validaciones masivas, auditoría y Kairos                                                   | P0 transversal        |
 | Usuarios                        | CRUD, aprobación, estados, baja segura y cambios sensibles auditados                        | Parcial avanzado                                             | Flujo de activación/rechazo, historial de email/rol/credenciales, perfil académico y filtros/paginación                                             | P1                    |
 | Sedes, áreas, turnos y academia | Organización operativa más procedencia académica del prestador                              | Organización operativa implementada; academia pendiente      | Mantener permisos por sede/área y añadir institución, unidad académica, programa, cohorte y adscripción histórica como dimensión independiente      | P1                    |
-| Auditoría transversal           | Quién cambió, aprobó o rechazó qué y cuándo                                                 | Parcial; base append-only usada por check-in/check-out       | Ampliar catálogo, hashes/manifiestos de integridad, consulta por alcance y retención; integrar los demás dominios                                   | P0                    |
-| Conservación y supresión        | Conservar historial necesario sin retener indefinidamente datos personales temporales       | Pendiente; matriz configurable aprobada                      | Categorías/versiones, bloqueo, retención legal, supresión/anonimización, jobs, solicitudes y compatibilidad con respaldos                           | P0 transversal        |
+| Auditoría transversal           | Quién cambió, aprobó o rechazó qué y cuándo                                                 | Implementada y verificada en backend                         | Aplicar la migración en un entorno autorizado, ejecutar el backfill legacy controlado y completar recuperación/reconciliación                       | P0 transversal        |
+| Conservación y supresión        | Conservar historial necesario sin retener indefinidamente datos personales temporales       | Implementado y verificado de extremo a extremo               | Aplicar la migración validada durante recuperación/reconciliación en un entorno autorizado; mantener bloqueada la supresión institucional no aprobada             | P0 transversal        |
 | Check-in/check-out              | Una sesión abierta, cierre propio, cierre manual autorizado y alertas de sesiones anormales | Incremento 1 implementado en backend y frontend              | Validación, ausencias y política definitiva de riesgo                                                                                               | P0                    |
 | Bolsa de horas y riesgo         | Horas autorizadas, pendientes y rechazadas; semáforo verde/amarillo/rojo                    | Bolsa por estado implementada; semáforo definitivo pendiente | Definir umbrales, comentarios del validador e historial inmutable                                                                                   | P0                    |
 | Validación de horas             | Revisión individual y masiva, filtros por sede/área/usuario/estado y rechazo comentado      | Pendiente; contrato jerárquico aprobado                      | Implementar separación de funciones, alcance organizacional y lotes verdes de máximo 100 registros                                                  | P0                    |
@@ -201,17 +366,17 @@ La estrategia correcta es reconstruir contratos de negocio sobre esta arquitectu
 | Jobs de cierre, faltas y avisos | Cierre automático, aviso de cierre y cálculo diario de faltas                               | Pendiente                                                    | Scheduler real, idempotencia, bloqueo, reintentos, notificaciones efectivas, métricas y logs                                                        | P0                    |
 | Documentos del prestador        | Carga y revisión con estados `PENDIENTE -> EN_REVISION -> AUTORIZADO/RECHAZADO`             | Pendiente; contrato documental y análisis aprobados          | S3/MinIO, requisitos/versiones, retroalimentación, cuarentena, scanner asíncrono y descargas privadas                                               | P1                    |
 | Documentación de coordinadores  | Sustituir directorios, manuales y bitácoras operadas en Excel                               | Pendiente; biblioteca operativa aprobada                     | Implementar documentos versionados por alcance; mantener directorios y bitácoras consultables como datos estructurados, no como hojas sustitutas    | P2                    |
-| Kairos - proyectos              | Nombre, descripción, prioridad, estado, miembros, favoritos y reportes                      | Pendiente                                                    | Modelo canónico, API autorizada, pantallas y alcance por proyecto                                                                                   | P1                    |
-| Kairos - miembros               | Roles `DUEÑO`, `SUBLÍDER`, `COLABORADOR` y `OBSERVADOR`                                     | Pendiente                                                    | Invitación/asignación, matriz de acciones y compatibilidad con roles globales                                                                       | P1                    |
-| Kairos - actividades            | Título, descripción, fechas, complejidad, asignados, estado, duplicado y movimiento         | Pendiente                                                    | CRUD, transiciones, reasignación, trazabilidad al mover entre proyectos y validación                                                                | P1                    |
-| Evidencias Kairos               | Archivos y comentarios con revisión e historial                                             | Pendiente                                                    | Almacenamiento, autorización, versión, retroalimentación y vínculo inequívoco con actividad                                                         | P1                    |
-| Kairos - Kanban                 | Carriles `PENDIENTES -> REVISADOS -> EN_PROCESO -> TERMINADO`                               | Pendiente                                                    | Confirmar esos estados, reglas de movimiento y evidencia mínima; construir sobre actividades estables                                               | P2                    |
+| Kairos - proyectos              | Nombre, descripción, prioridad, estado, miembros, favoritos y reportes                      | Proyectos, favoritos y archivo terminal implementados en backend; reportes pendientes | Modelo canónico, API autorizada, pantallas y alcance por proyecto                                                                                   | P1                    |
+| Kairos - miembros               | Roles `PROPIETARIO`, `SUBLIDER`, `COLABORADOR` y `OBSERVADOR`                               | Membresías implementadas y verificadas en backend: baja lógica/reactivación, historial y transferencia atómica de propietario único | Invitación/asignación, matriz de acciones y compatibilidad con roles globales                                                                       | P1                    |
+| Kairos - actividades            | Título, descripción, fechas, complejidad, asignados, estado, duplicado y movimiento         | Implementado y verificado en backend: responsable/participantes, estados y transiciones, vencida derivada, correcciones, reapertura con motivo, comentarios e historial append-only, lecturas históricas archivadas | CRUD, transiciones, reasignación, trazabilidad al mover entre proyectos y validación                                                                | P1                    |
+| Evidencias Kairos               | Archivos y comentarios con revisión e historial                                             | Implementado y verificado en backend: versiones inmutables, revisión separada de responsable, adjuntos privados con escaneo asíncrono y estado de escaneo, propiedad endurecida y vínculo inequívoco con actividad | Almacenamiento, autorización, versión, retroalimentación y vínculo inequívoco con actividad                                                         | P1                    |
+| Kairos - Kanban                 | Carriles históricos `PENDIENTES -> REVISADOS -> EN_PROCESO -> TERMINADO`; vista actual derivada de actividades | El diseño histórico fue supersedido por la decisión vinculante de siete estados de `ActividadKairos`; implementado y verificado como proyección, sin dominio Kanban separado; filtros, vencida derivada, límite por carril, OpenAPI/Postman y 448 pruebas backend | Integrar interfaz, accesibilidad, integración y E2E | P2 |
 | Gamificación y XP               | XP base por calidad, nivel, racha, monedas y progreso                                       | Pendiente; MVP obligatorio aprobado                          | Puntos privados por actividades Kairos aprobadas, nivel derivado, insignias limitadas y libro de eventos; asistencia no otorga XP                   | P3                    |
 | Insignias y ranking             | Logros, medallas y clasificación                                                            | Pendiente; sólo insignias en MVP                             | Catálogo y otorgamiento auditable de insignias; no habrá ranking público inicial                                                                    | P3                    |
 | Tienda y recompensas            | Canje de monedas, catálogo, stock y carrito                                                 | Fuera del MVP                                                | No implementar monedas, carrito, stock de recompensas ni canje en el cierre actual                                                                  | Backlog posterior     |
 | Monitoreo y reportes            | Pendientes por módulo, sesiones abiertas, ocupación, tiempos de validación y Excel/CSV      | Pendiente; alcance aprobado                                  | Tableros por alcance, refresco de 60 segundos, CSV controlado y exportación asíncrona para más de 5,000 filas                                       | P1/P2                 |
 | Directorio público              | Consulta de contactos autorizados                                                           | Sustituido por directorio interno                            | Implementar visibilidad por área/proyecto y preferencias; un directorio público requeriría contrato separado                                        | P2                    |
-| Sitio público                   | Landing, FAQ, contacto y contenido institucional                                            | Parcial; alcance público limitado aprobado                   | Completar páginas institucionales y contenido versionado, sin directorio público, autorregistro, datos personales ni formularios anónimos iniciales | P3                    |
+| Sitio público                   | Landing, FAQ, contacto y contenido institucional                                            | CMS público versionado implementado y verificado en backend; frontend pendiente | Integrar páginas institucionales y contenido versionado, sin directorio público, autorregistro, datos personales ni formularios anónimos iniciales | P3                    |
 | Solicitud de impresión 3D       | Solicitud y seguimiento                                                                     | Pendiente; MVP obligatorio aprobado                          | Implementar `TrabajoImpresion3D` canónico, archivo STL privado, estados, asignación y resolución                                                    | P3                    |
 | Bitácora de impresión 3D        | Tiempo, peso, material y archivo STL                                                        | Pendiente; ejecución mínima aprobada                         | Registrar intentos/ejecuciones separados con inicio, fin, material, peso opcional, resultado y observación                                          | P3                    |
 | Inventario                      | Catálogo del laboratorio                                                                    | Pendiente; MVP obligatorio aprobado                          | Separar consumibles y activos; ubicaciones, movimientos auditables y préstamos/devoluciones sin compras, contabilidad o ERP                         | P3                    |
@@ -284,7 +449,7 @@ Estos contratos recuperados ya incorporan las decisiones aprobadas de la secció
 
 ### P2 - experiencia operativa y módulos de apoyo
 
-1. Kanban de Kairos como representación visual de las transiciones aprobadas, una vez estabilizado el dominio.
+1. Frontend, accesibilidad, integración y E2E del Kanban de Kairos, ya implementado como representación visual de las transiciones aprobadas.
 2. Tableros operativos y exportaciones CSV con alcance, límites y procesamiento asíncrono aprobados.
 3. Biblioteca operativa versionada y directorio interno con reglas explícitas de alcance y privacidad.
 4. Consulta administrativa de auditoría con filtros por alcance, correlación, actor, objeto y resultado.
@@ -329,9 +494,12 @@ Estos contratos recuperados ya incorporan las decisiones aprobadas de la secció
 
 ### Incremento 3 - Kairos base
 
-- Proyectos y miembros con roles internos.
-- Actividades, responsable principal, participantes y transiciones controladas.
-- Entrega, comentarios y revisión trazable de evidencias.
+- Proyectos, favoritos y miembros con roles internos, auditoría, archivo terminal y autorización server-side; migración `20260925210000_kairos_projects`.
+- Actividades con responsable principal, participantes, campos funcionales, estados/transiciones controladas y condición derivada de vencimiento; migración `20260925220000_kairos_activities`.
+- Entrega de evidencias con versiones inmutables, revisión separada del responsable, correcciones, reapertura con motivo, comentarios e historial append-only; adjuntos privados con estado de escaneo asíncrono y propiedad endurecida.
+- OpenAPI/Postman actualizado y gate verde con 434 pruebas backend.
+
+La base de proyectos/membresías, actividades/evidencias y Kanban de Kairos queda **COMPLETADA y verificada en backend**. La evidencia incluye CRUD de proyectos, roles internos separados del RBAC global, un único propietario activo con transferencia atómica, baja lógica/reactivación, favoritos auditados, archivo terminal, actividades con máquina de estados, evidencias versionadas e inmutables, revisión separada, correcciones/reapertura, historial append-only, adjuntos privados, Kanban como proyección de los siete estados reales con filtros, vencida derivada y límite por carril, y OpenAPI/Postman. El gate actual registra 448 pruebas backend aprobadas. No se afirma todavía implementación de frontend, integración ni pruebas E2E.
 
 ### Incremento 4 - Kairos visual y experiencia operativa
 
@@ -432,8 +600,12 @@ Como no se proporcionaron nombres, se usan identificadores de rol. El reparto si
 
 **Propiedad principal:** colaboración y archivos.
 
-- Crear la abstracción de almacenamiento S3-compatible y configuración local de MinIO.
-- Implementar el pipeline compartido de cuarentena, validación de tipo/firma/tamaño, huella, scanner, reintentos, promoción privada y eliminación de archivos rechazados.
+- **Implementado — almacenamiento seguro:** la abstracción S3-compatible usa dos buckets privados (`quarantine` y `available`), con configuración local de MinIO y readiness que comprueba almacenamiento y scanner cuando están habilitados. Compose provisiona ambos buckets sin acceso anónimo.
+- **Implementado — pipeline técnico de archivos:** la recepción aplica límite de tamaño, streaming acotado a spool temporal con permisos restringidos, SHA-256 y validación de PDF, JPEG, texto UTF-8 y STL ASCII/binario; rechaza ZIP, firmas incompatibles, archivos truncados y dobles extensiones. El objeto entra primero en cuarentena y sólo se promueve a `available` después del análisis.
+- **Implementado — análisis asíncrono:** ClamAV analiza desde cuarentena; los estados persistidos incluyen pendiente, análisis, disponible, rechazado y error. El worker reclama trabajos con lease, reintenta errores y marca el agotamiento del máximo de intentos; un reconciliador programado repara promociones incompletas, residuos y objetos huérfanos.
+- **Implementado — descarga autorizada:** la URL firmada sólo se emite para archivos disponibles y exige una capacidad de descarga ligada al recurso, sujeto y propósito, con expiración corta.
+- **Implementado — reportes operativos:** métricas de asistencia, documentos y Kairos con alcance organizacional; CSV directo hasta 5000 filas y jobs asíncronos sobre ese umbral con leases, reintentos, expiración y limpieza, además de almacenamiento privado, descarga por capability, revalidación de estado/permiso/snapshot de alcance, auditoría, OpenAPI, Postman y migración `20260925240000_operational_reports`.
+- **Cerrado en backend:** el gate de reportes registra 513/513 pruebas, `check`, `build` y Prisma válido; frontend y E2E siguen pendientes.
 - Diseñar requisitos y versiones documentales inmutables, retroalimentación, estados aprobados y autorización de descarga.
 - Diseñar proyectos Kairos y miembros con relaciones canónicas y roles internos distintos al rol global.
 - Implementar actividades, participantes, entregas/evidencias inmutables, comentarios, revisión independiente y transiciones de estado.
@@ -441,7 +613,7 @@ Como no se proporcionaron nombres, se usan identificadores de rol. El reparto si
 - Añadir soporte backend de Kanban como vistas/consultas sobre actividades, no como un dominio duplicado.
 - Implementar invitaciones de cuenta, recuperación con tokens independientes, administración/revocación de sesiones, TOTP opcional, códigos de recuperación, Argon2id/lista de bloqueo, centro de notificaciones, correo transaccional, exportaciones asíncronas y directorio interno por alcance.
 - Modelar catálogos académicos y adscripciones versionadas, completamente separados del alcance RBAC de sede/área.
-- Reutilizar almacenamiento, auditoría y notificaciones para la biblioteca operativa versionada, sin introducir edición colaborativa en línea.
+- **Implementado — biblioteca operativa versionada:** categorías aprobadas, scopes `GLOBAL`/`SEDE`/`AREA`/`PROYECTO`, estados `BORRADOR`/`EN_REVISION`/`PUBLICADO`/`ARCHIVADO`, versiones inmutables con separación autor-revisor, motivo de sustitución/archivo y vigencia; archivos privados PDF/DOCX/XLSX/PPTX/JPG/PNG hasta `LIBRARY_MAX_BYTES=25 MiB`, OOXML estructural, scanner, descarga por capability, acuse idempotente por versión sin firma/aceptación legal, notificaciones, auditoría, OpenAPI/Postman y migración `20260925250000_operational_library`. Gate 552/552, `check`, `build` y Prisma válido; frontend y E2E pendientes.
 - Implementar contenido público versionado con componentes permitidos y separación explícita entre archivos públicos y privados.
 - Preparar importadores idempotentes y reportes de conciliación sólo cuando exista una fuente heredada aprobada.
 - Implementar categorías/versiones de retención, bloqueo, retención legal, supresión/anonimización y reaplicación de supresiones después de restaurar respaldos.
@@ -816,17 +988,16 @@ La migración 16B se ejecutará sólo si aparecen fuentes del sistema anterior, 
 
 ## 12. Próximo paso recomendado
 
+El perfil académico/adscripción histórica, el expediente documental funcional, el directorio interno, la base de proyectos/membresías y actividades/evidencias de Kairos, los reportes, la biblioteca, el CMS público, la gamificación privada, la impresión 3D privada, la retención/supresión, operación/auditoría/integridad/observabilidad y recuperación/reconciliación ya están cerrados y verificados en código. También quedaron cerrados el frontend, la integración y los E2E deterministas del alcance de Backend 2. Los dominios de Backend 1 están fuera de este bloque.
+
 El contrato funcional principal ya produjo el primer recorrido backend implementable. El orden recomendado desde este corte es:
 
 **Decisiones funcionales pendientes: ninguna.** Las decisiones externas al control del repositorio se omiten de esta secuencia y se resolverán por separado cuando corresponda; no bloquean los contratos ni la implementación local.
 
-1. Implementar validación individual y autorización masiva verde de máximo 100, con decisiones inmutables.
-2. Sustituir la bolsa agregada provisional por el historial de decisiones de validación y el semáforo definitivo.
-3. Implementar ausencias, calendario y los jobs idempotentes de aviso/cálculo acordados.
-4. Completar auditoría transversal y separación de funciones para validación y correcciones futuras.
-5. Continuar con documentos; en paralelo se mantienen los carriles ya asignados a Backend 2 y Frontend 2.
+1. Fusionar las ramas revisadas hacia la rama de integración definida por el equipo.
+2. Ejecutar el rollout productivo y las operaciones externas sólo con la autorización e infraestructura correspondientes.
 
-El Incremento 1 quedó integrado en `develop`. Backend 1 y Frontend 1 deben continuar con validación, ausencias y calendario sin duplicar las reglas ya centralizadas. En paralelo, Backend 2 puede preparar almacenamiento/documentos y Frontend 2 los componentes de estados y navegación de Kairos. Los cuatro MVP P3 siguen comprometidos, pero comienzan después de estabilizar sus dependencias y no desplazan el núcleo de Servicio Social.
+El Incremento 1 quedó integrado en `develop`. Backend 1 y Frontend 1 deben continuar con validación, ausencias y calendario sin duplicar las reglas ya centralizadas. Backend 2 queda con desarrollo local y validación desplegada terminados; sólo resta rollout/fusión. No debe ampliar alcance ni incorporar visitas o inventario, que permanecen bajo Backend 1.
 
 ## 13. Referencias del repositorio actual
 
@@ -837,7 +1008,12 @@ El Incremento 1 quedó integrado en `develop`. Backend 1 y Frontend 1 deben cont
 - Modelo vigente: [`../backend/prisma/schema.prisma`](../backend/prisma/schema.prisma)
 - Módulos backend: [`../backend/src/app.module.ts`](../backend/src/app.module.ts)
 - Permisos backend: [`../backend/src/auth/permissions.ts`](../backend/src/auth/permissions.ts)
-- Contrato OpenAPI: [`../backend/src/openapi/openapi.document.ts`](../backend/src/openapi/openapi.document.ts)
+- Contrato OpenAPI 3.1: [`../backend/src/openapi/openapi.document.ts`](../backend/src/openapi/openapi.document.ts)
+- Recuperación/reconciliación: [`../backend/src/recovery`](../backend/src/recovery), [`../backend/src/openapi/recovery.openapi.ts`](../backend/src/openapi/recovery.openapi.ts) y [`../backend/prisma/migrations/20260927020000_recovery_reconciliation/migration.sql`](../backend/prisma/migrations/20260927020000_recovery_reconciliation/migration.sql)
+- Identidad MFA/notificaciones: [`../backend/src/auth/mfa.service.ts`](../backend/src/auth/mfa.service.ts) y [`../backend/src/notifications/notifications.service.ts`](../backend/src/notifications/notifications.service.ts)
+- Outbox, entrega SMTP y limpieza: [`../backend/src/auth/outbox.service.ts`](../backend/src/auth/outbox.service.ts), [`../backend/src/auth/outbox-dispatcher.service.ts`](../backend/src/auth/outbox-dispatcher.service.ts), [`../backend/src/auth/email.service.ts`](../backend/src/auth/email.service.ts) y [`../backend/src/auth/identity-cleanup.service.ts`](../backend/src/auth/identity-cleanup.service.ts)
+- Colección y entorno Postman: [`../docs/api/postman/README.md`](../docs/api/postman/README.md), [`../docs/api/postman/ares-backend2.postman_collection.json`](../docs/api/postman/ares-backend2.postman_collection.json) y [`../docs/api/postman/ares-local.postman_environment.json`](../docs/api/postman/ares-local.postman_environment.json)
+- Colección consolidada actual: [`../postman/Ares-Backend.postman_collection.json`](../postman/Ares-Backend.postman_collection.json), incluida la carpeta 20 de recuperación.
 - Tipos frontend: [`../frontend/lib/types.ts`](../frontend/lib/types.ts)
 - Permisos frontend: [`../frontend/lib/permissions.ts`](../frontend/lib/permissions.ts)
 - CI: [`../.github/workflows/ci.yml`](../.github/workflows/ci.yml)

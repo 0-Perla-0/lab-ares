@@ -60,5 +60,5 @@ export async function bootstrapAdmin(
 
 export const activeAdminWhere = {
   rol: RolUsuario.ADMIN,
-  estado: EstadoUsuario.ACTIVO,
+  estado: EstadoUsuario.ACTIVA,
 } as const;

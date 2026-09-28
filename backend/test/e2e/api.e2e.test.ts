@@ -100,7 +100,7 @@ const managedUsers = {
   actualizar: vi.fn(async () => managedUser),
   darDeBaja: vi.fn(async () => ({
     ...managedUser,
-    estado: EstadoUsuario.BAJA,
+    estado: EstadoUsuario.DESACTIVADA,
   })),
 };
 const userRecords = { findById: vi.fn(async () => managedUser) };
@@ -341,7 +341,7 @@ describe("Nest API", () => {
         codigo: " POSTMAN20 ",
         email: " POSTMAN20@ARES.LOCAL ",
         password: "A-secure-password-123!",
-        estado: EstadoUsuario.ACTIVO,
+        estado: EstadoUsuario.ACTIVA,
         sedeId: 1,
         areaId: 2,
         turnoId: 3,
@@ -352,7 +352,7 @@ describe("Nest API", () => {
       email: "postman20@ares.local",
       password: "A-secure-password-123!",
       rol: RolUsuario.PRESTADOR,
-      estado: EstadoUsuario.ACTIVO,
+        estado: EstadoUsuario.ACTIVA,
       sedeId: 1,
       areaId: 2,
       turnoId: 3,
@@ -368,7 +368,7 @@ describe("Nest API", () => {
     });
 
     const deleted = await agent.delete("/api/users/20").expect(200);
-    expect(deleted.body.data.estado).toBe(EstadoUsuario.BAJA);
+    expect(deleted.body.data.estado).toBe(EstadoUsuario.DESACTIVADA);
     expect(deleted.body.data).not.toHaveProperty("passwordHash");
   });
 
@@ -394,7 +394,7 @@ function createUser(id: number, email: string, rol: RolUsuario) {
     codigo: `USER${id}`,
     email,
     rol,
-    estado: EstadoUsuario.ACTIVO,
+    estado: EstadoUsuario.ACTIVA,
     sedeId: null,
     areaId: null,
     turnoId: null,

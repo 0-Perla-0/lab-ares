@@ -1,0 +1,1189 @@
+{
+  "info": {
+    "name": "Ares Backend 2",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api"
+    },
+    {
+      "key": "userId",
+      "value": ""
+    },
+    {
+      "key": "sessionId",
+      "value": ""
+    },
+    {
+      "key": "invitationId",
+      "value": ""
+    },
+    {
+      "key": "notificationId",
+      "value": ""
+    },
+    {
+      "key": "invitationToken",
+      "value": ""
+    },
+    {
+      "key": "recoveryToken",
+      "value": ""
+    },
+    {
+      "key": "mfaChallenge",
+      "value": ""
+    },
+    { "key": "documentRequirementId", "value": "" },
+    { "key": "documentVersionId", "value": "" },
+    { "key": "documentFileId", "value": "" },
+    { "key": "projectId", "value": "" },
+    { "key": "memberUserId", "value": "" },
+    { "key": "activityId", "value": "" },
+    { "key": "evidenceId", "value": "" },
+    { "key": "activityFileId", "value": "" }
+    ,{ "key": "reportJobId", "value": "" }
+    ,{ "key": "libraryDocumentId", "value": "" }
+    ,{ "key": "libraryVersionId", "value": "" }
+    ,{ "key": "libraryFileId", "value": "" }
+    ,{ "key": "libraryNextFileId", "value": "" }
+    ,{ "key": "librarySedeId", "value": "" }
+    ,{ "key": "libraryAreaId", "value": "" }
+    ,{ "key": "publicPageId", "value": "" }
+    ,{ "key": "publicVersionId", "value": "" }
+    ,{ "key": "publicAssetFileId", "value": "" }
+    ,{ "key": "publicAssetId", "value": "" }
+    ,{ "key": "gamificationUserId", "value": "" }
+    ,{ "key": "gamificationEventId", "value": "" }
+    ,{ "key": "printingFileId", "value": "" }
+    ,{ "key": "printingJobId", "value": "" }
+    ,{ "key": "printingOperatorId", "value": "1" }
+    ,{ "key": "printingExecutionId", "value": "" }
+    ,{ "key": "retentionRuleId", "value": "" }
+    ,{ "key": "retentionRecordId", "value": "" }
+    ,{ "key": "retentionHoldId", "value": "" }
+    ,{ "key": "retentionRequestId", "value": "" }
+    ,{ "key": "retentionBatchId", "value": "" }
+    ,{ "key": "retentionPauseBatchId", "value": "" }
+    ,{ "key": "retentionSubjectId", "value": "1" }
+    ,{ "key": "retentionSyntheticResourceId", "value": "" }
+    ,{ "key": "fixtureFilePath", "value": "" }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "pm.request.headers.upsert({key:'Accept', value:'application/json'});"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const success=[200,201,204]; const negative=[400,401,403,404,409,422,429,500,503]; pm.test('status is documented',()=>pm.expect([...success,...negative]).to.include(pm.response.code));",
+          "const j=(()=>{try{return pm.response.json()}catch{return null}})(); if(success.includes(pm.response.code)&&pm.response.code!==204){pm.test('success envelope',()=>pm.expect(j).to.have.property('data'));} if(negative.includes(pm.response.code)){pm.test('structured error',()=>pm.expect(j).to.be.an('object'));}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"{{email}}\",\"password\":\"{{password}}\"}"
+            },
+            "url": "{{baseUrl}}/auth/login"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                  "const j=pm.response.json(); pm.expect(j).to.have.property('data'); if(j.data?.challenge) pm.collectionVariables.set('mfaChallenge',j.data.challenge);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Current user",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/auth/me"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                  "pm.expect(pm.response.json()).to.have.property('data');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/auth/logout"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 204',()=>pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Request recovery",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"{{email}}\"}"
+            },
+            "url": "{{baseUrl}}/auth/recovery/request"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                  "pm.expect(pm.response.json()).to.have.property('data');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reset recovery (token from Mailpit)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"token\":\"{{recoveryToken}}\",\"password\":\"{{newPassword}}\"}"
+            },
+            "url": "{{baseUrl}}/auth/recovery/reset"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                  "pm.expect(pm.response.json()).to.have.property('data');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Change password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"currentPassword\":\"{{password}}\",\"newPassword\":\"{{newPassword}}\"}"
+            },
+            "url": "{{baseUrl}}/auth/password/change"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                  "pm.expect(pm.response.json()).to.have.property('data');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List sessions",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/auth/sessions"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                  "const j=pm.response.json(); pm.expect(j).to.have.property('data'); if(j.data?.[0]?.id) pm.environment.set('sessionId',j.data[0].id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Revoke session",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/auth/sessions/{{sessionId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 204',()=>pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Revoke other sessions",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/auth/sessions/others"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 204',()=>pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "MFA",
+      "item": [
+        {
+          "name": "MFA status",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/auth/mfa"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                  "pm.expect(pm.response.json()).to.have.property('data');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "MFA setup",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/auth/mfa/setup"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                  "pm.expect(pm.response.json()).to.have.property('data');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "MFA enable",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"code\":\"{{otpCode}}\"}"
+            },
+            "url": "{{baseUrl}}/auth/mfa/enable"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                  "pm.expect(pm.response.json()).to.have.property('data');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "MFA verify challenge",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"challenge\":\"{{mfaChallenge}}\",\"code\":\"{{otpCode}}\"}"
+            },
+            "url": "{{baseUrl}}/auth/mfa/verify"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                  "pm.expect(pm.response.json()).to.have.property('data');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "MFA recovery challenge",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"challenge\":\"{{mfaChallenge}}\",\"code\":\"{{recoveryCode}}\"}"
+            },
+            "url": "{{baseUrl}}/auth/mfa/recovery"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                  "pm.expect(pm.response.json()).to.have.property('data');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "MFA disable",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"password\":\"{{password}}\",\"code\":\"{{otpCode}}\"}"
+            },
+            "url": "{{baseUrl}}/auth/mfa/disable"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                  "pm.expect(pm.response.json()).to.have.property('data');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Regenerate recovery codes",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"password\":\"{{password}}\",\"code\":\"{{otpCode}}\"}"
+            },
+            "url": "{{baseUrl}}/auth/mfa/recovery-codes/regenerate"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                  "pm.expect(pm.response.json()).to.have.property('data');"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Invitations",
+      "item": [
+        {
+          "name": "Create invitation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"targetEmail\":\"{{inviteEmail}}\",\"role\":\"{{inviteRole}}\"}"
+            },
+            "url": "{{baseUrl}}/invitations"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 201',()=>pm.response.to.have.status(201));",
+                  "const j=pm.response.json(); pm.expect(j).to.have.property('data'); pm.expect(j.data).not.to.have.property('token'); if(j.data?.id) pm.environment.set('invitationId',j.data.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List invitations",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/invitations"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                  "const j=pm.response.json(); pm.expect(j).to.have.property('data'); if(j.data?.[0]?.id) pm.environment.set('invitationId',j.data[0].id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get invitation",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/invitations/{{invitationToken}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                  "pm.expect(pm.response.json()).to.have.property('data');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Accept invitation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"codigo\":\"{{inviteCode}}\",\"password\":\"{{newPassword}}\"}"
+            },
+            "url": "{{baseUrl}}/invitations/{{invitationToken}}/accept"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 201',()=>pm.response.to.have.status(201));",
+                  "pm.expect(pm.response.json()).to.have.property('data');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Revoke invitation",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/invitations/{{invitationId}}/revoke"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                  "pm.expect(pm.response.json()).to.have.property('data');"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "List notifications",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/notifications?page=1&limit=20"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                  "const j=pm.response.json(); pm.expect(j).to.have.property('data'); if(j.data?.[0]?.id) pm.environment.set('notificationId',j.data[0].id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mark notification read",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/notifications/{{notificationId}}/read"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                  "pm.expect(pm.response.json()).to.have.property('data');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mark all notifications read",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/notifications/read-all"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                  "pm.expect(pm.response.json()).to.have.property('data');"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "08 - Perfil académico",
+      "item": [
+        {
+          "name": "Catálogos académicos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/academic/catalogs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "academic",
+                "catalogs"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text",
+                "exec": [
+                  "pm.response.to.have.status(200);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Consultar mi perfil académico",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/academic/profile/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "academic",
+                "profile",
+                "me"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text",
+                "exec": [
+                  "pm.response.to.have.status(200);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Solicitar cambio de adscripción",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/academic/profile/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "academic",
+                "profile",
+                "me"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"institucionId\":1,\"unidadAcademicaId\":1,\"programaAcademicoId\":1,\"cohorteId\":1,\"inicio\":\"2026-01-01\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text",
+                "exec": [
+                  "pm.response.to.have.status(200);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear institución",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/academic/catalogs/institucion",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "academic",
+                "catalogs",
+                "institucion"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nombre\":\"Institución de prueba\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text",
+                "exec": [
+                  "pm.response.to.have.status(201);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Confirmar solicitud",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/academic/profile/requests/1/confirm",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "academic",
+                "profile",
+                "requests",
+                "1",
+                "confirm"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"accept\":true}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text",
+                "exec": [
+                  "pm.response.to.have.status(200);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Solicitudes pendientes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/academic/requests/pending?page=1&pageSize=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "academic",
+                "requests",
+                "pending?page=1&pageSize=50"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text",
+                "exec": [
+                  "pm.response.to.have.status(200);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Historial académico propio",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/academic/profile/me/history?page=1&pageSize=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "academic",
+                "profile",
+                "me",
+                "history?page=1&pageSize=50"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text",
+                "exec": [
+                  "pm.response.to.have.status(200);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Rechazar solicitud capturada",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/academic/profile/requests/{{academicRequestId}}/confirm",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "academic",
+                "profile",
+                "requests",
+                "{{academicRequestId}}",
+                "confirm"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"accept\":false,\"motivo\":\"Datos por corregir\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text",
+                "exec": [
+                  "pm.response.to.have.status(200);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear unidad",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/academic/catalogs/unidad",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "academic",
+                "catalogs",
+                "unidad"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nombre\":\"Prueba\",\"parentId\":1}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text",
+                "exec": [
+                  "pm.response.to.have.status(201);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear programa",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/academic/catalogs/programa",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "academic",
+                "catalogs",
+                "programa"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nombre\":\"Prueba\",\"parentId\":1}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text",
+                "exec": [
+                  "pm.response.to.have.status(201);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear cohorte",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/academic/catalogs/cohorte",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "academic",
+                "catalogs",
+                "cohorte"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nombre\":\"Prueba\",\"parentId\":1}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text",
+                "exec": [
+                  "pm.response.to.have.status(201);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+    ,{
+      "name": "Private files",
+      "description": "Multipart upload enters quarantine and is scanned asynchronously. Use the returned activityFileId only after GET /files/{id} reports DISPONIBLE.",
+      "item": [
+        { "name": "Upload private file (local fixture)", "request": { "method": "POST", "header": [], "body": { "mode": "formdata", "formdata": [{ "key": "file", "type": "file", "src": "{{fixtureFilePath}}" }] }, "url": "{{baseUrl}}/files" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([201,400,413,415]).to.include(pm.response.code);", "if(pm.response.code===201) { const id=pm.response.json().data.id; pm.expect(id).to.match(/^[a-f0-9]{30}$/); pm.collectionVariables.set('activityFileId',id); }"] } }] },
+        { "name": "Get scan status", "request": { "method": "GET", "url": "{{baseUrl}}/files/{{activityFileId}}" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,404]).to.include(pm.response.code);", "if(pm.response.code===200) pm.expect(['RECIBIDO','PENDIENTE_ANALISIS','ANALIZANDO','DISPONIBLE','RECHAZADO','ERROR_ANALISIS','ELIMINADO']).to.include(pm.response.json().data.status);"] } }] }
+      ]
+    },
+    {
+      "name": "Documents",
+      "item": [
+        { "name": "List requirements", "request": { "method": "GET", "url": "{{baseUrl}}/documents?userId={{userId}}&page=1&pageSize=50" }, "event": [{ "listen": "test", "script": { "exec": ["pm.response.to.have.status(200);", "const d=pm.response.json().data; pm.expect(d).to.have.property('items'); if(d.items?.[0]?.id) pm.collectionVariables.set('documentRequirementId', d.items[0].id); const fileId=d.items?.[0]?.versiones?.[0]?.archivo?.id ?? d.items?.[0]?.versiones?.[0]?.archivoId; if(fileId) pm.collectionVariables.set('documentFileId', fileId);"] } }] },
+        { "name": "Create requirement (reviewer)", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"usuarioId\":{{userId}},\"codigo\":\"INE\",\"nombre\":\"Identificación oficial\",\"obligatorio\":true}" }, "url": "{{baseUrl}}/documents/requirements" }, "event": [{ "listen": "test", "script": { "exec": ["pm.response.to.have.status(201);", "pm.collectionVariables.set('documentRequirementId', pm.response.json().data.id);"] } }] },
+        { "name": "Upload available file for review", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"requisitoId\":{{documentRequirementId}},\"archivoId\":\"{{documentFileId}}\"}" }, "url": "{{baseUrl}}/documents/versions" }, "event": [{ "listen": "test", "script": { "exec": ["pm.response.to.have.status(201);", "pm.collectionVariables.set('documentVersionId', pm.response.json().data.id);"] } }] },
+        { "name": "Review version", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"estado\":\"AUTORIZADO\"}" }, "url": "{{baseUrl}}/documents/versions/{{documentVersionId}}/review" }, "event": [{ "listen": "test", "script": { "exec": ["pm.response.to.have.status(200);"] } }] },
+        { "name": "Download authorized version", "request": { "method": "GET", "url": "{{baseUrl}}/documents/versions/{{documentVersionId}}/download" }, "event": [{ "listen": "test", "script": { "exec": ["pm.response.to.have.status(200);", "pm.expect(pm.response.json().data).to.be.a('string');"] } }] }
+      ]
+    }
+    ,{
+      "name": "Kairos - proyectos, miembros y favoritos",
+      "description": "Flujo encadenable; requiere sesión activa y permisos de creación para crear proyecto.",
+      "item": [
+        { "name": "Crear proyecto", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"nombre\":\"Proyecto Kairos {{$timestamp}}\",\"prioridad\":\"MEDIA\"}" }, "url": "{{baseUrl}}/kairos/projects" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('Proyecto creado',()=>pm.response.to.have.status(201));", "if(pm.response.code===201) pm.collectionVariables.set('projectId',pm.response.json().data.id);"] } }] },
+        { "name": "Listar proyectos paginado/búsqueda/favoritos", "request": { "method": "GET", "url": "{{baseUrl}}/kairos/projects?page=1&pageSize=20&search=Proyecto&favorite=false" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('Listado Kairos',()=>pm.response.to.have.status(200));", "pm.expect(pm.response.json().data).to.have.property('items');"] } }] },
+        { "name": "Consultar proyecto y miembros", "request": { "method": "GET", "url": "{{baseUrl}}/kairos/projects/{{projectId}}" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('Detalle Kairos',()=>pm.response.to.have.status(200));", "pm.expect(pm.response.json().data).to.have.property('miembros');"] } }] },
+        { "name": "Agregar miembro", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"usuarioId\":{{memberUserId}},\"rol\":\"COLABORADOR\"}" }, "url": "{{baseUrl}}/kairos/projects/{{projectId}}/members" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('Miembro creado o conflicto',()=>pm.expect([201,409]).to.include(pm.response.code));"] } }] },
+        { "name": "Cambiar rol", "request": { "method": "PATCH", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"rol\":\"OBSERVADOR\"}" }, "url": "{{baseUrl}}/kairos/projects/{{projectId}}/members/{{memberUserId}}" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('Rol actualizado o conflicto documentado',()=>pm.expect([200,404,409]).to.include(pm.response.code));"] } }] },
+        { "name": "Marcar favorito", "request": { "method": "PUT", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"enabled\":true}" }, "url": "{{baseUrl}}/kairos/projects/{{projectId}}/favorite" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('Favorito actualizado',()=>pm.response.to.have.status(200));"] } }] },
+        { "name": "Actualizar proyecto", "request": { "method": "PATCH", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"estado\":\"ACTIVO\"}" }, "url": "{{baseUrl}}/kairos/projects/{{projectId}}" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('Proyecto actualizado',()=>pm.response.to.have.status(200));"] } }] },
+        { "name": "Archivar proyecto", "request": { "method": "POST", "url": "{{baseUrl}}/kairos/projects/{{projectId}}/archive" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('Proyecto archivado',()=>pm.response.to.have.status(200));"] } }] },
+        { "name": "Transferir propiedad atómicamente", "request": { "method": "POST", "url": "{{baseUrl}}/kairos/projects/{{projectId}}/members/{{memberUserId}}/transfer" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('Propiedad transferida o conflicto documentado',()=>pm.expect([200,403,404,409]).to.include(pm.response.code));"] } }] },
+        { "name": "Quitar miembro", "request": { "method": "DELETE", "url": "{{baseUrl}}/kairos/projects/{{projectId}}/members/{{memberUserId}}" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('Miembro removido o conflicto documentado',()=>pm.expect([200,404,409]).to.include(pm.response.code));"] } }] }
+        ,{ "name": "Crear actividad", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"title\":\"Actividad Kairos {{$timestamp}}\",\"description\":\"Entrega de prueba\",\"priority\":\"MEDIA\",\"complexity\":\"MEDIA\",\"responsableId\":{{userId}}}" }, "url": "{{baseUrl}}/kairos/projects/{{projectId}}/activities" }, "event": [{ "listen": "test", "script": { "exec": ["pm.response.to.have.status(201);", "pm.collectionVariables.set('activityId',pm.response.json().data.id);"] } }] },
+        { "name": "Listar actividades", "request": { "method": "GET", "url": "{{baseUrl}}/kairos/projects/{{projectId}}/activities" }, "event": [{ "listen": "test", "script": { "exec": ["pm.response.to.have.status(200);", "pm.expect(pm.response.json().data.items).to.be.an('array');"] } }] },
+        { "name": "Consultar actividad", "request": { "method": "GET", "url": "{{baseUrl}}/kairos/projects/{{projectId}}/activities/{{activityId}}" }, "event": [{ "listen": "test", "script": { "exec": ["pm.response.to.have.status(200);", "pm.expect(pm.response.json().data).to.have.property('vencida');"] } }] },
+        { "name": "Actualizar actividad pendiente", "request": { "method": "PATCH", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"description\":\"Actualizada\"}" }, "url": "{{baseUrl}}/kairos/projects/{{projectId}}/activities/{{activityId}}" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,400,403]).to.include(pm.response.code);"] } }] },
+        { "name": "Transicionar a EN_PROGRESO", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"state\":\"EN_PROGRESO\"}" }, "url": "{{baseUrl}}/kairos/projects/{{projectId}}/activities/{{activityId}}/transition" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,400,403]).to.include(pm.response.code);"] } }] },
+        { "name": "Entregar evidencia inmutable", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"archivoId\":\"{{activityFileId}}\",\"comment\":\"Entrega inicial\"}" }, "url": "{{baseUrl}}/kairos/projects/{{projectId}}/activities/{{activityId}}/submit" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,400,403]).to.include(pm.response.code);", "if(pm.response.code===200) pm.collectionVariables.set('evidenceId',pm.response.json().data.id);"] } }] },
+        { "name": "Revisar actividad", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"state\":\"TERMINADA\",\"comment\":\"Aprobada\"}" }, "url": "{{baseUrl}}/kairos/projects/{{projectId}}/activities/{{activityId}}/review" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,400,403]).to.include(pm.response.code);"] } }] },
+        { "name": "Reabrir actividad con motivo", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"reason\":\"Corrección solicitada\"}" }, "url": "{{baseUrl}}/kairos/projects/{{projectId}}/activities/{{activityId}}/reopen" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,400,403]).to.include(pm.response.code);"] } }] },
+        { "name": "Historial inmutable paginado", "request": { "method": "GET", "url": "{{baseUrl}}/kairos/projects/{{projectId}}/activities/{{activityId}}/history?page=1&pageSize=50" }, "event": [{ "listen": "test", "script": { "exec": ["pm.response.to.have.status(200);", "pm.expect(pm.response.json().data.items).to.be.an('array');", "pm.expect(pm.response.json().data).to.have.property('total');"] } }] },
+        { "name": "Listar evidencias paginado", "request": { "method": "GET", "url": "{{baseUrl}}/kairos/projects/{{projectId}}/activities/{{activityId}}/evidence?page=1&pageSize=50" }, "event": [{ "listen": "test", "script": { "exec": ["pm.response.to.have.status(200);", "pm.expect(pm.response.json().data.items).to.be.an('array');"] } }] },
+        { "name": "Descargar evidencia autorizada", "request": { "method": "GET", "url": "{{baseUrl}}/kairos/projects/{{projectId}}/activities/{{activityId}}/evidence/{{evidenceId}}/download" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,400,404]).to.include(pm.response.code);"] } }] },
+        { "name": "Listar comentarios paginado", "request": { "method": "GET", "url": "{{baseUrl}}/kairos/projects/{{projectId}}/activities/{{activityId}}/comments?page=1&pageSize=50" }, "event": [{ "listen": "test", "script": { "exec": ["pm.response.to.have.status(200);", "pm.expect(pm.response.json().data.items).to.be.an('array');"] } }] },
+        { "name": "Agregar comentario", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"body\":\"Comentario de seguimiento\"}" }, "url": "{{baseUrl}}/kairos/projects/{{projectId}}/activities/{{activityId}}/comments" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([201,400,403]).to.include(pm.response.code);"] } }] }
+      ]
+    }
+    ,{
+      "name": "Kairos - Kanban projection",
+      "description": "Read-only projection over activities. Requires active membership; archived projects remain readable. Seven canonical lanes are returned.",
+      "item": [
+        { "name": "Consultar tablero Kanban (7 carriles)", "request": { "method": "GET", "url": "{{baseUrl}}/kairos/projects/{{projectId}}/kanban?limitPerLane=20&vencida=false" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('Kanban accesible',()=>pm.response.to.have.status(200));", "const data=pm.response.json().data;", "pm.expect(data.lanes).to.have.length(7);", "pm.expect(data.lanes.map(l=>l.state)).to.eql(['PENDIENTE','EN_PROGRESO','BLOQUEADA','EN_REVISION','REQUIERE_CORRECCION','TERMINADA','CANCELADA']);", "pm.expect(data.lanes[0]).to.have.all.keys('state','total','items');"] } }] },
+        { "name": "Filtrar Kanban por responsable/prioridad", "request": { "method": "GET", "url": "{{baseUrl}}/kairos/projects/{{projectId}}/kanban?responsableId={{userId}}&priority=MEDIA&complexity=MEDIA&limitPerLane=5" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('Filtro Kanban',()=>pm.response.to.have.status(200));", "pm.expect(pm.response.json().data.lanes).to.have.length(7);"] } }] }
+      ]
+    },
+    {
+      "name": "Directory - privacidad y preferencias",
+      "description": "Requiere sesión activa y permission directory:read. scope=all solo para roles globales; projectId es CUID y obligatorio con scope=project. El email respeta mostrarEmail, salvo el propio usuario.",
+      "item": [
+        { "name": "Listar directorio por área", "request": { "method": "GET", "url": "{{baseUrl}}/directory?scope=area&page=1&pageSize=20" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('Directorio por área',()=>pm.response.to.have.status(200));", "pm.expect(pm.response.json().data).to.have.all.keys('items','page','pageSize','total');"] } }] },
+        { "name": "Listar directorio por proyecto", "request": { "method": "GET", "url": "{{baseUrl}}/directory?scope=project&projectId={{projectId}}&q=&page=1&pageSize=20" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('Directorio por proyecto',()=>pm.expect([200,403,404]).to.include(pm.response.code));"] } }] },
+        { "name": "Listar directorio global", "request": { "method": "GET", "url": "{{baseUrl}}/directory?scope=all&page=1&pageSize=20" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('Directorio global autorizado o denegado',()=>pm.expect([200,403]).to.include(pm.response.code));"] } }] },
+        { "name": "Consultar mis preferencias", "request": { "method": "GET", "url": "{{baseUrl}}/directory/preferences/me" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('Preferencias consultadas',()=>pm.response.to.have.status(200));", "pm.expect(pm.response.json().data).to.have.all.keys('visibleEnArea','visibleEnProyectos','mostrarEmail');"] } }] },
+        { "name": "Actualizar mis preferencias", "request": { "method": "PATCH", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"visibleEnArea\":true,\"visibleEnProyectos\":true,\"mostrarEmail\":false}" }, "url": "{{baseUrl}}/directory/preferences/me" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('Preferencias actualizadas',()=>pm.response.to.have.status(200));", "pm.expect(pm.response.json().data).to.have.property('mostrarEmail');"] } }] }
+      ]
+    },
+    {
+      "name": "Reports - métricas y exportación",
+      "description": "Requiere reports:read para métricas y reports:export para exportaciones. Hasta 5,000 filas devuelve CSV síncrono; por encima crea un trabajo asíncrono.",
+      "item": [
+        { "name": "Consultar métricas operativas", "request": { "method": "GET", "url": "{{baseUrl}}/reports/operational-metrics" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('Métricas consultadas',()=>pm.response.to.have.status(200));", "const data=pm.response.json().data; pm.expect(data).to.have.all.keys('attendance','documents','kairos');", "pm.expect(data.kairos).to.have.all.keys('byState','overdue');"] } }] },
+        { "name": "Solicitar exportación Kairos", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"type\":\"KAIROS\"}" }, "url": "{{baseUrl}}/reports/export" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('Exportación síncrona o encolada',()=>pm.expect([200,202]).to.include(pm.response.code));", "if(pm.response.code===202){const id=pm.response.json().data.id; pm.expect(id).to.match(/^[a-z0-9]{20,30}$/); pm.collectionVariables.set('reportJobId',id);}", "if(pm.response.code===200){pm.expect(pm.response.headers.get('Content-Type')).to.include('text/csv');}"] } }] },
+        { "name": "Consultar estado de exportación", "request": { "method": "GET", "url": "{{baseUrl}}/reports/export/{{reportJobId}}/status" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('Estado válido o id aún no disponible',()=>pm.expect([200,400,404]).to.include(pm.response.code));", "if(pm.response.code===200){pm.expect(['PENDIENTE','PROCESANDO','COMPLETADO','FALLIDO','EXPIRADO']).to.include(pm.response.json().data.status);}"] } }] },
+        { "name": "Obtener enlace de descarga", "request": { "method": "GET", "url": "{{baseUrl}}/reports/export/{{reportJobId}}/download" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('Descarga disponible o trabajo no listo',()=>pm.expect([200,400,404]).to.include(pm.response.code));", "if(pm.response.code===200){pm.expect(pm.response.json().data.url).to.be.a('string').and.not.empty;}"] } }] }
+      ]
+    },
+    {
+      "name": "Library - biblioteca operativa versionada",
+      "description": "Carga primero cada archivo por /files y espera estado DISPONIBLE. Completa libraryFileId/libraryNextFileId y los ids de sede/área. El flujo requiere cambiar entre autor, revisor/publicador y lector según RBAC.",
+      "item": [
+        { "name": "Listar biblioteca visible", "request": { "method": "GET", "url": "{{baseUrl}}/library?page=1&pageSize=20&q=&categoria=MANUAL" }, "event": [{ "listen": "test", "script": { "exec": ["pm.response.to.have.status(200);", "pm.expect(pm.response.json().data).to.have.all.keys('items','page','pageSize','total');"] } }] },
+        { "name": "Crear documento y versión 1", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"titulo\":\"Manual Postman\",\"categoria\":\"MANUAL\",\"alcance\":\"AREA\",\"sedeId\":{{librarySedeId}},\"areaId\":{{libraryAreaId}},\"requiereAcuse\":true,\"archivoId\":\"{{libraryFileId}}\",\"resumenCambios\":\"Versión inicial\"}" }, "url": "{{baseUrl}}/library" }, "event": [{ "listen": "test", "script": { "exec": ["pm.test('Documento creado o precondición explícita',()=>pm.expect([201,400,403,404,409]).to.include(pm.response.code));", "if(pm.response.code===201){const d=pm.response.json().data;pm.collectionVariables.set('libraryDocumentId',d.id);pm.collectionVariables.set('libraryVersionId',d.versiones[0].id);}"] } }] },
+        { "name": "Consultar documento", "request": { "method": "GET", "url": "{{baseUrl}}/library/{{libraryDocumentId}}" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,400,404]).to.include(pm.response.code);"] } }] },
+        { "name": "Agregar nueva versión", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"archivoId\":\"{{libraryNextFileId}}\",\"resumenCambios\":\"Actualización controlada\"}" }, "url": "{{baseUrl}}/library/{{libraryDocumentId}}/versions" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([201,400,403,404,409]).to.include(pm.response.code);", "if(pm.response.code===201){pm.collectionVariables.set('libraryVersionId',pm.response.json().data.id);}"] } }] },
+        { "name": "Enviar versión a revisión", "request": { "method": "POST", "url": "{{baseUrl}}/library/versions/{{libraryVersionId}}/submit-review" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,400,403,404,409]).to.include(pm.response.code);"] } }] },
+        { "name": "Aprobar revisión independiente", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"decision\":\"APPROVE\",\"retroalimentacion\":\"Contrato revisado\"}" }, "url": "{{baseUrl}}/library/versions/{{libraryVersionId}}/review" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,400,403,404,409]).to.include(pm.response.code);"] } }] },
+        { "name": "Publicar versión", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{}" }, "url": "{{baseUrl}}/library/versions/{{libraryVersionId}}/publish" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,400,403,404,409]).to.include(pm.response.code);"] } }] },
+        { "name": "Descargar versión autorizada", "request": { "method": "GET", "url": "{{baseUrl}}/library/versions/{{libraryVersionId}}/download" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,400,404]).to.include(pm.response.code);", "if(pm.response.code===200){pm.expect(pm.response.json().data.url).to.be.a('string').and.not.empty;}"] } }] },
+        { "name": "Registrar acuse idempotente", "request": { "method": "POST", "url": "{{baseUrl}}/library/versions/{{libraryVersionId}}/acknowledge" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,400,403,404]).to.include(pm.response.code);", "if(pm.response.code===200){pm.expect(pm.response.json().data).to.have.property('acknowledgedAt');}"] } }] },
+        { "name": "Archivar documento con motivo", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"motivo\":\"Sustituido por una política posterior\"}" }, "url": "{{baseUrl}}/library/{{libraryDocumentId}}/archive" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,400,403,404,409]).to.include(pm.response.code);"] } }] }
+      ]
+    },
+    {
+      "name": "Public Content - CMS seguro",
+      "description": "CMS público versionado con bloques controlados. Crear borradores requiere permiso; publicar/archivar requiere ADMIN. Los JPG/PNG públicos se copian a un bucket separado.",
+      "item": [
+        { "name": "Consultar Inicio publicado (sin sesión)", "request": { "method": "GET", "url": "{{baseUrl}}/public-content/pages/inicio" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,404]).to.include(pm.response.code);", "if(pm.response.code===200){const d=pm.response.json().data;pm.expect(d.estado).to.eql('PUBLICADO');pm.expect(d.bloques).to.be.an('array');}"] } }] },
+        { "name": "Consultar FAQ publicada (sin sesión)", "request": { "method": "GET", "url": "{{baseUrl}}/public-content/faq" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,404]).to.include(pm.response.code);", "if(pm.response.code===200){pm.response.json().data.bloques.forEach(b=>pm.expect(b.tipo).to.eql('FAQ'));}"] } }] },
+        { "name": "Clasificar imagen pública", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"archivoId\":\"{{publicAssetFileId}}\"}" }, "url": "{{baseUrl}}/public-content/admin/assets" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([201,400,403,409]).to.include(pm.response.code);", "if(pm.response.code===201)pm.collectionVariables.set('publicAssetId',pm.response.json().data.id);"] } }] },
+        { "name": "Crear página Inicio y versión 1", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"slug\":\"inicio\",\"titulo\":\"Ares\",\"resumenCambios\":\"Versión inicial\",\"seoTitulo\":\"Ares Servicio Social\",\"seoDescripcion\":\"Portal institucional Ares\",\"bloques\":[{\"orden\":0,\"tipo\":\"ENCABEZADO\",\"contenido\":{\"texto\":\"Ares\",\"nivel\":1}},{\"orden\":1,\"tipo\":\"TEXTO\",\"contenido\":{\"texto\":\"Información institucional autorizada.\"}}]}" }, "url": "{{baseUrl}}/public-content/admin/pages" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([201,403,409]).to.include(pm.response.code);", "if(pm.response.code===201){const d=pm.response.json().data;pm.collectionVariables.set('publicPageId',d.id);pm.collectionVariables.set('publicVersionId',d.versiones[0].id);}"] } }] },
+        { "name": "Listar páginas CMS", "request": { "method": "GET", "url": "{{baseUrl}}/public-content/admin/pages?page=1&pageSize=20" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,403]).to.include(pm.response.code);", "if(pm.response.code===200)pm.expect(pm.response.json().data).to.have.all.keys('items','total','page','pageSize');"] } }] },
+        { "name": "Consultar historial CMS", "request": { "method": "GET", "url": "{{baseUrl}}/public-content/admin/pages/{{publicPageId}}" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,400,403,404]).to.include(pm.response.code);"] } }] },
+        { "name": "Publicar versión (ADMIN)", "request": { "method": "POST", "url": "{{baseUrl}}/public-content/admin/versions/{{publicVersionId}}/publish" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,400,403,404,409]).to.include(pm.response.code);"] } }] },
+        { "name": "Crear versión siguiente", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"titulo\":\"Ares actualizado\",\"resumenCambios\":\"Actualización controlada\",\"bloques\":[{\"orden\":0,\"tipo\":\"TEXTO\",\"contenido\":{\"texto\":\"Nueva versión pública.\"}}]}" }, "url": "{{baseUrl}}/public-content/admin/pages/{{publicPageId}}/versions" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([201,400,403,404,409]).to.include(pm.response.code);", "if(pm.response.code===201)pm.collectionVariables.set('publicVersionId',pm.response.json().data.id);"] } }] },
+        { "name": "Archivar página (ADMIN)", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"motivo\":\"Retiro institucional autorizado\"}" }, "url": "{{baseUrl}}/public-content/admin/pages/{{publicPageId}}/archive" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,400,403,404,409]).to.include(pm.response.code);"] } }] }
+      ]
+    },
+    {
+      "name": "Gamification - ledger privado",
+      "description": "MVP Backend 2 privado, desactivado por defecto. Configura GAMIFICATION_ENABLED=true. Sin ranking, moneda, tienda ni recompensas.",
+      "item": [
+        { "name": "Consultar mi perfil privado", "request": { "method": "GET", "url": "{{baseUrl}}/gamification/me" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,503]).to.include(pm.response.code);", "if(pm.response.code===200){const d=pm.response.json().data;pm.expect(d.privado).to.eql(true);pm.expect(d).not.to.have.property('ranking');}"] } }] },
+        { "name": "Consultar mi historial", "request": { "method": "GET", "url": "{{baseUrl}}/gamification/me/history?page=1&pageSize=20" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,503]).to.include(pm.response.code);", "if(pm.response.code===200)pm.expect(pm.response.json().data.items).to.be.an('array');"] } }] },
+        { "name": "Consultar perfil de usuario (ADMIN)", "request": { "method": "GET", "url": "{{baseUrl}}/gamification/admin/users/{{gamificationUserId}}" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,400,403,404,503]).to.include(pm.response.code);"] } }] },
+        { "name": "Consultar historial de usuario (ADMIN)", "request": { "method": "GET", "url": "{{baseUrl}}/gamification/admin/users/{{gamificationUserId}}/history?page=1&pageSize=20" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,400,403,404,503]).to.include(pm.response.code);"] } }] },
+        { "name": "Listar reglas versionadas (ADMIN)", "request": { "method": "GET", "url": "{{baseUrl}}/gamification/admin/rules" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,403,503]).to.include(pm.response.code);"] } }] },
+        { "name": "Crear versión de regla Kairos (ADMIN)", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"codigo\":\"KAIROS_COMPLETADA\",\"origen\":\"KAIROS_TERMINADA\",\"puntos\":100,\"motivo\":\"Ajuste administrativo aprobado\"}" }, "url": "{{baseUrl}}/gamification/admin/rules" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([201,400,403,409,503]).to.include(pm.response.code);"] } }] },
+        { "name": "Listar insignias versionadas (ADMIN)", "request": { "method": "GET", "url": "{{baseUrl}}/gamification/admin/badges" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([200,403,503]).to.include(pm.response.code);"] } }] },
+        { "name": "Crear versión de insignia (ADMIN)", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"codigo\":\"COLABORADOR_DESTACADO\",\"nombre\":\"Colaborador destacado\",\"descripcion\":\"Reconoce mil puntos acumulados\",\"umbralPuntos\":1000,\"motivo\":\"Catálogo institucional\"}" }, "url": "{{baseUrl}}/gamification/admin/badges" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([201,400,403,409,503]).to.include(pm.response.code);"] } }] },
+        { "name": "Otorgar reconocimiento manual idempotente (ADMIN)", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Idempotency-Key", "value": "postman-recognition-{{$timestamp}}" }], "body": { "mode": "raw", "raw": "{\"usuarioId\":{{gamificationUserId}},\"puntos\":25,\"motivo\":\"Reconocimiento administrativo con justificación\"}" }, "url": "{{baseUrl}}/gamification/admin/recognitions" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([201,400,403,404,409,503]).to.include(pm.response.code);", "if(pm.response.code===201)pm.collectionVariables.set('gamificationEventId',pm.response.json().data.id);"] } }] },
+        { "name": "Reversar reconocimiento sin editar original (ADMIN)", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Idempotency-Key", "value": "postman-reversal-{{$timestamp}}" }], "body": { "mode": "raw", "raw": "{\"motivo\":\"Corrección administrativa autorizada\"}" }, "url": "{{baseUrl}}/gamification/admin/events/{{gamificationEventId}}/reverse" }, "event": [{ "listen": "test", "script": { "exec": ["pm.expect([201,400,403,404,409,503]).to.include(pm.response.code);", "if(pm.response.code===201)pm.expect(pm.response.json().data.puntos).to.be.below(0);"] } }] }
+      ]
+    },
+    {
+      "name": "Printing 3D - trabajos y ejecuciones",
+      "description": "Flujo privado de impresión 3D. Requiere PRINTING_3D_ENABLED=true y un STL propio que ya haya pasado cuarentena/antivirus. No realiza slicing, controla impresoras, cotiza, cobra ni admite 3MF. Cambia de usuario según la operación: solicitante para crear/consultar/cancelar y operador o gestor para revisar, asignar y ejecutar.",
+      "item": [
+        {"name":"Crear trabajo con STL disponible","event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.expect([201,400,403,404,409,503]).to.include(pm.response.code);","if(pm.response.code===201)pm.collectionVariables.set('printingJobId',pm.response.json().data.id);"]}}],"request":{"method":"POST","header":[{"key":"Content-Type","value":"application/json"},{"key":"Idempotency-Key","value":"postman-printing-create-{{$timestamp}}"}],"url":"{{baseUrl}}/printing-3d/jobs","description":"El archivo debe pertenecer al solicitante, ser STL y estar DISPONIBLE tras el escaneo.","body":{"mode":"raw","raw":"{\"archivoId\":\"{{printingFileId}}\",\"descripcion\":\"Pieza de demostración para impresión 3D\"}","options":{"raw":{"language":"json"}}}}},
+        {"name":"Listar trabajos visibles","event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.expect([200,403,503]).to.include(pm.response.code);","if(pm.response.code===200)pm.expect(pm.response.json().data.items).to.be.an('array');"]}}],"request":{"method":"GET","header":[],"url":"{{baseUrl}}/printing-3d/jobs?page=1&pageSize=20","description":"El solicitante ve los propios; operadores y gestores solo el alcance autorizado."}},
+        {"name":"Consultar trabajo","event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.expect([200,403,404,503]).to.include(pm.response.code);"]}}],"request":{"method":"GET","header":[],"url":"{{baseUrl}}/printing-3d/jobs/{{printingJobId}}","description":"No revela trabajos fuera del alcance del usuario autenticado."}},
+        {"name":"Iniciar revisión","event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.expect([201,400,403,404,409,503]).to.include(pm.response.code);"]}}],"request":{"method":"POST","header":[{"key":"Content-Type","value":"application/json"},{"key":"Idempotency-Key","value":"postman-printing-review-start-{{$timestamp}}"}],"url":"{{baseUrl}}/printing-3d/jobs/{{printingJobId}}/review","description":"Operación de gestor dentro de su alcance organizacional.","body":{"mode":"raw","raw":"{\"decision\":\"START\",\"observacion\":\"Revisión técnica iniciada\"}","options":{"raw":{"language":"json"}}}}},
+        {"name":"Aprobar trabajo","event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.expect([201,400,403,404,409,503]).to.include(pm.response.code);"]}}],"request":{"method":"POST","header":[{"key":"Content-Type","value":"application/json"},{"key":"Idempotency-Key","value":"postman-printing-review-approve-{{$timestamp}}"}],"url":"{{baseUrl}}/printing-3d/jobs/{{printingJobId}}/review","description":"Para probar rechazo, cambia decision a REJECT y agrega motivo; no ejecutes aprobar y rechazar sobre el mismo trabajo.","body":{"mode":"raw","raw":"{\"decision\":\"APPROVE\",\"observacion\":\"STL apto para impresión\"}","options":{"raw":{"language":"json"}}}}},
+        {"name":"Asignar operador","event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.expect([201,400,403,404,409,503]).to.include(pm.response.code);"]}}],"request":{"method":"POST","header":[{"key":"Content-Type","value":"application/json"},{"key":"Idempotency-Key","value":"postman-printing-assign-{{$timestamp}}"}],"url":"{{baseUrl}}/printing-3d/jobs/{{printingJobId}}/assign","description":"El operador debe estar activo y pertenecer al alcance permitido del gestor.","body":{"mode":"raw","raw":"{\"operadorId\":{{printingOperatorId}}}","options":{"raw":{"language":"json"}}}}},
+        {"name":"Iniciar ejecución","event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.expect([201,400,403,404,409,503]).to.include(pm.response.code);","if(pm.response.code===201)pm.collectionVariables.set('printingExecutionId',pm.response.json().data.ejecucion.id);"]}}],"request":{"method":"POST","header":[{"key":"Content-Type","value":"application/json"},{"key":"Idempotency-Key","value":"postman-printing-execution-start-{{$timestamp}}"}],"url":"{{baseUrl}}/printing-3d/jobs/{{printingJobId}}/executions","description":"Solo el operador asignado puede iniciar un intento de impresión.","body":{"mode":"raw","raw":"{\"material\":\"PLA\"}","options":{"raw":{"language":"json"}}}}},
+        {"name":"Finalizar ejecución exitosa","event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.expect([201,400,403,404,409,503]).to.include(pm.response.code);"]}}],"request":{"method":"POST","header":[{"key":"Content-Type","value":"application/json"},{"key":"Idempotency-Key","value":"postman-printing-execution-success-{{$timestamp}}"}],"url":"{{baseUrl}}/printing-3d/jobs/{{printingJobId}}/executions/{{printingExecutionId}}/finish","description":"Ruta exitosa. Ejecuta esta solicitud o la alternativa fallida, nunca ambas sobre el mismo intento.","body":{"mode":"raw","raw":"{\"resultado\":\"COMPLETADA\",\"pesoGramos\":42,\"observacion\":\"Pieza terminada correctamente\"}","options":{"raw":{"language":"json"}}}}},
+        {"name":"Finalizar ejecución fallida (alternativa)","event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.expect([201,400,403,404,409,503]).to.include(pm.response.code);"]}}],"request":{"method":"POST","header":[{"key":"Content-Type","value":"application/json"},{"key":"Idempotency-Key","value":"postman-printing-execution-failure-{{$timestamp}}"}],"url":"{{baseUrl}}/printing-3d/jobs/{{printingJobId}}/executions/{{printingExecutionId}}/finish","description":"Ruta alternativa para habilitar Reintentar. No la ejecutes si ya finalizaste el mismo intento como exitoso.","body":{"mode":"raw","raw":"{\"resultado\":\"FALLIDA\",\"observacion\":\"Fallo de adherencia registrado por el operador\"}","options":{"raw":{"language":"json"}}}}},
+        {"name":"Reintentar trabajo fallido","event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.expect([201,400,403,404,409,503]).to.include(pm.response.code);"]}}],"request":{"method":"POST","header":[{"key":"Content-Type","value":"application/json"},{"key":"Idempotency-Key","value":"postman-printing-retry-{{$timestamp}}"}],"url":"{{baseUrl}}/printing-3d/jobs/{{printingJobId}}/retry","description":"Solo aplica a un trabajo FALLIDO y conserva el historial de ejecuciones anterior.","body":{"mode":"raw","raw":"{\"motivo\":\"Se corrigió la configuración de adherencia\"}","options":{"raw":{"language":"json"}}}}},
+        {"name":"Cancelar trabajo","event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.expect([201,400,403,404,409,503]).to.include(pm.response.code);"]}}],"request":{"method":"POST","header":[{"key":"Content-Type","value":"application/json"},{"key":"Idempotency-Key","value":"postman-printing-cancel-{{$timestamp}}"}],"url":"{{baseUrl}}/printing-3d/jobs/{{printingJobId}}/cancel","description":"El solicitante puede cancelar antes de imprimir; gestores u operador asignado aplican las reglas del estado actual.","body":{"mode":"raw","raw":"{\"motivo\":\"Cancelación solicitada para la prueba\"}","options":{"raw":{"language":"json"}}}}},
+        {"name":"Descargar STL privado","event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.expect([200,403,404,503]).to.include(pm.response.code);"]}}],"request":{"method":"GET","header":[],"url":"{{baseUrl}}/printing-3d/jobs/{{printingJobId}}/download","description":"Emite una capacidad temporal solo después de volver a validar alcance, propiedad y estado DISPONIBLE del archivo."}}
+      ]
+    }
+    ,{"name":"18 - Retención y supresión privada","description":"Operaciones sensibles solo para ADMIN. Los endpoints /requests/me devuelven exclusivamente las solicitudes del usuario autenticado. Las reglas provisionales son temporales; aprobación institucional requiere RETENTION_INSTITUTIONAL_POLICIES_APPROVED=true. El worker está desactivado por defecto. Usa solo recursos de prueba: la ejecución puede eliminar o anonimizar los recursos registrados. Todas las escrituras exigen Idempotency-Key.","item":[{"name":"Listar reglas versionadas","event":[{"listen":"test","script":{"exec":["pm.response.to.have.status(200);"]}}],"request":{"method":"GET","header":[],"url":"{{baseUrl}}/retention/rules?page=1&pageSize=20"}},{"name":"Crear regla provisional de prueba","event":[{"listen":"test","script":{"exec":["pm.expect([201,400,403,409]).to.include(pm.response.code);","if(pm.response.code===201)pm.collectionVariables.set('retentionRuleId',pm.response.json().data.id);"]}}],"request":{"method":"POST","header":[{"key":"Content-Type","value":"application/json"},{"key":"Idempotency-Key","value":"ret-rule-{{$timestamp}}"}],"body":{"mode":"raw","raw":"{\"categoria\":\"EXPORTACIONES\",\"finalidad\":\"Retención temporal de exportaciones de prueba\",\"responsable\":\"ADMIN de pruebas\",\"eventoInicio\":\"Finalización de exportación de prueba\",\"periodoActivoDias\":1,\"periodoBloqueadoDias\":1,\"accionFinal\":\"ELIMINAR\",\"fundamento\":\"Política provisional acotada a datos sintéticos\",\"provisional\":true,\"automatica\":false}"},"url":"{{baseUrl}}/retention/rules"}},{"name":"Aprobar regla provisional","request":{"method":"POST","header":[{"key":"Idempotency-Key","value":"ret-approve-{{$timestamp}}"},{"key":"Content-Type","value":"application/json"}],"body":{"mode":"raw","raw":"{\"referenciaAprobacion\":\"Aprobación de prueba documentada\"}"},"url":"{{baseUrl}}/retention/rules/{{retentionRuleId}}/approve"},"event":[{"listen":"test","script":{"exec":["pm.expect([200,400,403,404,409]).to.include(pm.response.code);"]}}]},{"name":"Listar registros","request":{"method":"GET","header":[],"url":"{{baseUrl}}/retention/records?page=1&pageSize=20"},"event":[{"listen":"test","script":{"exec":["pm.expect([200,403]).to.include(pm.response.code);"]}}]},{"name":"Registrar recurso sintético","event":[{"listen":"test","script":{"exec":["pm.expect([201,400,403,404,409]).to.include(pm.response.code);","if(pm.response.code===201)pm.collectionVariables.set('retentionRecordId',pm.response.json().data.id);"]}}],"request":{"method":"POST","header":[{"key":"Content-Type","value":"application/json"},{"key":"Idempotency-Key","value":"ret-record-{{$timestamp}}"}],"body":{"mode":"raw","raw":"{\"categoria\":\"EXPORTACIONES\",\"resourceType\":\"ReporteExportacion\",\"resourceId\":\"{{retentionSyntheticResourceId}}\",\"subjectId\":{{retentionSubjectId}},\"triggeredAt\":\"{{$isoTimestamp}}\"}"},"url":"{{baseUrl}}/retention/records","description":"Usa un resourceId de exportación sintética existente y no datos de negocio. El registro por sí mismo no ejecuta supresión."}},{"name":"Listar retenciones legales","request":{"method":"GET","header":[],"url":"{{baseUrl}}/retention/legal-holds?page=1&pageSize=20"},"event":[{"listen":"test","script":{"exec":["pm.expect([200,403]).to.include(pm.response.code);"]}}]},{"name":"Crear hold de prueba","event":[{"listen":"prerequest","script":{"exec":["pm.variables.set('retentionReviewAt', new Date(Date.now() + 7 * 86400000).toISOString());","pm.variables.set('retentionEndsAt', new Date(Date.now() + 14 * 86400000).toISOString());"]}},{"listen":"test","script":{"exec":["if(pm.response.code===201)pm.collectionVariables.set('retentionHoldId',pm.response.json().data.id);"]}}],"request":{"method":"POST","header":[{"key":"Content-Type","value":"application/json"},{"key":"Idempotency-Key","value":"ret-hold-{{$timestamp}}"}],"body":{"mode":"raw","raw":"{\"registroId\":\"{{retentionRecordId}}\",\"motivo\":\"Hold temporal para verificar protección de supresión\",\"responsable\":\"ADMIN de pruebas\",\"reviewAt\":\"{{retentionReviewAt}}\",\"endsAt\":\"{{retentionEndsAt}}\"}"},"url":"{{baseUrl}}/retention/legal-holds","description":"Calcula reviewAt a +7 días y endsAt a +14 días; ambos cumplen la ventana máxima de 366 días."}},{"name":"Liberar hold (opcional)","request":{"method":"POST","header":[{"key":"Content-Type","value":"application/json"},{"key":"Idempotency-Key","value":"ret-release-{{$timestamp}}"}],"body":{"mode":"raw","raw":"{\"motivo\":\"Fin del hold de prueba autorizado\"}"},"url":"{{baseUrl}}/retention/legal-holds/{{retentionHoldId}}/release"},"event":[{"listen":"test","script":{"exec":["pm.expect([200,400,403,404,409]).to.include(pm.response.code);"]}}]},{"name":"Crear mi solicitud","event":[{"listen":"test","script":{"exec":["if(pm.response.code===201)pm.collectionVariables.set('retentionRequestId',pm.response.json().data.id);"]}}],"request":{"method":"POST","header":[{"key":"Content-Type","value":"application/json"},{"key":"Idempotency-Key","value":"ret-request-{{$timestamp}}"}],"body":{"mode":"raw","raw":"{\"motivo\":\"Solicitud de supresión para validar el flujo con cuenta de prueba\"}"},"url":"{{baseUrl}}/retention/requests/me"}},{"name":"Ver solo mis solicitudes","request":{"method":"GET","header":[],"url":"{{baseUrl}}/retention/requests/me"},"event":[{"listen":"test","script":{"exec":["pm.expect([200,401,403]).to.include(pm.response.code);"]}}]},{"name":"Cola administrativa de solicitudes","request":{"method":"GET","header":[],"url":"{{baseUrl}}/retention/requests?page=1&pageSize=20"},"event":[{"listen":"test","script":{"exec":["pm.expect([200,403]).to.include(pm.response.code);"]}}]},{"name":"Resolver solicitud (opcional) ","request":{"method":"POST","header":[{"key":"Content-Type","value":"application/json"},{"key":"Idempotency-Key","value":"ret-resolve-{{$timestamp}}"}],"body":{"mode":"raw","raw":"{\"decision\":\"REVIEW\",\"resolucion\":\"Se inicia revisión administrativa de la solicitud\",\"clasificacion\":[]}"},"url":"{{baseUrl}}/retention/requests/{{retentionRequestId}}/resolve"},"event":[{"listen":"test","script":{"exec":["pm.expect([200,400,403,404,409]).to.include(pm.response.code);"]}}]},{"name":"Previsualizar lote de supresión","event":[{"listen":"test","script":{"exec":["if(pm.response.code===201)pm.collectionVariables.set('retentionBatchId',pm.response.json().data.id);"]}}],"request":{"method":"POST","header":[{"key":"Content-Type","value":"application/json"},{"key":"Idempotency-Key","value":"ret-preview-{{$timestamp}}"}],"body":{"mode":"raw","raw":"{\"categoria\":\"EXPORTACIONES\",\"cutoffAt\":\"{{$isoTimestamp}}\",\"limit\":10}"},"url":"{{baseUrl}}/retention/batches","description":"Solo incluye registros vencidos y archivados sin hold activo. Preview no ejecuta eliminación ni anonimización."}},{"name":"Listar y consultar lotes","request":{"method":"GET","header":[],"url":"{{baseUrl}}/retention/batches?page=1&pageSize=20"},"event":[{"listen":"test","script":{"exec":["pm.expect([200,403]).to.include(pm.response.code);"]}}]},{"name":"Detalle del lote","request":{"method":"GET","header":[],"url":"{{baseUrl}}/retention/batches/{{retentionBatchId}}"},"event":[{"listen":"test","script":{"exec":["pm.expect([200,403,404]).to.include(pm.response.code);"]}}]},{"name":"Autorizar lote (paso separado)","request":{"method":"POST","header":[{"key":"Idempotency-Key","value":"ret-authorize-{{$timestamp}}"}],"url":"{{baseUrl}}/retention/batches/{{retentionBatchId}}/authorize","description":"Requiere un lote con elementos y política aprobada ejecutable. La política institucional no provisional requiere el flag correspondiente."},"event":[{"listen":"test","script":{"exec":["pm.expect([200,400,403,404,409]).to.include(pm.response.code);"]}}]},{"name":"Pausar lote alternativo","request":{"method":"POST","header":[{"key":"Content-Type","value":"application/json"},{"key":"Idempotency-Key","value":"ret-pause-{{$timestamp}}"}],"body":{"mode":"raw","raw":"{\"motivo\":\"Pausa preventiva de la prueba\"}"},"url":"{{baseUrl}}/retention/batches/{{retentionPauseBatchId}}/pause","description":"Usa un lote autorizado distinto; después de pausar ya no es ejecutable."},"event":[{"listen":"test","script":{"exec":["pm.expect([200,400,403,404,409]).to.include(pm.response.code);"]}}]},{"name":"Ejecutar lote de prueba","request":{"method":"POST","header":[{"key":"Idempotency-Key","value":"ret-execute-{{$timestamp}}"}],"url":"{{baseUrl}}/retention/batches/{{retentionBatchId}}/execute","description":"Solo con datos sintéticos: esta acción puede eliminar/anonimizar recursos configurados. Worker de fondo apagado por defecto."},"event":[{"listen":"test","script":{"exec":["pm.expect([200,400,403,404,409]).to.include(pm.response.code);"]}}]},{"name":"Reintentar o reanudar lote","event":[{"listen":"test","script":{"exec":["pm.expect([200,404,409]).to.include(pm.response.code);","if(pm.response.code===200){const receipt=pm.response.json().data;pm.expect(receipt.accepted).to.eql(true);pm.expect(receipt.resetFailures).to.be.a('number');}"]}}],"request":{"method":"POST","header":[{"key":"Idempotency-Key","value":"ret-retry-{{$timestamp}}"}],"url":"{{baseUrl}}/retention/batches/{{retentionPauseBatchId}}/retry","description":"Sólo para lotes PAUSADO o FALLIDO. Reinicia los elementos fallidos y devuelve un acuse idempotente con resetFailures; consulta el detalle del lote para conocer el resultado final. Otros estados devuelven 409."}},{"name":"Consultar registry de supresión","request":{"method":"GET","header":[],"url":"{{baseUrl}}/retention/suppression-registry?page=1&pageSize=20","description":"El registry expone fingerprint y metadatos, no resourceId."},"event":[{"listen":"test","script":{"exec":["pm.expect([200,403]).to.include(pm.response.code);"]}}]},{"name":"Reaplicar supresiones (ADMIN)","request":{"method":"POST","header":[{"key":"Idempotency-Key","value":"ret-reapply-{{$timestamp}}"}],"url":"{{baseUrl}}/retention/suppression-registry/reapply?limit=20"},"event":[{"listen":"test","script":{"exec":["pm.expect([201,400,403,409]).to.include(pm.response.code);"]}}]}]}
+  ]
+}

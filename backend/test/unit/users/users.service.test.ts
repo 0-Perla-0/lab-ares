@@ -16,7 +16,7 @@ const user = {
   codigo: "USER010",
   email: "user10@ares.local",
   rol: RolUsuario.PRESTADOR,
-  estado: EstadoUsuario.ACTIVO,
+  estado: EstadoUsuario.ACTIVA,
   sedeId: 1,
   areaId: 2,
   turnoId: 3,
@@ -144,13 +144,13 @@ describe("UsersService", () => {
   it("performs an idempotent logical delete", async () => {
     await service.darDeBaja(user.id);
     expect(users.update).toHaveBeenCalledWith(user.id, {
-      estado: EstadoUsuario.BAJA,
+      estado: EstadoUsuario.DESACTIVADA,
     });
 
-    users.findById.mockResolvedValue({ ...user, estado: EstadoUsuario.BAJA });
+    users.findById.mockResolvedValue({ ...user, estado: EstadoUsuario.DESACTIVADA });
     users.update.mockClear();
     await expect(service.darDeBaja(user.id)).resolves.toMatchObject({
-      estado: EstadoUsuario.BAJA,
+      estado: EstadoUsuario.DESACTIVADA,
     });
     expect(users.update).not.toHaveBeenCalled();
   });

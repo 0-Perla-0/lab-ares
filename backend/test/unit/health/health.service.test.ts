@@ -3,7 +3,18 @@ import { describe, expect, it, vi } from "vitest";
 import type { PrismaService } from "../../../src/database/prisma.service";
 import { HealthService } from "../../../src/health/health.service";
 
-const prisma = { $queryRaw: vi.fn() };
+const prisma = {
+  $queryRaw: vi.fn(),
+  recoveryWriteBarrier: {
+    findUnique: vi.fn().mockResolvedValue({
+      active: false,
+      runId: null,
+      version: 0,
+      frozenAt: null,
+      snapshotAt: null,
+    }),
+  },
+};
 const health = new HealthService(prisma as unknown as PrismaService);
 
 describe("HealthService", () => {
@@ -17,11 +28,29 @@ describe("HealthService", () => {
     await expect(health.readiness()).resolves.toEqual({
       status: "ok",
       database: "connected",
+      recovery: {
+        writeBarrier: "inactive",
+        runId: null,
+        version: 0,
+        snapshotAt: null,
+      },
     });
   });
 
   it("rejects readiness when MariaDB is unavailable", async () => {
     prisma.$queryRaw.mockRejectedValue(new Error("offline"));
     await expect(health.readiness()).rejects.toMatchObject({ status: 503 });
+  });
+  it("rejects readiness when storage dependencies are degraded", async () => {
+    const storage = { health: vi.fn().mockResolvedValue(false) };
+    const scanner = { health: vi.fn().mockResolvedValue(true) };
+    const service = new HealthService(
+      prisma as unknown as PrismaService,
+      storage as never,
+      scanner as never,
+      { get: () => true } as never,
+    );
+    prisma.$queryRaw.mockResolvedValue([{ "1": 1 }]);
+    await expect(service.readiness()).rejects.toMatchObject({ status: 503 });
   });
 });

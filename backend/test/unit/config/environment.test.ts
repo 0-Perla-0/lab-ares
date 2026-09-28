@@ -16,6 +16,45 @@ describe("validateEnvironment", () => {
       BACKEND_PORT: 3000,
       APP_TIME_ZONE: "America/Mexico_City",
       SESSION_SECRET: DEVELOPMENT_SESSION_SECRET,
+      GAMIFICATION_ENABLED: false,
+      PRINTING_3D_ENABLED: false,
+    });
+  });
+
+  it("parses the gamification feature flag without treating the string false as true", () => {
+    expect(
+      validateEnvironment({ ...base, GAMIFICATION_ENABLED: "false" })
+        .GAMIFICATION_ENABLED,
+    ).toBe(false);
+    expect(
+      validateEnvironment({ ...base, GAMIFICATION_ENABLED: "true" })
+        .GAMIFICATION_ENABLED,
+    ).toBe(true);
+  });
+
+  it("parses the printing feature flag without treating the string false as true", () => {
+    expect(
+      validateEnvironment({ ...base, PRINTING_3D_ENABLED: "false" })
+        .PRINTING_3D_ENABLED,
+    ).toBe(false);
+    expect(
+      validateEnvironment({ ...base, PRINTING_3D_ENABLED: "true" })
+        .PRINTING_3D_ENABLED,
+    ).toBe(true);
+  });
+
+  it.each([
+    ["RETENTION_INSTITUTIONAL_POLICIES_APPROVED", "false", false],
+    ["RETENTION_INSTITUTIONAL_POLICIES_APPROVED", "true", true],
+    ["RETENTION_INSTITUTIONAL_POLICIES_APPROVED", "0", false],
+    ["RETENTION_INSTITUTIONAL_POLICIES_APPROVED", "1", true],
+    ["RETENTION_WORKER_ENABLED", "false", false],
+    ["RETENTION_WORKER_ENABLED", "true", true],
+    ["RETENTION_WORKER_ENABLED", "0", false],
+    ["RETENTION_WORKER_ENABLED", "1", true],
+  ])("coerces %s=%s safely", (flag, raw, expected) => {
+    expect(validateEnvironment({ ...base, [flag]: raw })).toMatchObject({
+      [flag]: expected,
     });
   });
 
@@ -40,7 +79,33 @@ describe("validateEnvironment", () => {
         ...base,
         NODE_ENV: "production",
         SESSION_SECRET: "a-unique-production-secret-with-32-characters",
+        OUTBOX_ENCRYPTION_KEY: "a-unique-production-outbox-key-32chars",
+        MFA_ENCRYPTION_KEY: "a-unique-production-mfa-key-32chars",
+        SUPPRESSION_JOURNAL_HMAC_SECRET:
+          "a-unique-production-journal-key-with-32chars",
       }),
     ).toMatchObject({ NODE_ENV: "production" });
+  });
+
+  it("rejects a short production outbox key", () => {
+    expect(() =>
+      validateEnvironment({
+        ...base,
+        NODE_ENV: "production",
+        SESSION_SECRET: "a-unique-production-secret-with-32-characters",
+        OUTBOX_ENCRYPTION_KEY: "short",
+      }),
+    ).toThrow();
+  });
+
+  it("rejects the development outbox placeholder in production", () => {
+    expect(() =>
+      validateEnvironment({
+        ...base,
+        NODE_ENV: "production",
+        SESSION_SECRET: "a-unique-production-secret-with-32-characters",
+        OUTBOX_ENCRYPTION_KEY: "development-only-outbox-key-change-me-32chars",
+      }),
+    ).toThrow();
   });
 });

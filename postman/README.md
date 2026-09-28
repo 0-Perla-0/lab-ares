@@ -177,7 +177,57 @@ El cuerpo es opcional, pero check-in y check-out requieren un header
 La ubicación es consentida y opcional; la respuesta sólo indica si se registró
 ubicación/IP, sin devolver sus valores completos.
 
+## Gamificación privada
+
+La carpeta `16 - Gamificación privada` requiere sesión y
+`GAMIFICATION_ENABLED=true`; el valor predeterminado es `false`. Configura
+`gamificationUserId` con un usuario activo. Las operaciones administrativas
+requieren un usuario `ADMIN` y los reconocimientos/reversos usan un
+`Idempotency-Key` distinto por operación.
+
+El perfil y el historial sólo son visibles para su propietario o para un
+administrador. Los puntos forman un ledger inmutable: una corrección agrega un
+reverso negativo y nunca modifica el evento original. No existe ranking
+público, moneda, tienda ni premios canjeables.
+
+## Impresión 3D privada
+
+La carpeta `17 - Impresión 3D privada` requiere sesión,
+`PRINTING_3D_ENABLED=true` y reiniciar el backend; el valor predeterminado es
+`false`. Antes de crear un trabajo, sube un STL con el solicitante y espera a
+que pase de cuarentena a `DISPONIBLE`. Copia su identificador a
+`printingFileId`, el usuario operador a `printingOperatorId` y deja que las
+pruebas guarden `printingJobId` y `printingExecutionId`.
+
+Alterna la sesión por rol: solicitante para crear, consultar y cancelar;
+operador o gestor para revisar, asignar y ejecutar. Todas las mutaciones usan
+una clave idempotente. Al finalizar una ejecución elige sólo la solicitud
+exitosa o la fallida; la fallida habilita el reintento. El flujo no hace
+slicing, no controla impresoras, no cotiza, no cobra y no admite 3MF.
+
 ## Respuestas y errores
+
+## Auditoría, integridad y operación
+
+La carpeta `19 - Auditoría y operación` usa la misma cookie de sesión. Todos
+los usuarios autenticados pueden consultar `/audit/me`; las consultas y
+exportaciones administrativas respetan el alcance efectivo `AREA`, `SEDE` o
+`GLOBAL`. Las pantallas operativas, jobs, alertas, incidentes y la creación de
+manifiestos requieren un permiso global (`JEFE_COORDINADORES` o `ADMIN`).
+
+Configura `auditPeriod` con un día UTC ya cerrado. El manifiesto es inmutable,
+se ancla en almacenamiento privado y su verificación detecta alteraciones o
+pérdidas; es una comprobación técnica de integridad, no una firma legal. El
+worker permanece apagado salvo que se establezca
+`AUDIT_MANIFEST_WORKER_ENABLED=true`.
+
+`operationsJobId`, `operationsAlertId` y `operationsIncidentId` identifican
+fixtures descartables. El dueño de un lease manual se deriva de la sesión y no
+se acepta desde el cuerpo. Los incidentes sólo guardan una referencia al ticket
+externo: no sustituyen el sistema de ticketing. Los estados son `ABIERTO`,
+`RECONOCIDO`, `INVESTIGANDO`, `MITIGANDO`, `MONITOREANDO`, `RESUELTO` y
+`CERRADO`; cambiar estado o severidad exige motivo y responsable. S1 y S2
+repetido generan revisión con vencimiento a dos días hábiles.
 
 Las respuestas exitosas del dominio usan `{ "data": ... }`. Los errores usan
 principalmente `{ "error": "CODIGO" }`; una validación inválida devuelve además
@@ -194,6 +244,33 @@ su detalle estructurado.
 | 404    | Usuario, sede, área o turno inexistente                        |
 | 409    | Duplicado, estado incompatible o clave idempotente reutilizada |
 | 429    | Demasiados intentos de login                                   |
+| 503    | Funcionalidad desactivada mediante feature flag                |
 
 La colección hace borrados lógicos; los registros quedan en la base con
 `activa`/`activo` en `false` o, para usuarios, con `estado = BAJA`.
+
+## Retención y supresión
+
+La carpeta `18 - Retención y supresión privada` requiere sesión `ADMIN` para
+las operaciones administrativas. `/retention/requests/me` sólo permite al
+usuario autenticado crear y consultar sus solicitudes. Define
+`retentionSyntheticResourceId` como un recurso descartable de prueba existente
+y `retentionSubjectId` como una cuenta de pruebas; no registres recursos de
+negocio. Las variables `retentionRuleId`, `retentionRecordId`,
+`retentionHoldId`, `retentionRequestId` y `retentionBatchId` se capturan de las
+respuestas. Para probar pausa usa un lote separado y asigna su id a
+`retentionPauseBatchId`. La petición de creación de hold calcula
+automáticamente `reviewAt` a +7 días y `endsAt` a +14 días.
+
+Las escrituras requieren una clave `Idempotency-Key` propia. Las reglas
+provisionales son temporales; aprobar reglas no provisionales y ejecutar esas
+políticas depende de `RETENTION_INSTITUTIONAL_POLICIES_APPROVED=true`. El worker
+de sondeo se inicia apagado con `RETENTION_WORKER_ENABLED=false`; la petición
+explícita de ejecución procesa el lote de forma síncrona. Preview sólo crea una
+instantánea; autorizar y ejecutar son pasos separados. Ejecutar puede eliminar
+o anonimizar los recursos registrados, así que limita la prueba a datos
+sintéticos. `Reintentar o reanudar lote` sólo acepta lotes `PAUSADO` o
+`FALLIDO`, reinicia sus elementos fallidos y reanuda el procesamiento. El
+acuse idempotente incluye `resetFailures`; consulta el detalle del lote para
+ver el resultado final. El registry devuelve fingerprints, no identificadores
+de negocio.

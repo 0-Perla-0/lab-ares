@@ -18,11 +18,11 @@ enum RolUsuario {
 }
 
 enum EstadoUsuario {
-  ACTIVO
-  PENDIENTE
-  INACTIVO
-  LIBERADO
-  BAJA
+  INVITADA
+  ACTIVA
+  SUSPENDIDA
+  DESACTIVADA
+  BLOQUEADA
 }
 
 enum DiaSemana {
@@ -35,6 +35,12 @@ enum DiaSemana {
   DOMINGO
 }
 
+enum EstadoAdscripcionAcademica {
+  PENDIENTE_CONFIRMACION
+  CONFIRMADA
+  RECHAZADA
+}
+
 model Sede {
   id        Int     @id @default(autoincrement())
   nombre    String  @unique @db.VarChar(150)
@@ -44,6 +50,7 @@ model Sede {
 
   areas    Area[]
   usuarios Usuario[]
+  bibliotecaDocumentos DocumentoBiblioteca[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -60,6 +67,7 @@ model Area {
 
   turnos   Turno[]
   usuarios Usuario[]
+  bibliotecaDocumentos DocumentoBiblioteca[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -108,7 +116,7 @@ model Usuario {
   passwordHash String @db.VarChar(255)
 
   rol    RolUsuario    @default(PRESTADOR)
-  estado EstadoUsuario @default(PENDIENTE)
+  estado EstadoUsuario @default(INVITADA)
 
   sedeId  Int?
   areaId  Int?
@@ -119,6 +127,64 @@ model Usuario {
   turno Turno? @relation(fields: [turnoId], references: [id], onDelete: SetNull)
 
   asistencias Asistencia[]
+  sessions Session[]
+  invitationsCreated Invitation[] @relation("InvitationCreator")
+  invitationsTarget Invitation[] @relation("InvitationTarget")
+  recoveryTokens RecoveryToken[]
+  mfa UserMfa?
+  mfaChallenges MfaChallenge[]
+  recoveryCodes MfaRecoveryCode[]
+  notifications Notification[]
+  adscripcionesAcademicas AdscripcionAcademica[]
+  solicitudesAcademicas AdscripcionAcademica[] @relation("AcademicRequester")
+  confirmacionesAcademicas AdscripcionAcademica[] @relation("AcademicConfirmer")
+  requisitosDocumentales RequisitoDocumento[]
+  documentosCargados DocumentoVersion[] @relation("DocumentoUploader")
+  documentosRevisados DocumentoVersion[] @relation("DocumentoReviewer")
+  kairosProjectsCreated ProyectoKairos[] @relation("KairosProjectCreator")
+  kairosMemberships MiembroProyectoKairos[]
+  kairosFavorites FavoritoProyectoKairos[]
+  kairosActivitiesResponsible ActividadKairos[] @relation("KairosActivityResponsible")
+  kairosActivityParticipants ParticipanteActividadKairos[]
+  kairosEvidenceAuthors EntregaEvidenciaKairos[]
+  kairosActivityComments ComentarioActividadKairos[]
+  kairosActivityReviews HistorialActividadKairos[] @relation("KairosActivityReviewer")
+  kairosActivityHistory HistorialActividadKairos[] @relation("KairosActivityActor")
+  archivosPropiedad Archivo[] @relation("ArchivoOwner")
+  directorioPreferencia DirectorioPreferencia?
+  reportExportsRequested ReporteExportacion[]
+  bibliotecaDocumentosCreados DocumentoBiblioteca[] @relation("LibraryDocumentCreator")
+  bibliotecaDocumentosArchivados DocumentoBiblioteca[] @relation("LibraryDocumentArchiver")
+  bibliotecaVersionesCreadas VersionBiblioteca[] @relation("LibraryVersionAuthor")
+  bibliotecaVersionesRevisadas VersionBiblioteca[] @relation("LibraryVersionReviewer")
+  bibliotecaVersionesPublicadas VersionBiblioteca[] @relation("LibraryVersionPublisher")
+  bibliotecaAcuses AcuseBiblioteca[]
+  paginasPublicasCreadas PaginaPublica[] @relation("PublicPageCreator")
+  paginasPublicasArchivadas PaginaPublica[] @relation("PublicPageArchiver")
+  contenidoPublicoCreado VersionContenidoPublico[] @relation("PublicContentAuthor")
+  contenidoPublicoPublicado VersionContenidoPublico[] @relation("PublicContentPublisher")
+  activosPublicosPublicados ActivoPublico[] @relation("PublicAssetPublisher")
+  reglasGamificacionCreadas ReglaGamificacion[] @relation("GamificationRuleCreator")
+  insigniasGamificacionCreadas InsigniaGamificacion[] @relation("GamificationBadgeCreator")
+  eventosGamificacion EventoGamificacion[] @relation("GamificationSubject")
+  eventosGamificacionActuados EventoGamificacion[] @relation("GamificationActor")
+  trabajosImpresion3DSolicitados TrabajoImpresion3D[] @relation("Printing3DRequester")
+  trabajosImpresion3DAsignados TrabajoImpresion3D[] @relation("Printing3DOperator")
+  trabajosImpresion3DRevisados TrabajoImpresion3D[] @relation("Printing3DReviewer")
+  trabajosImpresion3DCancelados TrabajoImpresion3D[] @relation("Printing3DCanceller")
+  ejecucionesImpresion3D EjecucionImpresion3D[] @relation("Printing3DExecutionOperator")
+  operacionesImpresion3D OperacionImpresion3D[] @relation("Printing3DOperationActor")
+  reglasRetencionCreadas ReglaRetencion[] @relation("RetentionRuleCreator")
+  reglasRetencionAprobadas ReglaRetencion[] @relation("RetentionRuleApprover")
+  registrosRetencion RegistroRetencion[] @relation("RetentionSubject")
+  retencionesLegalesCreadas RetencionLegal[] @relation("LegalHoldCreator")
+  retencionesLegalesLiberadas RetencionLegal[] @relation("LegalHoldReleaser")
+  solicitudesSupresion SolicitudSupresion[] @relation("SuppressionRequester")
+  solicitudesSupresionResueltas SolicitudSupresion[] @relation("SuppressionResolver")
+  lotesSupresionCreados LoteSupresion[] @relation("SuppressionBatchCreator")
+  lotesSupresionAutorizados LoteSupresion[] @relation("SuppressionBatchAuthorizer")
+  registrosSupresionEjecutados RegistroSupresion[] @relation("SuppressionExecutor")
+  operacionesRetencion OperacionRetencion[] @relation("RetentionOperationActor")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -130,14 +196,769 @@ model Usuario {
   @@index([turnoId])
 }
 
+model DirectorioPreferencia {
+  usuarioId Int @id
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  visibleEnArea Boolean @default(true)
+  visibleEnProyectos Boolean @default(true)
+  mostrarEmail Boolean @default(false)
+  updatedAt DateTime @updatedAt
+}
+
+model InstitucionAcademica {
+  id Int @id @default(autoincrement())
+  nombre String @unique @db.VarChar(191)
+  activa Boolean @default(true)
+  unidades UnidadAcademica[]
+  adscripciones AdscripcionAcademica[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([activa])
+}
+
+model UnidadAcademica {
+  id Int @id @default(autoincrement())
+  nombre String @db.VarChar(191)
+  activa Boolean @default(true)
+  institucionId Int
+  institucion InstitucionAcademica @relation(fields: [institucionId], references: [id], onDelete: Restrict)
+  programas ProgramaAcademico[]
+  adscripciones AdscripcionAcademica[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([institucionId, nombre])
+  @@index([institucionId, activa])
+}
+
+model ProgramaAcademico {
+  id Int @id @default(autoincrement())
+  nombre String @db.VarChar(191)
+  activa Boolean @default(true)
+  unidadAcademicaId Int
+  unidadAcademica UnidadAcademica @relation(fields: [unidadAcademicaId], references: [id], onDelete: Restrict)
+  adscripciones AdscripcionAcademica[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([unidadAcademicaId, nombre])
+  @@index([unidadAcademicaId, activa])
+}
+
+model CohorteAcademica {
+  id Int @id @default(autoincrement())
+  nombre String @unique @db.VarChar(100)
+  activa Boolean @default(true)
+  adscripciones AdscripcionAcademica[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([activa])
+}
+
+model AdscripcionAcademica {
+  id Int @id @default(autoincrement())
+  usuarioId Int
+  institucionId Int
+  unidadAcademicaId Int?
+  programaAcademicoId Int
+  cohorteId Int?
+  inicio DateTime @db.Date
+  fin DateTime? @db.Date
+  vigente Boolean @default(true)
+  estado EstadoAdscripcionAcademica @default(PENDIENTE_CONFIRMACION)
+  motivoRechazo String? @db.VarChar(500)
+  solicitadoPorId Int?
+  confirmadoPorId Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+  institucion InstitucionAcademica @relation(fields: [institucionId], references: [id], onDelete: Restrict)
+  unidadAcademica UnidadAcademica? @relation(fields: [unidadAcademicaId], references: [id], onDelete: Restrict)
+  programaAcademico ProgramaAcademico @relation(fields: [programaAcademicoId], references: [id], onDelete: Restrict)
+  cohorte CohorteAcademica? @relation(fields: [cohorteId], references: [id], onDelete: Restrict)
+  solicitadoPor Usuario? @relation("AcademicRequester", fields: [solicitadoPorId], references: [id], onDelete: SetNull)
+  confirmadoPor Usuario? @relation("AcademicConfirmer", fields: [confirmadoPorId], references: [id], onDelete: SetNull)
+  @@index([usuarioId, vigente, inicio])
+  @@index([institucionId, programaAcademicoId])
+}
+
 model Session {
   id        String   @id @db.VarChar(191)
   data      Json
   expiresAt DateTime
+  userId Int?
+  user Usuario? @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastActivityAt DateTime @default(now())
+  absoluteExpiresAt DateTime
+  revokedAt DateTime?
+  ipHash String? @db.Char(64)
+  userAgentSummary String? @db.VarChar(255)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([expiresAt])
+  @@index([userId, revokedAt])
+}
+
+model Invitation {
+  id String @id @default(cuid()) @db.VarChar(30)
+  tokenHash String @unique @db.Char(64)
+  targetEmail String @db.VarChar(191)
+  targetUserId Int?
+  targetUser Usuario? @relation("InvitationTarget", fields: [targetUserId], references: [id], onDelete: SetNull)
+  role RolUsuario
+  sedeId Int?
+  areaId Int?
+  turnoId Int?
+  expiresAt DateTime
+  usedAt DateTime?
+  revokedAt DateTime?
+  createdById Int
+  createdBy Usuario @relation("InvitationCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  acceptedById Int?
+  archivedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([targetEmail, expiresAt])
+  @@index([createdById])
+  @@index([archivedAt])
+}
+
+model RecoveryToken {
+  id String @id @default(cuid()) @db.VarChar(30)
+  tokenHash String @unique @db.Char(64)
+  userId Int
+  user Usuario @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  usedAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([userId, expiresAt])
+}
+
+model UserMfa {
+  userId Int @id
+  user Usuario @relation(fields: [userId], references: [id], onDelete: Cascade)
+  secretCiphertext String @db.Text
+  enabledAt DateTime?
+  lastAcceptedStep BigInt?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model MfaChallenge {
+  id String @id @default(cuid()) @db.VarChar(30)
+  userId Int
+  user Usuario @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String @unique @db.Char(64)
+  expiresAt DateTime
+  attempts Int @default(0)
+  consumedAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([userId, expiresAt])
+}
+
+model MfaRecoveryCode {
+  id String @id @default(cuid()) @db.VarChar(30)
+  userId Int
+  user Usuario @relation(fields: [userId], references: [id], onDelete: Cascade)
+  codeHash String @unique @db.Char(64)
+  usedAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([userId, usedAt])
+}
+
+model Notification {
+  id String @id @default(cuid()) @db.VarChar(30)
+  userId Int
+  user Usuario @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type String @db.VarChar(100)
+  payload Json
+  readAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([userId, readAt, createdAt])
+}
+
+model OutboxEvent {
+  id String @id @default(cuid()) @db.VarChar(30)
+  type String @db.VarChar(100)
+  aggregateId String @db.VarChar(100)
+  payload Json
+  occurredAt DateTime @default(now())
+  processedAt DateTime?
+  attempts Int @default(0)
+  state String @default("PENDING") @db.VarChar(20)
+  nextAttemptAt DateTime @default(now())
+  leaseUntil DateTime?
+  leaseOwner String? @db.VarChar(80)
+  lastError String? @db.VarChar(500)
+  failedAt DateTime?
+  emailDeliveries EmailDelivery[]
+  @@index([processedAt, occurredAt])
+}
+
+model EmailDelivery {
+  id String @id @default(cuid()) @db.VarChar(30)
+  outboxEventId String @unique
+  event OutboxEvent @relation(fields: [outboxEventId], references: [id], onDelete: Cascade)
+  status String @db.VarChar(20)
+  attempts Int @default(0)
+  errorRedacted String? @db.VarChar(500)
+  sentAt DateTime?
+  messageId String @unique @db.VarChar(180)
+  leaseUntil DateTime?
+  leaseOwner String? @db.VarChar(80)
+  createdAt DateTime @default(now())
+  @@index([status, leaseUntil])
+}
+
+model AuditEvent {
+  id String @id @default(cuid()) @db.VarChar(30)
+  actorId Int?
+  subjectId Int?
+  action String @db.VarChar(100)
+  resource String @db.VarChar(100)
+  correlationId String? @db.VarChar(100)
+  metadata Json?
+  actorType String @default("HUMAN") @db.VarChar(20)
+  actorRole String? @db.VarChar(40)
+  accessScope String? @db.VarChar(20)
+  module String @default("LEGACY") @db.VarChar(60)
+  objectType String? @db.VarChar(100)
+  objectId String? @db.VarChar(100)
+  result String @default("SUCCESS") @db.VarChar(30)
+  reason String? @db.VarChar(500)
+  diff Json?
+  policyVersion String? @db.VarChar(50)
+  batchId String? @db.VarChar(100)
+  jobId String? @db.VarChar(100)
+  sedeId Int?
+  areaId Int?
+  periodKey String? @db.Char(10)
+  chainIndex Int?
+  previousHash String? @db.Char(64)
+  eventHash String? @db.Char(64)
+  occurredAt DateTime @default(now()) @db.DateTime(3)
+  @@index([resource, subjectId, occurredAt])
+  @@index([actorId, occurredAt])
+  @@unique([periodKey, chainIndex])
+  @@index([module, action, occurredAt])
+  @@index([correlationId])
+  @@index([sedeId, areaId, occurredAt])
+}
+
+model AuditManifest {
+  id String @id @default(cuid()) @db.VarChar(30)
+  periodKey String @unique @db.Char(10)
+  eventCount Int
+  firstHash String? @db.Char(64)
+  lastHash String? @db.Char(64)
+  manifestHash String @db.Char(64)
+  storageRef String? @db.VarChar(255)
+  verifiedAt DateTime? @db.DateTime(3)
+  createdAt DateTime @default(now()) @db.DateTime(3)
+}
+
+model AuditChainHead {
+  periodKey String @id @db.Char(10)
+  lastIndex Int @default(0)
+  lastHash String? @db.Char(64)
+  updatedAt DateTime @updatedAt @db.DateTime(3)
+}
+
+enum OperationalJobState {
+  PENDING
+  RUNNING
+  RETRY_SCHEDULED
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+enum OperationalAttemptResult {
+  RUNNING
+  SUCCEEDED
+  FAILED
+  LEASE_LOST
+}
+
+enum OperationalAlertState {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+enum OperationalSeverity {
+  S1
+  S2
+  S3
+  S4
+}
+
+enum OperationalIncidentState {
+  ABIERTO
+  RECONOCIDO
+  INVESTIGANDO
+  MITIGANDO
+  MONITOREANDO
+  RESUELTO
+  CERRADO
+}
+
+model OperationalJobExecution {
+  id String @id @default(cuid()) @db.VarChar(30)
+  name String @db.VarChar(100)
+  idempotencyKey String @unique @db.VarChar(191)
+  state OperationalJobState @default(PENDING)
+  actorType String @default("SYSTEM") @db.VarChar(20)
+  correlationId String? @db.VarChar(100)
+  payload Json?
+  result Json?
+  errorCode String? @db.VarChar(100)
+  attempts Int @default(0)
+  maxAttempts Int @default(3)
+  nextAttemptAt DateTime @default(now()) @db.DateTime(3)
+  leaseOwner String? @db.VarChar(100)
+  leaseUntil DateTime? @db.DateTime(3)
+  startedAt DateTime? @db.DateTime(3)
+  completedAt DateTime? @db.DateTime(3)
+  createdAt DateTime @default(now()) @db.DateTime(3)
+  updatedAt DateTime @updatedAt @db.DateTime(3)
+  attemptHistory OperationalJobAttempt[]
+  alerts OperationalAlert[]
+  @@index([state,nextAttemptAt])
+  @@index([name,createdAt])
+  @@index([leaseUntil])
+}
+
+model OperationalJobAttempt {
+  id String @id @default(cuid()) @db.VarChar(30)
+  executionId String @db.VarChar(30)
+  execution OperationalJobExecution @relation(fields:[executionId], references:[id], onDelete:Restrict)
+  number Int
+  owner String @db.VarChar(100)
+  result OperationalAttemptResult @default(RUNNING)
+  errorCode String? @db.VarChar(100)
+  startedAt DateTime @default(now()) @db.DateTime(3)
+  completedAt DateTime? @db.DateTime(3)
+  @@unique([executionId,number])
+  @@index([result,startedAt])
+}
+
+model OperationalAlert {
+  id String @id @default(cuid()) @db.VarChar(30)
+  severity OperationalSeverity
+  state OperationalAlertState @default(OPEN)
+  source String @db.VarChar(100)
+  code String @db.VarChar(100)
+  message String @db.VarChar(500)
+  jobExecutionId String? @db.VarChar(30)
+  jobExecution OperationalJobExecution? @relation(fields:[jobExecutionId], references:[id], onDelete:Restrict)
+  acknowledgedById Int?
+  acknowledgedAt DateTime? @db.DateTime(3)
+  resolvedById Int?
+  resolvedAt DateTime? @db.DateTime(3)
+  resolution String? @db.VarChar(500)
+  createdAt DateTime @default(now()) @db.DateTime(3)
+  updatedAt DateTime @updatedAt @db.DateTime(3)
+  @@index([state,severity,createdAt])
+  @@index([jobExecutionId])
+}
+
+model OperationalIncident {
+  id String @id @default(cuid()) @db.VarChar(30)
+  externalTicketRef String @unique @db.VarChar(191)
+  severity OperationalSeverity
+  state OperationalIncidentState @default(ABIERTO)
+  ownerId Int?
+  reason String @db.VarChar(1000)
+  communications Json?
+  repeatedS2 Boolean @default(false)
+  postmortemDueAt DateTime? @db.DateTime(3)
+  resolvedAt DateTime? @db.DateTime(3)
+  createdAt DateTime @default(now()) @db.DateTime(3)
+  updatedAt DateTime @updatedAt @db.DateTime(3)
+  history OperationalIncidentEvent[]
+  @@index([state,severity,createdAt])
+  @@index([ownerId,state])
+}
+
+model OperationalIncidentEvent {
+  id String @id @default(cuid()) @db.VarChar(30)
+  incidentId String @db.VarChar(30)
+  incident OperationalIncident @relation(fields:[incidentId], references:[id], onDelete:Restrict)
+  actorId Int
+  previousState OperationalIncidentState?
+  nextState OperationalIncidentState?
+  previousSeverity OperationalSeverity?
+  nextSeverity OperationalSeverity?
+  ownerId Int?
+  reason String @db.VarChar(1000)
+  occurredAt DateTime @default(now()) @db.DateTime(3)
+  @@index([incidentId,occurredAt])
+}
+
+enum RecoveryScope {
+  IMPORTANTE
+  SECUNDARIO
+}
+
+enum RecoveryRunState {
+  PLANNED
+  FROZEN
+  RESTORE_RECORDED
+  RECONCILIATION_PREVIEWED
+  RECONCILED
+  AUDIT_VERIFIED
+  JOURNAL_IMPORTED
+  SUPPRESSIONS_REAPPLIED
+  READY_APPROVED
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum RecoveryStepType {
+  PLAN
+  FREEZE
+  RESTORE_RECORD
+  RECONCILIATION_PREVIEW
+  RECONCILIATION_EXECUTE
+  AUDIT_VERIFY
+  JOURNAL_IMPORT
+  SUPPRESSION_REAPPLY
+  READY_APPROVAL
+  UNFREEZE
+  COMPLETE
+  FAIL
+  CANCEL
+}
+
+enum RecoveryStepState {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+  SKIPPED
+}
+
+enum RecoveryCheckType {
+  DATABASE
+  STORAGE
+  SCANNER
+  OUTBOX
+  SECONDARY_MODULES
+  AUDIT_INTEGRITY
+  JOURNAL_INTEGRITY
+  READINESS
+}
+
+enum RecoveryReconciliationMode {
+  PREVIEW
+  EXECUTE
+}
+
+enum RecoveryReconciliationState {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+enum RecoveryDrillResult {
+  PENDING
+  PASSED
+  PARTIAL
+  FAILED
+}
+
+enum SuppressionJournalState {
+  PENDING
+  PROCESSING
+  EXPORTED
+  FAILED
+}
+
+model RecoveryRun {
+  id String @id @default(cuid()) @db.VarChar(30)
+  name String @db.VarChar(191)
+  scope RecoveryScope
+  state RecoveryRunState @default(PLANNED)
+  isDrill Boolean @default(false)
+  restorePoint DateTime? @db.DateTime(3)
+  imageVersion String? @db.VarChar(191)
+  externalProviderRef String? @db.VarChar(191)
+  createdById Int
+  responsibleId Int
+  frozenById Int?
+  readyApprovedById Int?
+  completedById Int?
+  failedById Int?
+  cancelledById Int?
+  rpoTargetMinutes Int
+  rtoTargetMinutes Int
+  actualRpoMinutes Int?
+  actualRtoMinutes Int?
+  drillResult RecoveryDrillResult @default(PENDING)
+  drillNotes String? @db.VarChar(1000)
+  startedAt DateTime @default(now()) @db.DateTime(3)
+  frozenAt DateTime? @db.DateTime(3)
+  restoreRecordedAt DateTime? @db.DateTime(3)
+  previewedAt DateTime? @db.DateTime(3)
+  reconciledAt DateTime? @db.DateTime(3)
+  auditVerifiedAt DateTime? @db.DateTime(3)
+  journalImportedAt DateTime? @db.DateTime(3)
+  suppressionsReappliedAt DateTime? @db.DateTime(3)
+  readyApprovedAt DateTime? @db.DateTime(3)
+  completedAt DateTime? @db.DateTime(3)
+  failedAt DateTime? @db.DateTime(3)
+  cancelledAt DateTime? @db.DateTime(3)
+  createdAt DateTime @default(now()) @db.DateTime(3)
+  updatedAt DateTime @updatedAt @db.DateTime(3)
+  steps RecoveryStep[]
+  checks RecoveryCheck[]
+  reconciliations RecoveryReconciliationRun[]
+  operations RecoveryOperation[]
+  importedSuppressions RecoveryImportedSuppression[]
+  barrier RecoveryWriteBarrier?
+  @@index([state,createdAt])
+  @@index([scope,state])
+}
+
+model RecoveryStep {
+  id String @id @default(cuid()) @db.VarChar(30)
+  runId String @db.VarChar(30)
+  run RecoveryRun @relation(fields:[runId], references:[id], onDelete:Restrict)
+  type RecoveryStepType
+  state RecoveryStepState @default(PENDING)
+  actorId Int?
+  resultCode String? @db.VarChar(100)
+  summary Json?
+  startedAt DateTime? @db.DateTime(3)
+  completedAt DateTime? @db.DateTime(3)
+  createdAt DateTime @default(now()) @db.DateTime(3)
+  @@index([runId,type,createdAt])
+}
+
+model RecoveryCheck {
+  id String @id @default(cuid()) @db.VarChar(30)
+  runId String @db.VarChar(30)
+  run RecoveryRun @relation(fields:[runId], references:[id], onDelete:Restrict)
+  type RecoveryCheckType
+  passed Boolean
+  code String @db.VarChar(100)
+  summary Json?
+  checkedById Int?
+  checkedAt DateTime @default(now()) @db.DateTime(3)
+  @@index([runId,type,checkedAt])
+}
+
+model RecoveryReconciliationRun {
+  id String @id @default(cuid()) @db.VarChar(30)
+  runId String @db.VarChar(30)
+  run RecoveryRun @relation(fields:[runId], references:[id], onDelete:Restrict)
+  mode RecoveryReconciliationMode
+  state RecoveryReconciliationState @default(PENDING)
+  idempotencyKey String @unique @db.VarChar(191)
+  requestedById Int
+  leaseOwner String? @db.VarChar(100)
+  leaseUntil DateTime? @db.DateTime(3)
+  attempts Int @default(0)
+  maxAttempts Int @default(3)
+  result Json?
+  errorCode String? @db.VarChar(100)
+  startedAt DateTime? @db.DateTime(3)
+  completedAt DateTime? @db.DateTime(3)
+  createdAt DateTime @default(now()) @db.DateTime(3)
+  updatedAt DateTime @updatedAt @db.DateTime(3)
+  @@index([runId,mode,state])
+  @@index([state,leaseUntil])
+}
+
+model RecoveryOperation {
+  id String @id @default(cuid()) @db.VarChar(30)
+  runId String?
+  run RecoveryRun? @relation(fields:[runId], references:[id], onDelete:Restrict)
+  actorId Int
+  key String @db.VarChar(128)
+  action String @db.VarChar(80)
+  requestHash String @db.Char(64)
+  response Json?
+  createdAt DateTime @default(now()) @db.DateTime(3)
+  @@unique([actorId,key])
+  @@index([runId,createdAt])
+}
+
+model RecoveryWriteBarrier {
+  id String @id @default("global") @db.VarChar(30)
+  active Boolean @default(false)
+  runId String? @unique @db.VarChar(30)
+  run RecoveryRun? @relation(fields:[runId], references:[id], onDelete:Restrict)
+  version Int @default(0)
+  reasonCode String? @db.VarChar(100)
+  snapshotAt DateTime? @db.DateTime(3)
+  frozenAt DateTime? @db.DateTime(3)
+  frozenById Int?
+  unfrozenAt DateTime? @db.DateTime(3)
+  unfrozenById Int?
+  updatedAt DateTime @updatedAt @db.DateTime(3)
+}
+
+model RecoveryImportedSuppression {
+  id String @id @default(cuid()) @db.VarChar(30)
+  runId String @db.VarChar(30)
+  run RecoveryRun @relation(fields:[runId], references:[id], onDelete:Restrict)
+  journalEntryId String @db.VarChar(64)
+  payloadHash String @db.Char(64)
+  signature String @db.Char(64)
+  payload Json
+  occurredAt DateTime @db.DateTime(3)
+  matchedRegistroId String? @db.VarChar(30)
+  verifiedAt DateTime @db.DateTime(3)
+  reappliedAt DateTime? @db.DateTime(3)
+  resultCode String? @db.VarChar(100)
+  @@unique([runId,journalEntryId])
+  @@index([runId,occurredAt])
+}
+
+enum TipoReporteExportacion {
+  ATTENDANCE
+  DOCUMENTS
+  KAIROS
+}
+enum EstadoReporteExportacion {
+  PENDIENTE
+  GENERANDO
+  COMPLETADO
+  FALLIDO
+  EXPIRADO
+}
+model ReporteExportacion {
+  id String @id @default(cuid()) @db.VarChar(30)
+  requesterId Int
+  requester Usuario @relation(fields:[requesterId], references:[id], onDelete:Restrict)
+  type TipoReporteExportacion
+  filters Json
+  totalFilas Int @default(0)
+  archivoId String? @unique @db.VarChar(30)
+  archivo Archivo? @relation(fields:[archivoId], references:[id], onDelete:SetNull)
+  status EstadoReporteExportacion @default(PENDIENTE)
+  leaseOwner String? @db.VarChar(80)
+  leaseUntil DateTime?
+  attempts Int @default(0)
+  nextAttemptAt DateTime?
+  errorCode String? @db.VarChar(100)
+  expiresAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([requesterId, createdAt])
+  @@index([status, leaseUntil, createdAt])
+  @@index([status, nextAttemptAt, createdAt])
+  @@index([expiresAt, status])
+}
+
+enum EstadoArchivo {
+  RECIBIDO
+  PENDIENTE_ANALISIS
+  ANALIZANDO
+  DISPONIBLE
+  RECHAZADO
+  ERROR_ANALISIS
+  ELIMINADO
+}
+
+enum ResultadoAnalisisArchivo {
+  LIMPIO
+  INFECTADO
+  ERROR
+}
+
+model Archivo {
+  id              String       @id @default(cuid()) @db.VarChar(30)
+  propietarioId   Int?
+  propietario     Usuario? @relation("ArchivoOwner", fields:[propietarioId], references:[id], onDelete:SetNull)
+  objectKey       String       @unique @db.VarChar(500)
+  quarantineKey   String       @unique @db.VarChar(500)
+  originalName    String       @db.VarChar(255)
+  detectedMime    String?      @db.VarChar(150)
+  extension       String?      @db.VarChar(20)
+  sizeBytes       BigInt
+  sha256          String?      @db.Char(64)
+  status          EstadoArchivo @default(RECIBIDO)
+  analysisAttempts Int         @default(0)
+  analysisExhaustedAt DateTime?
+  nextAttemptAt   DateTime?
+  leaseUntil      DateTime?
+  leaseOwner      String?       @db.VarChar(80)
+  lastError       String?      @db.VarChar(1000)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  analyses        AnalisisArchivo[]
+  documentoVersiones DocumentoVersion[]
+  kairosEvidence EntregaEvidenciaKairos[]
+  reportExports ReporteExportacion[]
+  bibliotecaVersion VersionBiblioteca?
+  activoPublico ActivoPublico?
+  trabajosImpresion3D TrabajoImpresion3D[]
+
+  @@index([status, nextAttemptAt])
+  @@index([leaseUntil])
+  @@index([propietarioId])
+}
+
+enum EstadoDocumento {
+  PENDIENTE_CARGA
+  EN_REVISION
+  AUTORIZADO
+  RECHAZADO
+  REQUIERE_CORRECCION
+  VENCIDO
+  CANCELADO
+}
+
+model RequisitoDocumento {
+  id Int @id @default(autoincrement())
+  usuarioId Int
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+  codigo String @db.VarChar(80)
+  nombre String @db.VarChar(191)
+  obligatorio Boolean @default(true)
+  activo Boolean @default(true)
+  versiones DocumentoVersion[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([usuarioId, codigo])
+  @@index([usuarioId, activo])
+}
+
+model DocumentoVersion {
+  id String @id @default(cuid()) @db.VarChar(30)
+  requisitoId Int
+  requisito RequisitoDocumento @relation(fields: [requisitoId], references: [id], onDelete: Restrict)
+  archivoId String
+  archivo Archivo @relation(fields: [archivoId], references: [id], onDelete: Restrict)
+  version Int
+  estado EstadoDocumento @default(PENDIENTE_CARGA)
+  comentario String? @db.VarChar(1000)
+  cargadoPorId Int
+  cargadoPor Usuario @relation("DocumentoUploader", fields: [cargadoPorId], references: [id], onDelete: Restrict)
+  revisadoPorId Int?
+  revisadoPor Usuario? @relation("DocumentoReviewer", fields: [revisadoPorId], references: [id], onDelete: Restrict)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([requisitoId, version])
+  @@index([requisitoId, estado, createdAt])
+}
+
+model AnalisisArchivo {
+  id        String                    @id @default(cuid()) @db.VarChar(30)
+  archivoId String
+  archivo   Archivo                   @relation(fields: [archivoId], references: [id], onDelete: Cascade)
+  scanner   String                    @db.VarChar(50)
+  resultado ResultadoAnalisisArchivo
+  signature String?                   @db.VarChar(255)
+  error     String?                   @db.VarChar(1000)
+  startedAt DateTime                  @default(now())
+  finishedAt DateTime?
+
+  @@index([archivoId, startedAt])
 }
 
 enum EstadoAsistencia {
@@ -145,6 +966,804 @@ enum EstadoAsistencia {
   PENDIENTE
   AUTORIZADA
   RECHAZADA
+}
+
+enum EstadoProyectoKairos {
+  BORRADOR
+  ACTIVO
+  ARCHIVADO
+}
+
+enum PrioridadProyectoKairos {
+  BAJA
+  MEDIA
+  ALTA
+  CRITICA
+}
+
+enum RolMiembroProyectoKairos {
+  PROPIETARIO
+  SUBLIDER
+  COLABORADOR
+  OBSERVADOR
+}
+
+model ProyectoKairos {
+  id          String @id @default(cuid()) @db.VarChar(30)
+  nombre      String @db.VarChar(191)
+  descripcion String? @db.VarChar(1000)
+  estado      EstadoProyectoKairos @default(BORRADOR)
+  prioridad   PrioridadProyectoKairos @default(MEDIA)
+  creadoPorId Int
+  creadoPor   Usuario @relation("KairosProjectCreator", fields: [creadoPorId], references: [id], onDelete: Restrict)
+  miembros    MiembroProyectoKairos[]
+  favoritos   FavoritoProyectoKairos[]
+  activities ActividadKairos[]
+  bibliotecaDocumentos DocumentoBiblioteca[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([estado, prioridad, updatedAt])
+  @@index([creadoPorId, createdAt])
+}
+
+model MiembroProyectoKairos {
+  proyectoId String @db.VarChar(30)
+  usuarioId  Int
+  rol        RolMiembroProyectoKairos
+  proyecto   ProyectoKairos @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+  usuario    Usuario @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  removedAt  DateTime?
+
+  @@id([proyectoId, usuarioId])
+  @@index([usuarioId, rol])
+  @@index([proyectoId, rol])
+}
+
+model FavoritoProyectoKairos {
+  proyectoId String @db.VarChar(30)
+  usuarioId  Int
+  proyecto   ProyectoKairos @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+  usuario    Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@id([proyectoId, usuarioId])
+  @@index([usuarioId, createdAt])
+}
+
+enum EstadoActividadKairos {
+  PENDIENTE
+  EN_PROGRESO
+  BLOQUEADA
+  EN_REVISION
+  REQUIERE_CORRECCION
+  TERMINADA
+  CANCELADA
+}
+enum PrioridadActividadKairos {
+  BAJA
+  MEDIA
+  ALTA
+  CRITICA
+}
+enum ComplejidadActividadKairos {
+  BAJA
+  MEDIA
+  ALTA
+}
+enum TipoHistorialActividadKairos {
+  TRANSICION
+  REVISION
+  REAPERTURA
+  ENTREGA
+}
+
+model ActividadKairos {
+  id String @id @default(cuid()) @db.VarChar(30)
+  proyectoId String @db.VarChar(30)
+  responsableId Int
+  title String @db.VarChar(191)
+  description String? @db.VarChar(3000)
+  startAt DateTime?
+  dueAt DateTime?
+  closedAt DateTime?
+  priority PrioridadActividadKairos @default(MEDIA)
+  complexity ComplejidadActividadKairos @default(MEDIA)
+  state EstadoActividadKairos @default(PENDIENTE)
+  proyecto ProyectoKairos @relation(fields:[proyectoId], references:[id], onDelete: Cascade)
+  responsable Usuario @relation("KairosActivityResponsible", fields:[responsableId], references:[id], onDelete: Restrict)
+  participants ParticipanteActividadKairos[]
+  evidence EntregaEvidenciaKairos[]
+  comments ComentarioActividadKairos[]
+  history HistorialActividadKairos[]
+  gamificationEvents EventoGamificacion[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([proyectoId,state,dueAt])
+  @@index([responsableId,state])
+}
+model ParticipanteActividadKairos {
+  actividadId String @db.VarChar(30)
+  usuarioId Int
+  actividad ActividadKairos @relation(fields:[actividadId], references:[id], onDelete: Cascade)
+  usuario Usuario @relation(fields:[usuarioId], references:[id], onDelete: Restrict)
+  createdAt DateTime @default(now())
+  @@id([actividadId,usuarioId])
+}
+model EntregaEvidenciaKairos {
+  id String @id @default(cuid()) @db.VarChar(30)
+  actividadId String @db.VarChar(30)
+  archivoId String @db.VarChar(30)
+  authorId Int
+  version Int
+  comment String? @db.VarChar(1000)
+  actividad ActividadKairos @relation(fields:[actividadId], references:[id], onDelete: Cascade)
+  archivo Archivo @relation(fields:[archivoId], references:[id], onDelete: Restrict)
+  author Usuario @relation(fields:[authorId], references:[id], onDelete: Restrict)
+  createdAt DateTime @default(now())
+  histories HistorialActividadKairos[]
+  @@unique([actividadId,version])
+  @@index([archivoId])
+}
+model ComentarioActividadKairos {
+  id String @id @default(cuid()) @db.VarChar(30)
+  actividadId String @db.VarChar(30)
+  authorId Int
+  body String @db.VarChar(2000)
+  actividad ActividadKairos @relation(fields:[actividadId], references:[id], onDelete: Cascade)
+  author Usuario @relation(fields:[authorId], references:[id], onDelete: Restrict)
+  createdAt DateTime @default(now())
+  @@index([actividadId,createdAt])
+}
+model HistorialActividadKairos {
+  id String @id @default(cuid()) @db.VarChar(30)
+  actividadId String @db.VarChar(30)
+  actorId Int
+  reviewerId Int?
+  type TipoHistorialActividadKairos
+  fromState EstadoActividadKairos?
+  toState EstadoActividadKairos?
+  comment String? @db.VarChar(2000)
+  evidenceId String? @db.VarChar(30)
+  evidence EntregaEvidenciaKairos? @relation(fields:[evidenceId], references:[id], onDelete: Restrict)
+  actividad ActividadKairos @relation(fields:[actividadId], references:[id], onDelete: Cascade)
+  actor Usuario @relation("KairosActivityActor", fields:[actorId], references:[id], onDelete: Restrict)
+  reviewer Usuario? @relation("KairosActivityReviewer", fields:[reviewerId], references:[id], onDelete: Restrict)
+  createdAt DateTime @default(now())
+  @@index([actividadId,createdAt])
+}
+
+enum CategoriaBiblioteca {
+  MANUAL
+  PROCEDIMIENTO
+  REGLAMENTO
+  FORMATO
+  INSTRUCTIVO
+  PROTOCOLO
+  CAPACITACION
+  PLANTILLA
+  COMUNICADO_PERMANENTE
+  POLITICA
+}
+
+enum AlcanceBiblioteca {
+  GLOBAL
+  SEDE
+  AREA
+  PROYECTO
+}
+
+enum EstadoBiblioteca {
+  BORRADOR
+  EN_REVISION
+  PUBLICADO
+  ARCHIVADO
+}
+
+model DocumentoBiblioteca {
+  id String @id @default(cuid()) @db.VarChar(30)
+  titulo String @db.VarChar(191)
+  descripcion String? @db.VarChar(2000)
+  categoria CategoriaBiblioteca
+  alcance AlcanceBiblioteca
+  estado EstadoBiblioteca @default(BORRADOR)
+  requiereAcuse Boolean @default(false)
+  sedeId Int?
+  sede Sede? @relation(fields:[sedeId], references:[id], onDelete:Restrict)
+  areaId Int?
+  area Area? @relation(fields:[areaId], references:[id], onDelete:Restrict)
+  proyectoId String? @db.VarChar(30)
+  proyecto ProyectoKairos? @relation(fields:[proyectoId], references:[id], onDelete:Restrict)
+  creadoPorId Int
+  creadoPor Usuario @relation("LibraryDocumentCreator", fields:[creadoPorId], references:[id], onDelete:Restrict)
+  archivadoPorId Int?
+  archivadoPor Usuario? @relation("LibraryDocumentArchiver", fields:[archivadoPorId], references:[id], onDelete:Restrict)
+  motivoArchivo String? @db.VarChar(1000)
+  archivadoAt DateTime?
+  versiones VersionBiblioteca[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([alcance,estado,updatedAt])
+  @@index([sedeId,estado,updatedAt])
+  @@index([areaId,estado,updatedAt])
+  @@index([proyectoId,estado,updatedAt])
+  @@index([categoria,estado,updatedAt])
+}
+
+model VersionBiblioteca {
+  id String @id @default(cuid()) @db.VarChar(30)
+  documentoId String @db.VarChar(30)
+  documento DocumentoBiblioteca @relation(fields:[documentoId], references:[id], onDelete:Restrict)
+  numero Int
+  estado EstadoBiblioteca @default(BORRADOR)
+  archivoId String @unique @db.VarChar(30)
+  archivo Archivo @relation(fields:[archivoId], references:[id], onDelete:Restrict)
+  autorId Int
+  autor Usuario @relation("LibraryVersionAuthor", fields:[autorId], references:[id], onDelete:Restrict)
+  revisadoPorId Int?
+  revisadoPor Usuario? @relation("LibraryVersionReviewer", fields:[revisadoPorId], references:[id], onDelete:Restrict)
+  publicadoPorId Int?
+  publicadoPor Usuario? @relation("LibraryVersionPublisher", fields:[publicadoPorId], references:[id], onDelete:Restrict)
+  resumenCambios String @db.VarChar(2000)
+  retroalimentacion String? @db.VarChar(2000)
+  motivoSustitucion String? @db.VarChar(1000)
+  vigenteDesde DateTime?
+  vigenteHasta DateTime?
+  submittedAt DateTime?
+  reviewedAt DateTime?
+  publishedAt DateTime?
+  archivedAt DateTime?
+  acuses AcuseBiblioteca[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([documentoId,numero])
+  @@index([documentoId,estado,numero])
+  @@index([estado,publishedAt])
+}
+
+model AcuseBiblioteca {
+  id String @id @default(cuid()) @db.VarChar(30)
+  versionId String @db.VarChar(30)
+  version VersionBiblioteca @relation(fields:[versionId], references:[id], onDelete:Restrict)
+  usuarioId Int
+  usuario Usuario @relation(fields:[usuarioId], references:[id], onDelete:Restrict)
+  acknowledgedAt DateTime @default(now())
+  @@unique([versionId,usuarioId])
+  @@index([usuarioId,acknowledgedAt])
+}
+
+enum EstadoContenidoPublico {
+  BORRADOR
+  PUBLICADO
+  ARCHIVADO
+}
+
+enum TipoBloqueContenidoPublico {
+  TEXTO
+  ENCABEZADO
+  LISTA
+  ENLACE
+  AVISO
+  IMAGEN
+  FAQ
+}
+
+model PaginaPublica {
+  id String @id @default(cuid()) @db.VarChar(30)
+  slug String @unique @db.VarChar(80)
+  titulo String @db.VarChar(191)
+  estado EstadoContenidoPublico @default(BORRADOR)
+  creadoPorId Int
+  creadoPor Usuario @relation("PublicPageCreator", fields:[creadoPorId], references:[id], onDelete:Restrict)
+  archivadoPorId Int?
+  archivadoPor Usuario? @relation("PublicPageArchiver", fields:[archivadoPorId], references:[id], onDelete:Restrict)
+  motivoArchivo String? @db.VarChar(1000)
+  archivadoAt DateTime?
+  versiones VersionContenidoPublico[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([estado,updatedAt])
+}
+
+model VersionContenidoPublico {
+  id String @id @default(cuid()) @db.VarChar(30)
+  paginaId String @db.VarChar(30)
+  pagina PaginaPublica @relation(fields:[paginaId], references:[id], onDelete:Restrict)
+  numero Int
+  estado EstadoContenidoPublico @default(BORRADOR)
+  autorId Int
+  autor Usuario @relation("PublicContentAuthor", fields:[autorId], references:[id], onDelete:Restrict)
+  publicadoPorId Int?
+  publicadoPor Usuario? @relation("PublicContentPublisher", fields:[publicadoPorId], references:[id], onDelete:Restrict)
+  titulo String @db.VarChar(191)
+  resumenCambios String @db.VarChar(2000)
+  seoTitulo String? @db.VarChar(191)
+  seoDescripcion String? @db.VarChar(500)
+  publishedAt DateTime?
+  archivedAt DateTime?
+  bloques BloqueContenidoPublico[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([paginaId,numero])
+  @@index([paginaId,estado,numero])
+  @@index([estado,publishedAt])
+}
+
+model BloqueContenidoPublico {
+  id String @id @default(cuid()) @db.VarChar(30)
+  versionId String @db.VarChar(30)
+  version VersionContenidoPublico @relation(fields:[versionId], references:[id], onDelete:Restrict)
+  orden Int
+  tipo TipoBloqueContenidoPublico
+  contenido Json
+  activoPublicoId String? @db.VarChar(30)
+  activoPublico ActivoPublico? @relation(fields:[activoPublicoId], references:[id], onDelete:Restrict)
+  createdAt DateTime @default(now())
+  @@unique([versionId,orden])
+  @@index([activoPublicoId])
+}
+
+model ActivoPublico {
+  id String @id @default(cuid()) @db.VarChar(30)
+  archivoOrigenId String @unique @db.VarChar(30)
+  archivoOrigen Archivo @relation(fields:[archivoOrigenId], references:[id], onDelete:Restrict)
+  objectKey String @unique @db.VarChar(500)
+  nombre String @db.VarChar(255)
+  mime String @db.VarChar(150)
+  sizeBytes BigInt
+  publicadoPorId Int
+  publicadoPor Usuario @relation("PublicAssetPublisher", fields:[publicadoPorId], references:[id], onDelete:Restrict)
+  activo Boolean @default(true)
+  motivoArchivo String? @db.VarChar(1000)
+  archivadoAt DateTime?
+  bloques BloqueContenidoPublico[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([activo,createdAt])
+}
+
+enum OrigenReglaGamificacion {
+  KAIROS_TERMINADA
+}
+
+enum TipoEventoGamificacion {
+  OTORGAMIENTO
+  REVERSO
+  RECONOCIMIENTO_MANUAL
+}
+
+model ReglaGamificacion {
+  id String @id @default(cuid()) @db.VarChar(30)
+  codigo String @db.VarChar(80)
+  version Int
+  origen OrigenReglaGamificacion
+  puntos Int
+  activa Boolean @default(true)
+  motivo String @db.VarChar(1000)
+  creadoPorId Int?
+  creadoPor Usuario? @relation("GamificationRuleCreator", fields:[creadoPorId], references:[id], onDelete:Restrict)
+  eventos EventoGamificacion[]
+  createdAt DateTime @default(now())
+  @@unique([codigo,version])
+  @@index([origen,activa,version])
+}
+
+model InsigniaGamificacion {
+  id String @id @default(cuid()) @db.VarChar(30)
+  codigo String @db.VarChar(80)
+  version Int
+  nombre String @db.VarChar(120)
+  descripcion String @db.VarChar(500)
+  umbralPuntos Int
+  activa Boolean @default(true)
+  motivo String @db.VarChar(1000)
+  creadoPorId Int?
+  creadoPor Usuario? @relation("GamificationBadgeCreator", fields:[creadoPorId], references:[id], onDelete:Restrict)
+  createdAt DateTime @default(now())
+  @@unique([codigo,version])
+  @@index([activa,umbralPuntos])
+}
+
+model EventoGamificacion {
+  id String @id @default(cuid()) @db.VarChar(30)
+  usuarioId Int
+  usuario Usuario @relation("GamificationSubject", fields:[usuarioId], references:[id], onDelete:Restrict)
+  actorId Int?
+  actor Usuario? @relation("GamificationActor", fields:[actorId], references:[id], onDelete:Restrict)
+  tipo TipoEventoGamificacion
+  puntos Int
+  sourceKey String @unique @db.VarChar(191)
+  motivo String @db.VarChar(1000)
+  actividadId String? @db.VarChar(30)
+  actividad ActividadKairos? @relation(fields:[actividadId], references:[id], onDelete:Restrict)
+  reglaId String? @db.VarChar(30)
+  regla ReglaGamificacion? @relation(fields:[reglaId], references:[id], onDelete:Restrict)
+  reversaDeId String? @unique @db.VarChar(30)
+  reversaDe EventoGamificacion? @relation("GamificationReversal", fields:[reversaDeId], references:[id], onDelete:Restrict)
+  reverso EventoGamificacion? @relation("GamificationReversal")
+  createdAt DateTime @default(now())
+  @@index([usuarioId,createdAt])
+  @@index([actividadId,tipo,createdAt])
+  @@index([actorId,createdAt])
+}
+
+enum EstadoTrabajoImpresion3D {
+  SOLICITADO
+  EN_REVISION
+  APROBADO
+  EN_COLA
+  EN_IMPRESION
+  COMPLETADO
+  RECHAZADO
+  CANCELADO
+  FALLIDO
+}
+
+enum ResultadoEjecucionImpresion3D {
+  COMPLETADA
+  FALLIDA
+  CANCELADA
+}
+
+enum TipoOperacionImpresion3D {
+  CREAR_TRABAJO
+  INICIAR_REVISION
+  RESOLVER_REVISION
+  ASIGNAR_OPERADOR
+  INICIAR_EJECUCION
+  FINALIZAR_EJECUCION
+  REENCOLAR
+  CANCELAR
+}
+
+model TrabajoImpresion3D {
+  id String @id @default(cuid()) @db.VarChar(30)
+  solicitanteId Int
+  solicitante Usuario @relation("Printing3DRequester", fields:[solicitanteId], references:[id], onDelete:Restrict)
+  archivoId String @db.VarChar(30)
+  archivo Archivo @relation(fields:[archivoId], references:[id], onDelete:Restrict)
+  descripcion String @db.VarChar(2000)
+  estado EstadoTrabajoImpresion3D @default(SOLICITADO)
+  sedeId Int?
+  areaId Int?
+  operadorAsignadoId Int?
+  operadorAsignado Usuario? @relation("Printing3DOperator", fields:[operadorAsignadoId], references:[id], onDelete:Restrict)
+  revisadoPorId Int?
+  revisadoPor Usuario? @relation("Printing3DReviewer", fields:[revisadoPorId], references:[id], onDelete:Restrict)
+  motivoRevision String? @db.VarChar(1000)
+  reviewedAt DateTime?
+  assignedAt DateTime?
+  canceladoPorId Int?
+  canceladoPor Usuario? @relation("Printing3DCanceller", fields:[canceladoPorId], references:[id], onDelete:Restrict)
+  motivoCancelacion String? @db.VarChar(1000)
+  cancelledAt DateTime?
+  ejecuciones EjecucionImpresion3D[]
+  operaciones OperacionImpresion3D[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([solicitanteId,createdAt])
+  @@index([estado,sedeId,areaId,createdAt])
+  @@index([operadorAsignadoId,estado,createdAt])
+  @@index([archivoId])
+}
+
+model EjecucionImpresion3D {
+  id String @id @default(cuid()) @db.VarChar(30)
+  trabajoId String @db.VarChar(30)
+  trabajo TrabajoImpresion3D @relation(fields:[trabajoId], references:[id], onDelete:Restrict)
+  operadorId Int
+  operador Usuario @relation("Printing3DExecutionOperator", fields:[operadorId], references:[id], onDelete:Restrict)
+  numero Int
+  startedAt DateTime @default(now())
+  finishedAt DateTime?
+  material String @db.VarChar(120)
+  pesoGramos Int?
+  resultado ResultadoEjecucionImpresion3D?
+  observacion String? @db.VarChar(2000)
+  operaciones OperacionImpresion3D[]
+  createdAt DateTime @default(now())
+  @@unique([trabajoId,numero])
+  @@index([operadorId,startedAt])
+  @@index([trabajoId,finishedAt])
+}
+
+model OperacionImpresion3D {
+  id String @id @default(cuid()) @db.VarChar(30)
+  actorId Int
+  actor Usuario @relation("Printing3DOperationActor", fields:[actorId], references:[id], onDelete:Restrict)
+  key String @db.VarChar(128)
+  requestHash String @db.Char(64)
+  tipo TipoOperacionImpresion3D
+  trabajoId String? @db.VarChar(30)
+  trabajo TrabajoImpresion3D? @relation(fields:[trabajoId], references:[id], onDelete:Restrict)
+  ejecucionId String? @db.VarChar(30)
+  ejecucion EjecucionImpresion3D? @relation(fields:[ejecucionId], references:[id], onDelete:Restrict)
+  createdAt DateTime @default(now())
+  @@unique([actorId,key])
+  @@index([trabajoId,createdAt])
+  @@index([ejecucionId])
+}
+
+enum CategoriaRetencion {
+  IDENTIDAD_CUENTA
+  PERFIL_ACADEMICO
+  ASISTENCIA_HORAS
+  AUSENCIAS_JUSTIFICANTES
+  EXPEDIENTE
+  KAIROS_EVIDENCIAS
+  BIBLIOTECA
+  AUDITORIA
+  NOTIFICACIONES_CORREO
+  SESIONES_TOKENS
+  LOGS
+  EXPORTACIONES
+  ARCHIVOS_RECHAZADOS
+}
+
+enum AccionFinalRetencion {
+  ELIMINAR
+  ANONIMIZAR
+}
+
+enum EstadoReglaRetencion {
+  BORRADOR
+  APROBADA
+  SUSTITUIDA
+}
+
+enum EstadoRegistroRetencion {
+  ACTIVO
+  BLOQUEADO_ARCHIVADO
+  SUPRESION_PROGRAMADA
+  SUPRIMIDO
+  ANONIMIZADO
+}
+
+enum EstadoRetencionLegal {
+  ACTIVA
+  LIBERADA
+}
+
+enum EstadoSolicitudSupresion {
+  ABIERTA
+  EN_REVISION
+  APROBADA
+  RECHAZADA
+  EJECUTADA
+}
+
+enum EstadoLoteSupresion {
+  BORRADOR
+  AUTORIZADO
+  EN_EJECUCION
+  PAUSADO
+  COMPLETADO
+  FALLIDO
+}
+
+enum EstadoElementoSupresion {
+  PENDIENTE
+  PROCESANDO
+  OMITIDO_RETENCION_LEGAL
+  EJECUTADO
+  FALLIDO
+}
+
+enum TipoOperacionRetencion {
+  CREAR_REGLA
+  APROBAR_REGLA
+  REGISTRAR_ELEMENTO
+  CREAR_RETENCION_LEGAL
+  LIBERAR_RETENCION_LEGAL
+  CREAR_SOLICITUD
+  RESOLVER_SOLICITUD
+  CREAR_LOTE
+  AUTORIZAR_LOTE
+  PAUSAR_LOTE
+  EJECUTAR_LOTE
+  REAPLICAR_SUPRESIONES
+}
+
+model ReglaRetencion {
+  id String @id @default(cuid()) @db.VarChar(30)
+  categoria CategoriaRetencion
+  version Int
+  finalidad String @db.VarChar(1000)
+  responsable String @db.VarChar(191)
+  eventoInicio String @db.VarChar(191)
+  periodoActivoDias Int
+  periodoBloqueadoDias Int
+  accionFinal AccionFinalRetencion
+  fundamento String @db.VarChar(2000)
+  provisional Boolean @default(false)
+  automatica Boolean @default(false)
+  estado EstadoReglaRetencion @default(BORRADOR)
+  referenciaAprobacion String? @db.VarChar(500)
+  approvedAt DateTime?
+  creadoPorId Int?
+  creadoPor Usuario? @relation("RetentionRuleCreator", fields:[creadoPorId], references:[id], onDelete:Restrict)
+  aprobadoPorId Int?
+  aprobadoPor Usuario? @relation("RetentionRuleApprover", fields:[aprobadoPorId], references:[id], onDelete:Restrict)
+  registros RegistroRetencion[]
+  createdAt DateTime @default(now())
+  @@unique([categoria,version])
+  @@index([categoria,estado,version])
+}
+
+model RegistroRetencion {
+  id String @id @default(cuid()) @db.VarChar(30)
+  categoria CategoriaRetencion
+  resourceType String @db.VarChar(100)
+  resourceId String @db.VarChar(191)
+  subjectId Int?
+  subject Usuario? @relation("RetentionSubject", fields:[subjectId], references:[id], onDelete:SetNull)
+  reglaId String @db.VarChar(30)
+  regla ReglaRetencion @relation(fields:[reglaId], references:[id], onDelete:Restrict)
+  estado EstadoRegistroRetencion @default(ACTIVO)
+  triggeredAt DateTime
+  archiveDueAt DateTime
+  actionDueAt DateTime
+  blockedAt DateTime?
+  scheduledAt DateTime?
+  processedAt DateTime?
+  retencionesLegales RetencionLegal[]
+  elementosLote ElementoLoteSupresion[]
+  registrosSupresion RegistroSupresion[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([categoria,resourceType,resourceId])
+  @@index([estado,actionDueAt])
+  @@index([subjectId,estado,createdAt])
+  @@index([reglaId,estado])
+}
+
+model RetencionLegal {
+  id String @id @default(cuid()) @db.VarChar(30)
+  registroId String @db.VarChar(30)
+  registro RegistroRetencion @relation(fields:[registroId], references:[id], onDelete:Restrict)
+  motivo String @db.VarChar(2000)
+  responsable String @db.VarChar(191)
+  reviewAt DateTime
+  endsAt DateTime?
+  estado EstadoRetencionLegal @default(ACTIVA)
+  creadoPorId Int
+  creadoPor Usuario @relation("LegalHoldCreator", fields:[creadoPorId], references:[id], onDelete:Restrict)
+  liberadoPorId Int?
+  liberadoPor Usuario? @relation("LegalHoldReleaser", fields:[liberadoPorId], references:[id], onDelete:Restrict)
+  motivoLiberacion String? @db.VarChar(2000)
+  releasedAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([registroId,estado,reviewAt])
+}
+
+model SolicitudSupresion {
+  id String @id @default(cuid()) @db.VarChar(30)
+  solicitanteId Int
+  solicitante Usuario @relation("SuppressionRequester", fields:[solicitanteId], references:[id], onDelete:Restrict)
+  motivo String @db.VarChar(2000)
+  estado EstadoSolicitudSupresion @default(ABIERTA)
+  clasificacion Json?
+  resolucion String? @db.VarChar(2000)
+  resueltoPorId Int?
+  resueltoPor Usuario? @relation("SuppressionResolver", fields:[resueltoPorId], references:[id], onDelete:Restrict)
+  resolvedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([solicitanteId,createdAt])
+  @@index([estado,createdAt])
+}
+
+model LoteSupresion {
+  id String @id @default(cuid()) @db.VarChar(30)
+  categoria CategoriaRetencion?
+  estado EstadoLoteSupresion @default(BORRADOR)
+  cutoffAt DateTime
+  totalElementos Int @default(0)
+  ejecutados Int @default(0)
+  omitidos Int @default(0)
+  fallidos Int @default(0)
+  creadoPorId Int
+  creadoPor Usuario @relation("SuppressionBatchCreator", fields:[creadoPorId], references:[id], onDelete:Restrict)
+  autorizadoPorId Int?
+  autorizadoPor Usuario? @relation("SuppressionBatchAuthorizer", fields:[autorizadoPorId], references:[id], onDelete:Restrict)
+  authorizedAt DateTime?
+  pausedAt DateTime?
+  motivoPausa String? @db.VarChar(1000)
+  startedAt DateTime?
+  finishedAt DateTime?
+  elementos ElementoLoteSupresion[]
+  operaciones OperacionRetencion[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([estado,createdAt])
+  @@index([categoria,estado,createdAt])
+}
+
+model ElementoLoteSupresion {
+  id String @id @default(cuid()) @db.VarChar(30)
+  loteId String @db.VarChar(30)
+  lote LoteSupresion @relation(fields:[loteId], references:[id], onDelete:Restrict)
+  registroId String @db.VarChar(30)
+  registro RegistroRetencion @relation(fields:[registroId], references:[id], onDelete:Restrict)
+  estado EstadoElementoSupresion @default(PENDIENTE)
+  attempts Int @default(0)
+  nextAttemptAt DateTime?
+  leaseUntil DateTime?
+  leaseOwner String? @db.VarChar(80)
+  errorCode String? @db.VarChar(100)
+  processedAt DateTime?
+  createdAt DateTime @default(now())
+  @@unique([loteId,registroId])
+  @@index([loteId,estado])
+  @@index([estado,nextAttemptAt,leaseUntil])
+}
+
+model RegistroSupresion {
+  id String @id @default(cuid()) @db.VarChar(30)
+  registroId String @db.VarChar(30)
+  registro RegistroRetencion @relation(fields:[registroId], references:[id], onDelete:Restrict)
+  categoria CategoriaRetencion
+  resourceType String @db.VarChar(100)
+  resourceFingerprint String @db.Char(64)
+  accion AccionFinalRetencion
+  policyVersion Int
+  loteId String @db.VarChar(30)
+  ejecutadoPorId Int?
+  ejecutadoPor Usuario? @relation("SuppressionExecutor", fields:[ejecutadoPorId], references:[id], onDelete:Restrict)
+  occurredAt DateTime @default(now())
+  lastReappliedAt DateTime?
+  journalEntry SuppressionJournalEntry?
+  @@unique([registroId,accion])
+  @@index([categoria,occurredAt])
+  @@index([loteId,occurredAt])
+}
+
+model SuppressionJournalEntry {
+  id String @id @default(cuid()) @db.VarChar(30)
+  sequence Int @unique
+  registroSupresionId String @unique @db.VarChar(30)
+  registroSupresion RegistroSupresion @relation(fields:[registroSupresionId], references:[id], onDelete:Restrict)
+  payload Json
+  payloadHash String @db.Char(64)
+  previousHash String? @db.Char(64)
+  entryHash String @db.Char(64)
+  signature String? @db.Char(64)
+  keyVersion String? @db.VarChar(50)
+  state SuppressionJournalState @default(PENDING)
+  attempts Int @default(0)
+  nextAttemptAt DateTime @default(now()) @db.DateTime(3)
+  leaseOwner String? @db.VarChar(100)
+  leaseUntil DateTime? @db.DateTime(3)
+  storageRef String? @db.VarChar(255)
+  lastErrorCode String? @db.VarChar(100)
+  exportedAt DateTime? @db.DateTime(3)
+  createdAt DateTime @default(now()) @db.DateTime(3)
+  @@index([state,nextAttemptAt])
+  @@index([createdAt])
+}
+
+model SuppressionJournalHead {
+  id String @id @default("global") @db.VarChar(30)
+  lastSequence Int @default(0)
+  lastHash String? @db.Char(64)
+  updatedAt DateTime @updatedAt @db.DateTime(3)
+}
+
+model OperacionRetencion {
+  id String @id @default(cuid()) @db.VarChar(30)
+  actorId Int
+  actor Usuario @relation("RetentionOperationActor", fields:[actorId], references:[id], onDelete:Restrict)
+  key String @db.VarChar(128)
+  requestHash String @db.Char(64)
+  tipo TipoOperacionRetencion
+  loteId String? @db.VarChar(30)
+  lote LoteSupresion? @relation(fields:[loteId], references:[id], onDelete:Restrict)
+  response Json?
+  createdAt DateTime @default(now())
+  @@unique([actorId,key])
+  @@index([loteId,createdAt])
 }
 
 model Asistencia {

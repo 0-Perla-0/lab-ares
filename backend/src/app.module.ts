@@ -8,12 +8,30 @@ import { PermissionsGuard } from "./auth/permissions.guard";
 import { SessionAuthGuard } from "./auth/session-auth.guard";
 import { ApiExceptionFilter } from "./common/errors/api-exception.filter";
 import { NoStoreInterceptor } from "./common/http/no-store.interceptor";
+import { CorrelationInterceptor } from "./common/http/correlation.interceptor";
+import { CorrelationModule } from "./common/http/correlation.module";
 import { validateEnvironment } from "./config/environment";
 import { DatabaseModule } from "./database/database.module";
 import { HealthModule } from "./health/health.module";
 import { OrganizationModule } from "./organization/organization.module";
 import { OpenApiModule } from "./openapi/openapi.module";
 import { UsersModule } from "./users/users.module";
+import { StorageModule } from "./storage/storage.module";
+import { InvitationsModule } from "./invitations/invitations.module";
+import { NotificationsModule } from "./notifications/notifications.module";
+import { AcademicModule } from "./academic/academic.module";
+import { DocumentsModule } from "./documents/documents.module";
+import { KairosModule } from "./kairos/kairos.module";
+import { DirectoryModule } from "./directory/directory.module";
+import { ReportsModule } from "./reports/reports.module";
+import { LibraryModule } from "./library/library.module";
+import { PublicContentModule } from "./public-content/public-content.module";
+import { GamificationModule } from "./gamification/gamification.module";
+import { Printing3dModule } from "./printing-3d/printing-3d.module";
+import { RetentionModule } from "./retention/retention.module";
+import { OperationsModule } from "./operations/operations.module";
+import { RecoveryModule } from "./recovery/recovery.module";
+import { WriteBarrierGuard } from "./recovery/write-barrier.guard";
 
 @Module({
   imports: [
@@ -23,16 +41,34 @@ import { UsersModule } from "./users/users.module";
       validate: validateEnvironment,
     }),
     DatabaseModule,
+    CorrelationModule,
     AuthModule,
     AttendanceModule,
     HealthModule,
     OrganizationModule,
     UsersModule,
+    StorageModule,
+    InvitationsModule,
+    NotificationsModule,
+    AcademicModule,
+    DocumentsModule,
+    KairosModule,
+    DirectoryModule,
+    ReportsModule,
+    LibraryModule,
+    PublicContentModule,
+    GamificationModule,
+    Printing3dModule,
+    RetentionModule,
+    OperationsModule,
+    RecoveryModule,
     OpenApiModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: ApiExceptionFilter },
+    { provide: APP_INTERCEPTOR, useClass: CorrelationInterceptor },
     { provide: APP_INTERCEPTOR, useClass: NoStoreInterceptor },
+    { provide: APP_GUARD, useClass: WriteBarrierGuard },
     { provide: APP_GUARD, useClass: SessionAuthGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
   ],

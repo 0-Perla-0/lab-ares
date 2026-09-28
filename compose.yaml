@@ -1,6 +1,45 @@
 name: ares
 
 services:
+  storage:
+    image: bitnamilegacy/minio:2025.7.23-debian-12-r5@sha256:6dabb4a2088c9a79908de3bc05f4586c23ad2182c8908e7e3acbf61c1467fb20
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-ares-local}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-ares-local-secret}
+      MINIO_DEFAULT_BUCKETS: ares-quarantine,ares-available,ares-public,ares-suppression-journal
+      MINIO_BROWSER: "on"
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    volumes:
+      - ares-storage:/bitnami/minio/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  clamav:
+    image: clamav/clamav:1.4
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "printf 'PING\\0' | nc -w 2 127.0.0.1 3310 | grep -q PONG",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  mailpit:
+    image: axllent/mailpit:v1.21
+    ports:
+      - "127.0.0.1:1025:1025"
+      - "8025:8025"
+    restart: unless-stopped
+
   database:
     image: mariadb:11.8
     environment:
@@ -9,7 +48,8 @@ services:
       MARIADB_PASSWORD: ${MARIADB_PASSWORD:-ares-local-password}
       MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:-ares-local-root-password}
     ports:
-      - "3306:3306"
+      # 3307 avoids colliding with an existing local MySQL/MariaDB service.
+      - "127.0.0.1:${MARIADB_HOST_PORT:-3307}:3306"
     volumes:
       - ares-database:/var/lib/mysql
     healthcheck:
@@ -38,7 +78,9 @@ services:
       dockerfile: backend/Dockerfile
       target: runtime
     environment:
-      NODE_ENV: production
+      # This Compose file is the local development stack (Mailpit, local MinIO).
+      # Override NODE_ENV and all secrets explicitly for a real deployment.
+      NODE_ENV: ${NODE_ENV:-development}
       DATABASE_URL: mysql://ares_app:${MARIADB_PASSWORD:-ares-local-password}@database:3306/ares_dev
       BACKEND_HOST: 0.0.0.0
       BACKEND_PORT: 3000
@@ -46,11 +88,56 @@ services:
       APP_TIME_ZONE: ${APP_TIME_ZONE:-America/Mexico_City}
       ATTENDANCE_ALERT_HOURS: ${ATTENDANCE_ALERT_HOURS:-12}
       SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET in .env before starting the backend}
+      S3_ENDPOINT: http://storage:9000
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-ares-local}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-ares-local-secret}
+      S3_FORCE_PATH_STYLE: "true"
+      S3_QUARANTINE_BUCKET: ares-quarantine
+      S3_AVAILABLE_BUCKET: ares-available
+      S3_PUBLIC_BUCKET: ares-public
+      S3_SUPPRESSION_JOURNAL_BUCKET: ares-suppression-journal
+      SUPPRESSION_JOURNAL_HMAC_SECRET: ${SUPPRESSION_JOURNAL_HMAC_SECRET:-development-only-journal-key-change-me-32chars}
+      SUPPRESSION_JOURNAL_KEY_VERSION: ${SUPPRESSION_JOURNAL_KEY_VERSION:-v1}
+      SUPPRESSION_JOURNAL_WORKER_ENABLED: ${SUPPRESSION_JOURNAL_WORKER_ENABLED:-false}
+      SUPPRESSION_JOURNAL_WORKER_INTERVAL_MS: ${SUPPRESSION_JOURNAL_WORKER_INTERVAL_MS:-60000}
+      RECOVERY_RECONCILIATION_MAX_ATTEMPTS: ${RECOVERY_RECONCILIATION_MAX_ATTEMPTS:-3}
+      RECOVERY_RECONCILIATION_LEASE_MS: ${RECOVERY_RECONCILIATION_LEASE_MS:-120000}
+      CLAMAV_HOST: clamav
+      CLAMAV_PORT: 3310
+      STORAGE_SCANNER_ENABLED: "true"
+      GAMIFICATION_ENABLED: ${GAMIFICATION_ENABLED:-false}
+      GAMIFICATION_POINTS_PER_LEVEL: ${GAMIFICATION_POINTS_PER_LEVEL:-100}
+      PRINTING_3D_ENABLED: ${PRINTING_3D_ENABLED:-false}
+      RETENTION_INSTITUTIONAL_POLICIES_APPROVED: ${RETENTION_INSTITUTIONAL_POLICIES_APPROVED:-false}
+      RETENTION_WORKER_ENABLED: ${RETENTION_WORKER_ENABLED:-false}
+      RETENTION_WORKER_INTERVAL_MS: ${RETENTION_WORKER_INTERVAL_MS:-60000}
+      RETENTION_BATCH_SIZE: ${RETENTION_BATCH_SIZE:-20}
+      RETENTION_MAX_ATTEMPTS: ${RETENTION_MAX_ATTEMPTS:-3}
+      RETENTION_LEASE_MS: ${RETENTION_LEASE_MS:-120000}
+      RETENTION_RETRY_BASE_MS: ${RETENTION_RETRY_BASE_MS:-60000}
+      AUDIT_MANIFEST_WORKER_ENABLED: ${AUDIT_MANIFEST_WORKER_ENABLED:-false}
+      AUDIT_MANIFEST_WORKER_INTERVAL_MS: ${AUDIT_MANIFEST_WORKER_INTERVAL_MS:-3600000}
+      OPERATIONS_JOB_MAX_ATTEMPTS: ${OPERATIONS_JOB_MAX_ATTEMPTS:-3}
+      OPERATIONS_JOB_LEASE_MS: ${OPERATIONS_JOB_LEASE_MS:-120000}
+      OPERATIONS_RETRY_BASE_MS: ${OPERATIONS_RETRY_BASE_MS:-60000}
+      MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:-development-only-mfa-key-change-me-32chars}
+      OUTBOX_ENCRYPTION_KEY: ${OUTBOX_ENCRYPTION_KEY:-development-only-outbox-key-change-me-32chars}
+      SMTP_ENABLED: ${SMTP_ENABLED:-true}
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_FROM: ${SMTP_FROM:-no-reply@ares.local}
     ports:
       - "3000:3000"
     depends_on:
       migrate:
         condition: service_completed_successfully
+      storage:
+        condition: service_healthy
+      clamav:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
     healthcheck:
       test:
         [
@@ -96,3 +183,4 @@ services:
 
 volumes:
   ares-database:
+  ares-storage:

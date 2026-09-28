@@ -70,8 +70,8 @@ export class UsersService {
 
   async darDeBaja(id: number) {
     const current = await this.obtener(id);
-    if (current.estado === EstadoUsuario.BAJA) return current;
-    return this.users.update(id, { estado: EstadoUsuario.BAJA });
+    if (current.estado === EstadoUsuario.DESACTIVADA) return current;
+    return this.users.update(id, { estado: EstadoUsuario.DESACTIVADA });
   }
 
   private async ensureUniqueIdentity(

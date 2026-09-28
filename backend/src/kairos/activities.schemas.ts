@@ -1,0 +1,10 @@
+import { z } from "zod";
+export const activitySchema=z.object({title:z.string().trim().min(1).max(191),description:z.string().trim().max(3000).nullable().optional(),startAt:z.coerce.date().optional(),dueAt:z.coerce.date().optional(),priority:z.enum(["BAJA","MEDIA","ALTA","CRITICA"]).optional(),complexity:z.enum(["BAJA","MEDIA","ALTA"]).optional(),responsableId:z.number().int().positive(),participantIds:z.array(z.number().int().positive()).max(100).optional()}).strict();
+export const updateActivitySchema=activitySchema.partial().strict().refine(v=>Object.keys(v).length>0,{message:"At least one field is required"});
+export const transitionSchema=z.object({state:z.enum(["EN_PROGRESO","BLOQUEADA","CANCELADA"]),comment:z.string().trim().max(2000).optional()}).strict();
+export const submitSchema=z.object({archivoId:z.string().regex(/^[a-f0-9]{30}$/,{message:"Invalid file id"}),comment:z.string().trim().max(1000).optional()}).strict();
+export const reviewSchema=z.object({state:z.enum(["TERMINADA","REQUIERE_CORRECCION"]),comment:z.string().trim().max(2000).optional()}).strict();
+export const reopenSchema=z.object({reason:z.string().trim().min(1).max(2000)}).strict();
+export const commentSchema=z.object({body:z.string().trim().min(1).max(2000)}).strict();
+export const pageSchema=z.object({page:z.coerce.number().int().min(1).max(100000).default(1),pageSize:z.coerce.number().int().min(1).max(100).default(50)}).strict();
+export type ActivityInput=z.infer<typeof activitySchema>; export type ActivityUpdate=z.infer<typeof updateActivitySchema>;

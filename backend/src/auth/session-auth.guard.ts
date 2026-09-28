@@ -33,7 +33,7 @@ export class SessionAuthGuard implements CanActivate {
 
     const user = await this.users.findByIdForSession(userId as number);
 
-    if (!user || user.estado !== EstadoUsuario.ACTIVO) {
+    if (!user || user.estado !== EstadoUsuario.ACTIVA) {
       request.session.destroy(() => undefined);
       throw new ApiException("UNAUTHORIZED", 401);
     }

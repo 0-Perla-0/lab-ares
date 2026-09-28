@@ -43,7 +43,7 @@ class PrismaBootstrapAdminRepository implements BootstrapAdminRepository {
       data: {
         ...input,
         rol: RolUsuario.ADMIN,
-        estado: EstadoUsuario.ACTIVO,
+        estado: EstadoUsuario.ACTIVA,
       },
       select: { id: true },
     });
@@ -55,7 +55,7 @@ class PrismaBootstrapAdminRepository implements BootstrapAdminRepository {
       data: {
         passwordHash: input.passwordHash,
         rol: RolUsuario.ADMIN,
-        estado: EstadoUsuario.ACTIVO,
+        estado: EstadoUsuario.ACTIVA,
       },
       select: { id: true },
     });

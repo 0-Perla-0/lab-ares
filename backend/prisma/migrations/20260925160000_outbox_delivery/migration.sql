@@ -1,0 +1,5 @@
+ALTER TABLE `OutboxEvent` ADD COLUMN `state` VARCHAR(20) NOT NULL DEFAULT 'PENDING', ADD COLUMN `nextAttemptAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3), ADD COLUMN `leaseUntil` DATETIME(3) NULL, ADD COLUMN `leaseOwner` VARCHAR(80) NULL, ADD COLUMN `lastError` VARCHAR(500) NULL, ADD COLUMN `failedAt` DATETIME(3) NULL;
+CREATE INDEX `OutboxEvent_state_nextAttemptAt_idx` ON `OutboxEvent`(`state`,`nextAttemptAt`);
+CREATE TABLE `EmailDelivery` (`id` VARCHAR(30) NOT NULL, `outboxEventId` VARCHAR(30) NOT NULL, `status` VARCHAR(20) NOT NULL, `attempts` INTEGER NOT NULL DEFAULT 0, `errorRedacted` VARCHAR(500) NULL, `sentAt` DATETIME(3) NULL, `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3), PRIMARY KEY (`id`), INDEX `EmailDelivery_outboxEventId_createdAt_idx` (`outboxEventId`,`createdAt`)) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+ALTER TABLE `EmailDelivery` ADD CONSTRAINT `EmailDelivery_outboxEventId_fkey` FOREIGN KEY (`outboxEventId`) REFERENCES `OutboxEvent`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+CREATE UNIQUE INDEX `EmailDelivery_outboxEventId_attempts_key` ON `EmailDelivery`(`outboxEventId`,`attempts`);
