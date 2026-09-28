@@ -6,7 +6,7 @@
 | --------------------------- | ----------------------------------------------------------------------------------------------------------------- |
 | Fecha de revisión           | 27 de septiembre de 2026                                                                                          |
 | Rama de trabajo             | `feature/backend/backend2-full-scope`                                                                             |
-| Commit base revisado        | `0c390be` (corte previo al cierre de operación/auditoría), además de los cortes históricos ya documentados        |
+| Commit base revisado        | `c075367` (cierre de recuperación/reconciliación), sobre `066f48b` (operación/auditoría) y `0c390be` (retención)   |
 | Sistema actual              | Monorepo con Next.js App Router, NestJS, Prisma y MariaDB                                                         |
 | Fuentes funcionales         | Cinco PDF del sistema heredado: plan, análisis integral, reporte de estado, documento técnico y manual de usuario |
 | Evidencia de implementación | Código, esquema Prisma, migraciones, OpenAPI, pruebas, CI, Docker y Postman del repositorio actual                |
@@ -20,7 +20,50 @@
 - La matriz de retención/supresión queda **COMPLETADA y verificada en backend**; la migración fue creada y validada, pero no aplicada a un entorno real.
 - Operación, auditoría, integridad y observabilidad de Backend 2 quedan **COMPLETADAS y verificadas en backend**; la migración fue creada y validada, pero no aplicada a un entorno real.
 - Los dominios de Backend 1 quedan excluidos de este bloque.
-- Este checkpoint sustituye las menciones históricas de “frontend/E2E pendiente” conservadas en los cierres incrementales inferiores: el único bloque funcional pendiente de Backend 2 es recuperación/reconciliación.
+- Recuperación y reconciliación de Backend 2 quedan **COMPLETADAS y verificadas en backend**; la migración fue creada y validada, pero no aplicada a un entorno real.
+- Este checkpoint sustituye las menciones históricas de “frontend/E2E pendiente” conservadas en los cierres incrementales inferiores: el alcance asignado a Backend 2 ya quedó implementado en backend y frontend. Sólo faltan despliegue, integración contra servicios reales, simulacros operativos y fusión de ramas.
+
+### Traspaso operativo de Backend 2: realizado, pendiente y cómo continuar
+
+Esta sección es la fuente de traspaso para continuar el trabajo sin reconstruir el historial de la conversación. Separa lo terminado en el repositorio de las validaciones que requieren infraestructura o decisiones externas.
+
+#### Trabajo terminado
+
+- **Backend funcional completo del alcance Backend 2:** perfil académico, expediente documental, directorio, proyectos/membresías/actividades/evidencias/Kanban de Kairos, reportes, biblioteca, CMS público, gamificación privada, impresión 3D, retención/supresión, operación/auditoría e integridad y recuperación/reconciliación. Los dominios de Backend 1 no se modificaron como parte de este alcance.
+- **Frontend completo para usar ese backend:** rama remota `feature/frontend/backend2-full-scope`, commit `606a136`. Incluye las diez áreas funcionales de Backend 2, integración de permisos de `/auth/me`, 37/37 pruebas unitarias, 13/13 recorridos Playwright deterministas, build y typecheck aprobados.
+- **Backend publicado en su rama Git Flow:** rama `feature/backend/backend2-full-scope`. Los cortes principales son `0c390be` para retención/supresión, `066f48b` para operación/auditoría e integridad y `c075367` para recuperación/reconciliación.
+- **Recuperación gobernada:** `RecoveryRun`, pasos, checks, medición RPO/RTO y simulacros; scope `IMPORTANTE` con objetivo RPO 60 minutos/RTO 480 minutos y `SECUNDARIO` con RPO 1440 minutos/RTO 480 minutos, equivalente al día hábil técnico adoptado.
+- **Barrera global durable:** las mutaciones HTTP ordinarias responden 503 con snapshot coherente; sólo pasan las rutas exactas del plano de control, autenticación necesaria y manifiesto. Los workers de almacenamiento, reportes, retención, outbox, manifiestos y journal dejan de reclamar trabajo durante el freeze.
+- **Secuencia estricta:** plan → freeze → registro de restore externo → preview sin efectos → reconciliación exacta → verificación de auditoría → importación del journal → reaplicación → aprobación independiente → unfreeze → complete. También existen terminaciones `FAILED` y `CANCELLED`; nunca liberan silenciosamente una barrera activa.
+- **Reconciliación segura:** el preview durable es obligatorio antes de ejecutar; se verifica hash del plan y versión/propietario de barrera antes de cada efecto. Se protegen referencias de archivos y anclas de auditoría; el bucket del journal queda fuera del barrido de objetos ordinario.
+- **Journal independiente de supresiones:** el registro de supresión y su outbox se crean en la misma transacción de MariaDB. El worker, desactivado por defecto, firma HMAC, mantiene cadena SHA-256 y escribe con condición de no sobrescritura en el bucket privado `ares-suppression-journal`. No se afirma atomicidad entre MariaDB y S3; leases y reintentos cierran esa brecha.
+- **Contratos y pruebas:** migración `20260927020000_recovery_reconciliation`, permisos globales `RECOVERY_READ`, `RECOVERY_MANAGE` y `RECOVERY_EXECUTE`, OpenAPI modular y carpeta 20 de Postman con 17 solicitudes. Gate final: Prisma validate/generate, typecheck, build, diff-check y 64 archivos con 716/716 pruebas backend aprobadas. El JSON de Postman parsea correctamente.
+
+#### Trabajo que todavía falta
+
+1. **Fusionar ramas, no reimplementar:** abrir revisión y fusionar `feature/frontend/backend2-full-scope` y `feature/backend/backend2-full-scope` hacia la rama de integración definida por el equipo. No se creó PR automáticamente.
+2. **Aplicar migraciones en un entorno autorizado:** respaldar primero y desplegar, en orden, `20260925300000_retention_suppression`, `20260927010000_operations_audit_integrity` y `20260927020000_recovery_reconciliation`. En este corte fueron validadas y generadas, no aplicadas contra una MariaDB real.
+3. **Validar infraestructura real:** comprobar MariaDB, MinIO/S3, bucket privado del journal, ClamAV y SMTP con credenciales no ejemplificadas. Confirmar políticas de acceso y ciclo de vida antes de habilitar workers.
+4. **Preparar auditoría histórica:** los `AuditEvent` anteriores al encadenamiento necesitan un backfill controlado antes de generar manifiestos de esos periodos. El ancla privada actual no usa WORM/object-lock y representa integridad técnica, no firma legal.
+5. **Ejecutar un simulacro real de recuperación:** el proveedor o el operador realiza PITR/restore fuera de Ares; la API sólo registra y gobierna evidencia. Deben medirse RPO/RTO, usar dos personas para freeze/aprobación y verificar scanner, outbox, journal, objetos y módulos secundarios antes de unfreeze.
+6. **Pruebas desplegadas:** ejecutar Newman contra la API levantada y un E2E cross-stack con MariaDB/MinIO/ClamAV reales. Los 13 E2E de frontend ya aprobados son deterministas con API interceptada y no sustituyen el simulacro de infraestructura.
+7. **Activación controlada:** `SUPPRESSION_JOURNAL_WORKER_ENABLED`, `RETENTION_WORKER_ENABLED`, `AUDIT_MANIFEST_WORKER_ENABLED` y los demás workers continúan apagados por defecto donde corresponde. Habilitarlos sólo después de migraciones, secretos y buckets verificados.
+
+#### Orden para retomar
+
+1. Obtener ambas ramas remotas y revisar primero los commits anteriores; no mezclar dominios de Backend 1.
+2. Levantar dependencias con `docker compose up -d`, configurar un `.env` real y comprobar `GET /api/health/ready`. La respuesta ahora incluye el estado de la barrera de recuperación.
+3. En un entorno desechable, aplicar las migraciones pendientes con `npm run prisma:migrate:deploy --workspace @ares/backend`; nunca probar por primera vez sobre datos únicos.
+4. Ejecutar `npm run check --workspace @ares/backend`, `npm run build --workspace @ares/backend` y `npm test --workspace @ares/backend`; después validar la carpeta 20 de [`Ares-Backend.postman_collection.json`](../postman/Ares-Backend.postman_collection.json).
+5. Realizar el simulacro siguiendo el orden documentado. `POST /api/recovery/:id/restore` sólo registra el restore externo: no llama al proveedor ni ejecuta una restauración destructiva.
+6. Con el simulacro y Newman en verde, fusionar las ramas y actualizar este bloque con ambiente, fecha, evidencia y resultado real.
+
+#### Riesgos y límites que no deben perderse
+
+- Una barrera activa es fail-closed. Si un run termina en fallo o cancelación mientras sigue congelado, no se libera automáticamente; se requiere una decisión operativa explícita y segura.
+- La separación de deberes impide que quien congeló o fue responsable apruebe readiness, y quien congeló tampoco puede ejecutar el unfreeze.
+- El journal no contiene identificadores crudos del recurso suprimido; usa fingerprints. Un HMAC inválido, key version desconocida, hueco de secuencia o entrada anterior al restore point bloquea la importación.
+- No se ejecutaron migraciones reales, Newman ni restauraciones de proveedor en este corte. Los gates verdes prueban código y contratos locales, no disponibilidad productiva.
 
 ### Cierre verificado: perfil académico y adscripción histórica
 
@@ -132,7 +175,7 @@ Las instrucciones o recomendaciones contenidas en los PDF se trataron como mater
 
 ## 2. Resumen ejecutivo
 
-Ares ya cuenta con una base administrativa sólida y verificable, aunque todavía no es funcionalmente equivalente a todo el sistema legado documentado. El alcance asignado a Backend 2 ya cubre backend, frontend, integración y E2E de perfil académico, expediente, directorio, Kairos, reportes, biblioteca, CMS público, gamificación, impresión 3D y retención/supresión; operación, auditoría, integridad y observabilidad también quedaron cerradas en backend en este corte. Para Backend 2 sólo permanece pendiente recuperación/reconciliación. Los dominios asignados a Backend 1 conservan su propio estado y no se contabilizan como deuda de este bloque.
+Ares ya cuenta con una base administrativa sólida y verificable, aunque todavía no es funcionalmente equivalente a todo el sistema legado documentado. El alcance asignado a Backend 2 ya cubre backend, frontend, integración y E2E de perfil académico, expediente, directorio, Kairos, reportes, biblioteca, CMS público, gamificación, impresión 3D y retención/supresión; operación, auditoría, integridad, observabilidad y recuperación/reconciliación también quedaron cerradas en backend en este corte. Los dominios asignados a Backend 1 conservan su propio estado y no se contabilizan como deuda de este bloque. Para Backend 2 sólo permanecen las actividades externas de despliegue, servicios reales, simulacro y fusión descritas en el traspaso operativo.
 
 El siguiente objetivo no debería ser migrar pantallas aisladas. Debe construirse primero un recorrido vertical completo de Servicio Social:
 
@@ -148,8 +191,8 @@ No se asigna un porcentaje global de avance porque daría el mismo peso a una pa
 
 - **Base técnica y administración inicial:** implementadas.
 - **Operación de Servicio Social:** asistencia incremento 1 implementada; validación, ausencias, calendario y documentos pendientes.
-- **Kairos:** proyectos, membresías, favoritos, actividades, evidencias y Kanban implementados y verificados en backend; frontend, integración y E2E pendientes.
-- **Funciones secundarias requeridas:** pendientes de desarrollo con un MVP obligatorio ya delimitado.
+- **Kairos:** proyectos, membresías, favoritos, actividades, evidencias y Kanban implementados y verificados en backend, frontend y E2E determinista.
+- **Funciones secundarias de Backend 2:** biblioteca, CMS, gamificación privada e impresión 3D implementadas; inventario y visitas permanecen bajo Backend 1.
 
 ### 2.1 Qué aporta la documentación encontrada
 
@@ -948,16 +991,16 @@ La migración 16B se ejecutará sólo si aparecen fuentes del sistema anterior, 
 
 ## 12. Próximo paso recomendado
 
-El perfil académico/adscripción histórica, el expediente documental funcional, el directorio interno, la base de proyectos/membresías y actividades/evidencias de Kairos, los reportes, la biblioteca, el CMS público, la gamificación privada, la impresión 3D privada, la retención/supresión y el bloque de operación/auditoría/integridad/observabilidad ya están cerrados y verificados. También quedaron cerrados el frontend, la integración y los E2E del alcance desarrollado de Backend 2. El único bloque funcional pendiente de Backend 2 es **recuperación/reconciliación**. Los dominios de Backend 1 están fuera de este bloque.
+El perfil académico/adscripción histórica, el expediente documental funcional, el directorio interno, la base de proyectos/membresías y actividades/evidencias de Kairos, los reportes, la biblioteca, el CMS público, la gamificación privada, la impresión 3D privada, la retención/supresión, operación/auditoría/integridad/observabilidad y recuperación/reconciliación ya están cerrados y verificados en código. También quedaron cerrados el frontend, la integración y los E2E deterministas del alcance de Backend 2. Los dominios de Backend 1 están fuera de este bloque.
 
 El contrato funcional principal ya produjo el primer recorrido backend implementable. El orden recomendado desde este corte es:
 
 **Decisiones funcionales pendientes: ninguna.** Las decisiones externas al control del repositorio se omiten de esta secuencia y se resolverán por separado cuando corresponda; no bloquean los contratos ni la implementación local.
 
-1. Completar recuperación/reconciliación de Backend 2: restauración coordinada de base y objetos, verificación de scanner/jobs, conciliación de auditoría y supresiones y estados degradados seguros.
-2. Validar ese recorrido con servicios reales y un ejercicio de restauración antes de aplicar las migraciones pendientes en el entorno autorizado.
+1. Aplicar las migraciones pendientes en un entorno autorizado y validar MariaDB, almacenamiento, scanner, SMTP y workers con configuración real.
+2. Ejecutar Newman, un recorrido cross-stack y un simulacro de restauración externo siguiendo la secuencia gobernada antes de fusionar a la rama de integración.
 
-El Incremento 1 quedó integrado en `develop`. Backend 1 y Frontend 1 deben continuar con validación, ausencias y calendario sin duplicar las reglas ya centralizadas. Backend 2 queda concentrado exclusivamente en recuperación y reconciliación: restauración coordinada de base de datos y objetos, validación del scanner y de los jobs, reconciliación de auditoría y supresión, y estados degradados seguros. Visitas e inventario permanecen dentro del alcance de Backend 1 y no deben incorporarse a este frente.
+El Incremento 1 quedó integrado en `develop`. Backend 1 y Frontend 1 deben continuar con validación, ausencias y calendario sin duplicar las reglas ya centralizadas. Backend 2 queda en fase de validación desplegada y fusión; no debe ampliar alcance ni incorporar visitas o inventario, que permanecen bajo Backend 1.
 
 ## 13. Referencias del repositorio actual
 
@@ -969,9 +1012,11 @@ El Incremento 1 quedó integrado en `develop`. Backend 1 y Frontend 1 deben cont
 - Módulos backend: [`../backend/src/app.module.ts`](../backend/src/app.module.ts)
 - Permisos backend: [`../backend/src/auth/permissions.ts`](../backend/src/auth/permissions.ts)
 - Contrato OpenAPI 3.1: [`../backend/src/openapi/openapi.document.ts`](../backend/src/openapi/openapi.document.ts)
+- Recuperación/reconciliación: [`../backend/src/recovery`](../backend/src/recovery), [`../backend/src/openapi/recovery.openapi.ts`](../backend/src/openapi/recovery.openapi.ts) y [`../backend/prisma/migrations/20260927020000_recovery_reconciliation/migration.sql`](../backend/prisma/migrations/20260927020000_recovery_reconciliation/migration.sql)
 - Identidad MFA/notificaciones: [`../backend/src/auth/mfa.service.ts`](../backend/src/auth/mfa.service.ts) y [`../backend/src/notifications/notifications.service.ts`](../backend/src/notifications/notifications.service.ts)
 - Outbox, entrega SMTP y limpieza: [`../backend/src/auth/outbox.service.ts`](../backend/src/auth/outbox.service.ts), [`../backend/src/auth/outbox-dispatcher.service.ts`](../backend/src/auth/outbox-dispatcher.service.ts), [`../backend/src/auth/email.service.ts`](../backend/src/auth/email.service.ts) y [`../backend/src/auth/identity-cleanup.service.ts`](../backend/src/auth/identity-cleanup.service.ts)
 - Colección y entorno Postman: [`../docs/api/postman/README.md`](../docs/api/postman/README.md), [`../docs/api/postman/ares-backend2.postman_collection.json`](../docs/api/postman/ares-backend2.postman_collection.json) y [`../docs/api/postman/ares-local.postman_environment.json`](../docs/api/postman/ares-local.postman_environment.json)
+- Colección consolidada actual: [`../postman/Ares-Backend.postman_collection.json`](../postman/Ares-Backend.postman_collection.json), incluida la carpeta 20 de recuperación.
 - Tipos frontend: [`../frontend/lib/types.ts`](../frontend/lib/types.ts)
 - Permisos frontend: [`../frontend/lib/permissions.ts`](../frontend/lib/permissions.ts)
 - CI: [`../.github/workflows/ci.yml`](../.github/workflows/ci.yml)
