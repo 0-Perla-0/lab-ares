@@ -64,6 +64,35 @@ const environmentSchema = z
     S3_QUARANTINE_BUCKET: z.string().min(1).default("ares-quarantine"),
     S3_AVAILABLE_BUCKET: z.string().min(1).default("ares-available"),
     S3_PUBLIC_BUCKET: z.string().min(1).default("ares-public"),
+    S3_SUPPRESSION_JOURNAL_BUCKET: z
+      .string()
+      .min(1)
+      .default("ares-suppression-journal"),
+    SUPPRESSION_JOURNAL_HMAC_SECRET: z
+      .string()
+      .min(32)
+      .default("development-only-journal-key-change-me-32chars"),
+    SUPPRESSION_JOURNAL_KEY_VERSION: z.string().min(1).max(50).default("v1"),
+    SUPPRESSION_JOURNAL_WORKER_ENABLED: z
+      .union([z.boolean(), z.enum(["true", "false", "1", "0"])])
+      .transform((value) => value === true || value === "true" || value === "1")
+      .default(false),
+    SUPPRESSION_JOURNAL_WORKER_INTERVAL_MS: z.coerce
+      .number()
+      .int()
+      .min(1000)
+      .default(60000),
+    RECOVERY_RECONCILIATION_MAX_ATTEMPTS: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(20)
+      .default(3),
+    RECOVERY_RECONCILIATION_LEASE_MS: z.coerce
+      .number()
+      .int()
+      .min(10000)
+      .default(120000),
     STORAGE_MAX_BYTES: z.coerce.number().int().positive().default(52428800),
     LIBRARY_MAX_BYTES: z.coerce.number().int().positive().default(26214400),
     GAMIFICATION_ENABLED: z
@@ -148,6 +177,7 @@ const environmentSchema = z
         SESSION_SECRET,
         OUTBOX_ENCRYPTION_KEY,
         MFA_ENCRYPTION_KEY,
+        SUPPRESSION_JOURNAL_HMAC_SECRET,
         SMTP_ENABLED,
         SMTP_HOST,
         SMTP_USER,
@@ -180,6 +210,16 @@ const environmentSchema = z
           code: "custom",
           path: ["MFA_ENCRYPTION_KEY"],
           message: "MFA_ENCRYPTION_KEY must be replaced in production",
+        });
+      if (
+        NODE_ENV === "production" &&
+        !hasSecureEntropy(SUPPRESSION_JOURNAL_HMAC_SECRET)
+      )
+        context.addIssue({
+          code: "custom",
+          path: ["SUPPRESSION_JOURNAL_HMAC_SECRET"],
+          message:
+            "SUPPRESSION_JOURNAL_HMAC_SECRET must be replaced in production",
         });
       if (
         NODE_ENV === "production" &&

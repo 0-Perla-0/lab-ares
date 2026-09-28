@@ -81,6 +81,8 @@ describe("validateEnvironment", () => {
         SESSION_SECRET: "a-unique-production-secret-with-32-characters",
         OUTBOX_ENCRYPTION_KEY: "a-unique-production-outbox-key-32chars",
         MFA_ENCRYPTION_KEY: "a-unique-production-mfa-key-32chars",
+        SUPPRESSION_JOURNAL_HMAC_SECRET:
+          "a-unique-production-journal-key-with-32chars",
       }),
     ).toMatchObject({ NODE_ENV: "production" });
   });

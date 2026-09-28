@@ -43,6 +43,9 @@ export enum Permission {
   AUDIT_EXPORT = "audit:export",
   OPERATIONS_READ = "operations:read",
   OPERATIONS_MANAGE = "operations:manage",
+  RECOVERY_READ = "recovery:read",
+  RECOVERY_MANAGE = "recovery:manage",
+  RECOVERY_EXECUTE = "recovery:execute",
 }
 
 export enum AccessScope {
@@ -149,6 +152,9 @@ const permissionsByRole: Record<RolUsuario, RoleGrants> = {
     [Permission.AUDIT_EXPORT]: AccessScope.GLOBAL,
     [Permission.OPERATIONS_READ]: AccessScope.GLOBAL,
     [Permission.OPERATIONS_MANAGE]: AccessScope.GLOBAL,
+    [Permission.RECOVERY_READ]: AccessScope.GLOBAL,
+    [Permission.RECOVERY_MANAGE]: AccessScope.GLOBAL,
+    [Permission.RECOVERY_EXECUTE]: AccessScope.GLOBAL,
   },
   [RolUsuario.ADMIN]: Object.fromEntries(
     Object.values(Permission).map((permission) => [

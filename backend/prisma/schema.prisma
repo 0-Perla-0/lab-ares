@@ -595,6 +595,229 @@ model OperationalIncidentEvent {
   @@index([incidentId,occurredAt])
 }
 
+enum RecoveryScope {
+  IMPORTANTE
+  SECUNDARIO
+}
+
+enum RecoveryRunState {
+  PLANNED
+  FROZEN
+  RESTORE_RECORDED
+  RECONCILIATION_PREVIEWED
+  RECONCILED
+  AUDIT_VERIFIED
+  JOURNAL_IMPORTED
+  SUPPRESSIONS_REAPPLIED
+  READY_APPROVED
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum RecoveryStepType {
+  PLAN
+  FREEZE
+  RESTORE_RECORD
+  RECONCILIATION_PREVIEW
+  RECONCILIATION_EXECUTE
+  AUDIT_VERIFY
+  JOURNAL_IMPORT
+  SUPPRESSION_REAPPLY
+  READY_APPROVAL
+  UNFREEZE
+  COMPLETE
+  FAIL
+  CANCEL
+}
+
+enum RecoveryStepState {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+  SKIPPED
+}
+
+enum RecoveryCheckType {
+  DATABASE
+  STORAGE
+  SCANNER
+  OUTBOX
+  SECONDARY_MODULES
+  AUDIT_INTEGRITY
+  JOURNAL_INTEGRITY
+  READINESS
+}
+
+enum RecoveryReconciliationMode {
+  PREVIEW
+  EXECUTE
+}
+
+enum RecoveryReconciliationState {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+enum RecoveryDrillResult {
+  PENDING
+  PASSED
+  PARTIAL
+  FAILED
+}
+
+enum SuppressionJournalState {
+  PENDING
+  PROCESSING
+  EXPORTED
+  FAILED
+}
+
+model RecoveryRun {
+  id String @id @default(cuid()) @db.VarChar(30)
+  name String @db.VarChar(191)
+  scope RecoveryScope
+  state RecoveryRunState @default(PLANNED)
+  isDrill Boolean @default(false)
+  restorePoint DateTime? @db.DateTime(3)
+  imageVersion String? @db.VarChar(191)
+  externalProviderRef String? @db.VarChar(191)
+  createdById Int
+  responsibleId Int
+  frozenById Int?
+  readyApprovedById Int?
+  completedById Int?
+  failedById Int?
+  cancelledById Int?
+  rpoTargetMinutes Int
+  rtoTargetMinutes Int
+  actualRpoMinutes Int?
+  actualRtoMinutes Int?
+  drillResult RecoveryDrillResult @default(PENDING)
+  drillNotes String? @db.VarChar(1000)
+  startedAt DateTime @default(now()) @db.DateTime(3)
+  frozenAt DateTime? @db.DateTime(3)
+  restoreRecordedAt DateTime? @db.DateTime(3)
+  previewedAt DateTime? @db.DateTime(3)
+  reconciledAt DateTime? @db.DateTime(3)
+  auditVerifiedAt DateTime? @db.DateTime(3)
+  journalImportedAt DateTime? @db.DateTime(3)
+  suppressionsReappliedAt DateTime? @db.DateTime(3)
+  readyApprovedAt DateTime? @db.DateTime(3)
+  completedAt DateTime? @db.DateTime(3)
+  failedAt DateTime? @db.DateTime(3)
+  cancelledAt DateTime? @db.DateTime(3)
+  createdAt DateTime @default(now()) @db.DateTime(3)
+  updatedAt DateTime @updatedAt @db.DateTime(3)
+  steps RecoveryStep[]
+  checks RecoveryCheck[]
+  reconciliations RecoveryReconciliationRun[]
+  operations RecoveryOperation[]
+  importedSuppressions RecoveryImportedSuppression[]
+  barrier RecoveryWriteBarrier?
+  @@index([state,createdAt])
+  @@index([scope,state])
+}
+
+model RecoveryStep {
+  id String @id @default(cuid()) @db.VarChar(30)
+  runId String @db.VarChar(30)
+  run RecoveryRun @relation(fields:[runId], references:[id], onDelete:Restrict)
+  type RecoveryStepType
+  state RecoveryStepState @default(PENDING)
+  actorId Int?
+  resultCode String? @db.VarChar(100)
+  summary Json?
+  startedAt DateTime? @db.DateTime(3)
+  completedAt DateTime? @db.DateTime(3)
+  createdAt DateTime @default(now()) @db.DateTime(3)
+  @@index([runId,type,createdAt])
+}
+
+model RecoveryCheck {
+  id String @id @default(cuid()) @db.VarChar(30)
+  runId String @db.VarChar(30)
+  run RecoveryRun @relation(fields:[runId], references:[id], onDelete:Restrict)
+  type RecoveryCheckType
+  passed Boolean
+  code String @db.VarChar(100)
+  summary Json?
+  checkedById Int?
+  checkedAt DateTime @default(now()) @db.DateTime(3)
+  @@index([runId,type,checkedAt])
+}
+
+model RecoveryReconciliationRun {
+  id String @id @default(cuid()) @db.VarChar(30)
+  runId String @db.VarChar(30)
+  run RecoveryRun @relation(fields:[runId], references:[id], onDelete:Restrict)
+  mode RecoveryReconciliationMode
+  state RecoveryReconciliationState @default(PENDING)
+  idempotencyKey String @unique @db.VarChar(191)
+  requestedById Int
+  leaseOwner String? @db.VarChar(100)
+  leaseUntil DateTime? @db.DateTime(3)
+  attempts Int @default(0)
+  maxAttempts Int @default(3)
+  result Json?
+  errorCode String? @db.VarChar(100)
+  startedAt DateTime? @db.DateTime(3)
+  completedAt DateTime? @db.DateTime(3)
+  createdAt DateTime @default(now()) @db.DateTime(3)
+  updatedAt DateTime @updatedAt @db.DateTime(3)
+  @@index([runId,mode,state])
+  @@index([state,leaseUntil])
+}
+
+model RecoveryOperation {
+  id String @id @default(cuid()) @db.VarChar(30)
+  runId String?
+  run RecoveryRun? @relation(fields:[runId], references:[id], onDelete:Restrict)
+  actorId Int
+  key String @db.VarChar(128)
+  action String @db.VarChar(80)
+  requestHash String @db.Char(64)
+  response Json?
+  createdAt DateTime @default(now()) @db.DateTime(3)
+  @@unique([actorId,key])
+  @@index([runId,createdAt])
+}
+
+model RecoveryWriteBarrier {
+  id String @id @default("global") @db.VarChar(30)
+  active Boolean @default(false)
+  runId String? @unique @db.VarChar(30)
+  run RecoveryRun? @relation(fields:[runId], references:[id], onDelete:Restrict)
+  version Int @default(0)
+  reasonCode String? @db.VarChar(100)
+  snapshotAt DateTime? @db.DateTime(3)
+  frozenAt DateTime? @db.DateTime(3)
+  frozenById Int?
+  unfrozenAt DateTime? @db.DateTime(3)
+  unfrozenById Int?
+  updatedAt DateTime @updatedAt @db.DateTime(3)
+}
+
+model RecoveryImportedSuppression {
+  id String @id @default(cuid()) @db.VarChar(30)
+  runId String @db.VarChar(30)
+  run RecoveryRun @relation(fields:[runId], references:[id], onDelete:Restrict)
+  journalEntryId String @db.VarChar(64)
+  payloadHash String @db.Char(64)
+  signature String @db.Char(64)
+  payload Json
+  occurredAt DateTime @db.DateTime(3)
+  matchedRegistroId String? @db.VarChar(30)
+  verifiedAt DateTime @db.DateTime(3)
+  reappliedAt DateTime? @db.DateTime(3)
+  resultCode String? @db.VarChar(100)
+  @@unique([runId,journalEntryId])
+  @@index([runId,occurredAt])
+}
+
 enum TipoReporteExportacion {
   ATTENDANCE
   DOCUMENTS
@@ -1491,9 +1714,41 @@ model RegistroSupresion {
   ejecutadoPor Usuario? @relation("SuppressionExecutor", fields:[ejecutadoPorId], references:[id], onDelete:Restrict)
   occurredAt DateTime @default(now())
   lastReappliedAt DateTime?
+  journalEntry SuppressionJournalEntry?
   @@unique([registroId,accion])
   @@index([categoria,occurredAt])
   @@index([loteId,occurredAt])
+}
+
+model SuppressionJournalEntry {
+  id String @id @default(cuid()) @db.VarChar(30)
+  sequence Int @unique
+  registroSupresionId String @unique @db.VarChar(30)
+  registroSupresion RegistroSupresion @relation(fields:[registroSupresionId], references:[id], onDelete:Restrict)
+  payload Json
+  payloadHash String @db.Char(64)
+  previousHash String? @db.Char(64)
+  entryHash String @db.Char(64)
+  signature String? @db.Char(64)
+  keyVersion String? @db.VarChar(50)
+  state SuppressionJournalState @default(PENDING)
+  attempts Int @default(0)
+  nextAttemptAt DateTime @default(now()) @db.DateTime(3)
+  leaseOwner String? @db.VarChar(100)
+  leaseUntil DateTime? @db.DateTime(3)
+  storageRef String? @db.VarChar(255)
+  lastErrorCode String? @db.VarChar(100)
+  exportedAt DateTime? @db.DateTime(3)
+  createdAt DateTime @default(now()) @db.DateTime(3)
+  @@index([state,nextAttemptAt])
+  @@index([createdAt])
+}
+
+model SuppressionJournalHead {
+  id String @id @default("global") @db.VarChar(30)
+  lastSequence Int @default(0)
+  lastHash String? @db.Char(64)
+  updatedAt DateTime @updatedAt @db.DateTime(3)
 }
 
 model OperacionRetencion {

@@ -1,6 +1,8 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import type { Environment } from "../config/environment";
+import { PrismaService } from "../database/prisma.service";
+import { workersMayMutate } from "../recovery/barrier";
 import { RetentionService } from "./retention.service";
 
 @Injectable()
@@ -11,6 +13,7 @@ export class RetentionWorker implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly retention: RetentionService,
     private readonly config: ConfigService<Environment, true>,
+    private readonly prisma?: PrismaService,
   ) {}
 
   onModuleInit() {
@@ -31,6 +34,7 @@ export class RetentionWorker implements OnModuleInit, OnModuleDestroy {
     if (this.running) return;
     this.running = true;
     try {
+      if (this.prisma && !(await workersMayMutate(this.prisma))) return;
       await this.retention.processAuthorized(
         this.config.get("RETENTION_BATCH_SIZE"),
       );

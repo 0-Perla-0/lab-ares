@@ -10,5 +10,6 @@ import { RetentionWorker } from "./retention.worker";
   imports: [AuthModule, NotificationsModule, StorageModule],
   controllers: [RetentionController],
   providers: [RetentionService, RetentionWorker],
+  exports: [RetentionService],
 })
 export class RetentionModule {}

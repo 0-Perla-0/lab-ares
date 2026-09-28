@@ -30,6 +30,8 @@ import { GamificationModule } from "./gamification/gamification.module";
 import { Printing3dModule } from "./printing-3d/printing-3d.module";
 import { RetentionModule } from "./retention/retention.module";
 import { OperationsModule } from "./operations/operations.module";
+import { RecoveryModule } from "./recovery/recovery.module";
+import { WriteBarrierGuard } from "./recovery/write-barrier.guard";
 
 @Module({
   imports: [
@@ -59,12 +61,14 @@ import { OperationsModule } from "./operations/operations.module";
     Printing3dModule,
     RetentionModule,
     OperationsModule,
+    RecoveryModule,
     OpenApiModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: ApiExceptionFilter },
     { provide: APP_INTERCEPTOR, useClass: CorrelationInterceptor },
     { provide: APP_INTERCEPTOR, useClass: NoStoreInterceptor },
+    { provide: APP_GUARD, useClass: WriteBarrierGuard },
     { provide: APP_GUARD, useClass: SessionAuthGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
   ],

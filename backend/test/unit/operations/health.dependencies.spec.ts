@@ -2,10 +2,24 @@ import { describe, expect, it, vi } from "vitest";
 
 import { HealthService } from "../../../src/health/health.service";
 
+const prisma = () =>
+  ({
+    $queryRaw: vi.fn(async () => 1),
+    recoveryWriteBarrier: {
+      findUnique: vi.fn(async () => ({
+        active: false,
+        runId: null,
+        version: 0,
+        frozenAt: null,
+        snapshotAt: null,
+      })),
+    },
+  }) as any;
+
 describe("health dependency attribution", () => {
   it("attributes storage failure without reporting the database as down", async () => {
     const service = new HealthService(
-      { $queryRaw: vi.fn(async () => 1) } as any,
+      prisma(),
       { health: vi.fn(async () => false) } as any,
       { health: vi.fn(async () => true) } as any,
       { get: () => true } as any,
@@ -22,7 +36,7 @@ describe("health dependency attribution", () => {
   it("reports a disabled scanner separately", async () => {
     const scanner = { health: vi.fn(async () => true) };
     const service = new HealthService(
-      { $queryRaw: vi.fn(async () => 1) } as any,
+      prisma(),
       { health: vi.fn(async () => true) } as any,
       scanner as any,
       { get: () => false } as any,

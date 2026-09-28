@@ -6,7 +6,7 @@ services:
     environment:
       MINIO_ROOT_USER: ${S3_ACCESS_KEY:-ares-local}
       MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-ares-local-secret}
-      MINIO_DEFAULT_BUCKETS: ares-quarantine,ares-available,ares-public
+      MINIO_DEFAULT_BUCKETS: ares-quarantine,ares-available,ares-public,ares-suppression-journal
       MINIO_BROWSER: "on"
     ports:
       - "127.0.0.1:9000:9000"
@@ -23,7 +23,11 @@ services:
   clamav:
     image: clamav/clamav:1.4
     healthcheck:
-      test: ["CMD-SHELL", "printf 'PING\\0' | nc -w 2 127.0.0.1 3310 | grep -q PONG"]
+      test:
+        [
+          "CMD-SHELL",
+          "printf 'PING\\0' | nc -w 2 127.0.0.1 3310 | grep -q PONG",
+        ]
       interval: 30s
       timeout: 5s
       retries: 10
@@ -92,6 +96,13 @@ services:
       S3_QUARANTINE_BUCKET: ares-quarantine
       S3_AVAILABLE_BUCKET: ares-available
       S3_PUBLIC_BUCKET: ares-public
+      S3_SUPPRESSION_JOURNAL_BUCKET: ares-suppression-journal
+      SUPPRESSION_JOURNAL_HMAC_SECRET: ${SUPPRESSION_JOURNAL_HMAC_SECRET:-development-only-journal-key-change-me-32chars}
+      SUPPRESSION_JOURNAL_KEY_VERSION: ${SUPPRESSION_JOURNAL_KEY_VERSION:-v1}
+      SUPPRESSION_JOURNAL_WORKER_ENABLED: ${SUPPRESSION_JOURNAL_WORKER_ENABLED:-false}
+      SUPPRESSION_JOURNAL_WORKER_INTERVAL_MS: ${SUPPRESSION_JOURNAL_WORKER_INTERVAL_MS:-60000}
+      RECOVERY_RECONCILIATION_MAX_ATTEMPTS: ${RECOVERY_RECONCILIATION_MAX_ATTEMPTS:-3}
+      RECOVERY_RECONCILIATION_LEASE_MS: ${RECOVERY_RECONCILIATION_LEASE_MS:-120000}
       CLAMAV_HOST: clamav
       CLAMAV_PORT: 3310
       STORAGE_SCANNER_ENABLED: "true"

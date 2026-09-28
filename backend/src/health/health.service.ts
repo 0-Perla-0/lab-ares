@@ -5,6 +5,7 @@ import { S3Storage } from "../storage/s3.storage";
 import { ClamAvScanner } from "../storage/clamav.scanner";
 import { ConfigService } from "@nestjs/config";
 import type { Environment } from "../config/environment";
+import { readWriteBarrier } from "../recovery/barrier";
 
 @Injectable()
 export class HealthService {
@@ -50,21 +51,30 @@ export class HealthService {
 
   async readiness() {
     const dependencies = await this.dependencies();
+    const barrier = await readWriteBarrier(this.prisma);
+    const recovery = {
+      writeBarrier: barrier.active ? "active" : "inactive",
+      runId: barrier.runId,
+      version: barrier.version,
+      snapshotAt: barrier.snapshotAt,
+    };
     if (!this.storage && !this.scanner && !this.config) {
-      if (dependencies.database === "connected")
-        return { status: "ok", database: "connected" };
+      if (dependencies.database === "connected" && !barrier.active)
+        return { status: "ok", database: "connected", recovery };
       throw new ServiceUnavailableException({
         status: "error",
-        database: "disconnected",
+        database: dependencies.database,
+        recovery,
       });
     }
     const status =
       dependencies.database === "connected" &&
       !["disconnected"].includes(dependencies.storage) &&
-      !["disconnected"].includes(dependencies.scanner)
+      !["disconnected"].includes(dependencies.scanner) &&
+      !barrier.active
         ? "ok"
         : "error";
-    const result = { status, ...dependencies, dependencies };
+    const result = { status, ...dependencies, dependencies, recovery };
     if (status === "error") throw new ServiceUnavailableException(result);
     return result;
   }

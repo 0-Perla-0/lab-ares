@@ -22,6 +22,7 @@ import {
   TipoOperacionRetencion,
 } from "../generated/prisma/enums";
 import { NotificationsService } from "../notifications/notifications.service";
+import { journalHash } from "../recovery/journal-integrity";
 import { S3Storage } from "../storage/s3.storage";
 import { StorageService } from "../storage/storage.service";
 import type {
@@ -189,6 +190,55 @@ export class RetentionService {
     return createHash("sha256")
       .update(JSON.stringify(this.stable({ type, payload })))
       .digest("hex");
+  }
+
+  private async enqueueSuppressionJournal(tx: any, registry: any) {
+    const existing = await tx.suppressionJournalEntry.findUnique({
+      where: { registroSupresionId: registry.id },
+    });
+    if (existing) return existing;
+    await tx.$executeRaw`SELECT id FROM SuppressionJournalHead WHERE id=${"global"} FOR UPDATE`;
+    const head = await tx.suppressionJournalHead.findUnique({
+      where: { id: "global" },
+    });
+    if (!head) throw api("SUPPRESSION_JOURNAL_UNAVAILABLE", 503);
+    const sequence = head.lastSequence + 1;
+    const occurredAt = registry.occurredAt.toISOString();
+    const payload = {
+      category: registry.categoria,
+      resourceType: registry.resourceType,
+      resourceFingerprint: registry.resourceFingerprint,
+      action: registry.accion,
+      policyVersion: registry.policyVersion,
+      occurredAt,
+    };
+    const payloadHash = journalHash(payload);
+    const created = await tx.suppressionJournalEntry.create({
+      data: {
+        sequence,
+        registroSupresionId: registry.id,
+        payload: this.json(payload),
+        payloadHash,
+        previousHash: head.lastHash,
+        entryHash: "0".repeat(64),
+      },
+    });
+    const entryHash = journalHash({
+      entryId: created.id,
+      sequence,
+      previousHash: head.lastHash,
+      payloadHash,
+      occurredAt,
+    });
+    const entry = await tx.suppressionJournalEntry.update({
+      where: { id: created.id },
+      data: { entryHash },
+    });
+    await tx.suppressionJournalHead.update({
+      where: { id: "global" },
+      data: { lastSequence: sequence, lastHash: entryHash },
+    });
+    return entry;
   }
 
   private json(value: unknown) {
@@ -1472,7 +1522,7 @@ export class RetentionService {
           },
         });
         if (!updated.count) return;
-        await tx.registroSupresion.upsert({
+        const registry = await tx.registroSupresion.upsert({
           where: {
             registroId_accion: {
               registroId: item.registroId,
@@ -1495,6 +1545,7 @@ export class RetentionService {
           },
           update: {},
         });
+        await this.enqueueSuppressionJournal(tx, registry);
         const finalized = await tx.registroRetencion.updateMany({
           where: {
             id: item.registroId,
@@ -1740,6 +1791,83 @@ export class RetentionService {
       this.prisma.registroSupresion.count({ where }),
     ]);
     return { items, total, page: input.page, pageSize: input.pageSize };
+  }
+
+  async reapplyImportedJournal(
+    actor: AuthUser,
+    imported: Array<{ id: string; payload: unknown }>,
+  ) {
+    this.require(actor, Permission.RECOVERY_EXECUTE);
+    const reappliedIds: string[] = [];
+    const matches: Array<{ importedId: string; registroId: string }> = [];
+    const failures: Array<{ importedId: string; errorCode: string }> = [];
+    for (const entry of imported) {
+      try {
+        const payload = entry.payload as {
+          category?: CategoriaRetencion;
+          resourceType?: string;
+          resourceFingerprint?: string;
+          action?: AccionFinalRetencion;
+          policyVersion?: number;
+        };
+        if (
+          !payload.category ||
+          !payload.resourceType ||
+          !payload.resourceFingerprint ||
+          !payload.action ||
+          !payload.policyVersion
+        )
+          throw new Error("RECOVERY_JOURNAL_PAYLOAD_INVALID");
+        const candidates = await this.prisma.registroRetencion.findMany({
+          where: {
+            categoria: payload.category,
+            resourceType: payload.resourceType,
+          },
+          include: { regla: true },
+          take: 10_000,
+        });
+        const record = candidates.find(
+          (candidate) =>
+            createHash("sha256")
+              .update(
+                `${candidate.categoria}:${candidate.resourceType}:${candidate.resourceId}`,
+              )
+              .digest("hex") === payload.resourceFingerprint,
+        );
+        if (!record) throw new Error("RECOVERY_SUPPRESSION_TARGET_NOT_FOUND");
+        if (
+          record.regla.accionFinal !== payload.action ||
+          record.regla.version !== payload.policyVersion
+        )
+          throw new Error("RECOVERY_SUPPRESSION_POLICY_MISMATCH");
+        await this.executeAdapter(record);
+        await this.prisma.registroRetencion.update({
+          where: { id: record.id },
+          data: {
+            estado:
+              payload.action === AccionFinalRetencion.ANONIMIZAR
+                ? EstadoRegistroRetencion.ANONIMIZADO
+                : EstadoRegistroRetencion.SUPRIMIDO,
+            processedAt: new Date(),
+          },
+        });
+        reappliedIds.push(entry.id);
+        matches.push({ importedId: entry.id, registroId: record.id });
+      } catch (error) {
+        failures.push({
+          importedId: entry.id,
+          errorCode: this.safeError(error),
+        });
+      }
+    }
+    return {
+      total: imported.length,
+      reapplied: reappliedIds.length,
+      failed: failures.length,
+      reappliedIds,
+      matches,
+      failures,
+    };
   }
 
   async reapplySuppressed(actor: AuthUser, limit: number, key: string) {
