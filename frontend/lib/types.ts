@@ -38,6 +38,7 @@ export type AuthUser = {
   sedeId: number | null;
   areaId: number | null;
   turnoId: number | null;
+  permissions?: Partial<Record<string, "self" | "area" | "sede" | "global">>;
 };
 
 export type PublicUser = AuthUser & {

@@ -22,6 +22,7 @@ import {
   loginRateLimitKey,
 } from "./login-rate-limiter";
 import { Public } from "./public.decorator";
+import { permissionGrants } from "./permissions";
 import { z } from "zod";
 import { MfaService } from "./mfa.service";
 
@@ -86,7 +87,12 @@ export class AuthController {
 
   @Get("me")
   me(@Req() request: Request) {
-    return { data: request.user };
+    return {
+      data: {
+        ...request.user!,
+        permissions: permissionGrants(request.user!),
+      },
+    };
   }
 
   @Public()

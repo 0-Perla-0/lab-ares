@@ -218,7 +218,12 @@ describe("Nest API", () => {
   it("persists the session and exposes the current user", async () => {
     const agent = await loginAs(admin.email);
     const response = await agent.get("/api/auth/me").expect(200);
-    expect(response.body).toEqual({ data: admin });
+    expect(response.body.data).toMatchObject(admin);
+    expect(response.body.data.permissions).toMatchObject({
+      "academic:profile:read": "global",
+      "documents:upload": "global",
+      "retention:execute": "global",
+    });
     expect(response.headers["cache-control"]).toBe("no-store");
   });
 
@@ -352,7 +357,7 @@ describe("Nest API", () => {
       email: "postman20@ares.local",
       password: "A-secure-password-123!",
       rol: RolUsuario.PRESTADOR,
-        estado: EstadoUsuario.ACTIVA,
+      estado: EstadoUsuario.ACTIVA,
       sedeId: 1,
       areaId: 2,
       turnoId: 3,
