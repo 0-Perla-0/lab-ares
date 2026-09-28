@@ -21,7 +21,7 @@ CREATE TABLE `ReglaRetencion` (
   INDEX `ReglaRetencion_categoria_estado_version_idx`(`categoria`,`estado`,`version`),
   PRIMARY KEY (`id`),
   CONSTRAINT `ReglaRetencion_creadoPorId_fkey` FOREIGN KEY (`creadoPorId`) REFERENCES `Usuario`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
-  CONSTRAINT `ReglaRetencion_aprobadoPorId_fkey` FOREIGN KEY (`aprobadoPorId`) REFERENCES `Usuario`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `ReglaRetencion_aprobadoPorId_fkey` FOREIGN KEY (`aprobadoPorId`) REFERENCES `Usuario`(`id`) ON DELETE RESTRICT ON UPDATE RESTRICT,
   CONSTRAINT `ReglaRetencion_periods_chk` CHECK (`version` > 0 AND `periodoActivoDias` >= 0 AND `periodoBloqueadoDias` >= 0),
   CONSTRAINT `ReglaRetencion_approval_chk` CHECK ((`estado` = 'APROBADA' AND `approvedAt` IS NOT NULL AND `aprobadoPorId` IS NOT NULL AND `referenciaAprobacion` IS NOT NULL) OR (`estado` <> 'APROBADA'))
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -70,7 +70,7 @@ CREATE TABLE `RetencionLegal` (
   PRIMARY KEY (`id`),
   CONSTRAINT `RetencionLegal_registroId_fkey` FOREIGN KEY (`registroId`) REFERENCES `RegistroRetencion`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT `RetencionLegal_creadoPorId_fkey` FOREIGN KEY (`creadoPorId`) REFERENCES `Usuario`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
-  CONSTRAINT `RetencionLegal_liberadoPorId_fkey` FOREIGN KEY (`liberadoPorId`) REFERENCES `Usuario`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `RetencionLegal_liberadoPorId_fkey` FOREIGN KEY (`liberadoPorId`) REFERENCES `Usuario`(`id`) ON DELETE RESTRICT ON UPDATE RESTRICT,
   CONSTRAINT `RetencionLegal_release_chk` CHECK ((`estado` = 'LIBERADA' AND `liberadoPorId` IS NOT NULL AND `motivoLiberacion` IS NOT NULL AND `releasedAt` IS NOT NULL) OR (`estado` = 'ACTIVA' AND `liberadoPorId` IS NULL AND `motivoLiberacion` IS NULL AND `releasedAt` IS NULL)),
   CONSTRAINT `RetencionLegal_review_chk` CHECK (`endsAt` IS NULL OR `endsAt` >= `reviewAt`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -90,7 +90,7 @@ CREATE TABLE `SolicitudSupresion` (
   INDEX `SolicitudSupresion_estado_createdAt_idx`(`estado`,`createdAt`),
   PRIMARY KEY (`id`),
   CONSTRAINT `SolicitudSupresion_solicitanteId_fkey` FOREIGN KEY (`solicitanteId`) REFERENCES `Usuario`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
-  CONSTRAINT `SolicitudSupresion_resueltoPorId_fkey` FOREIGN KEY (`resueltoPorId`) REFERENCES `Usuario`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `SolicitudSupresion_resueltoPorId_fkey` FOREIGN KEY (`resueltoPorId`) REFERENCES `Usuario`(`id`) ON DELETE RESTRICT ON UPDATE RESTRICT,
   CONSTRAINT `SolicitudSupresion_resolution_chk` CHECK ((`estado` IN ('APROBADA','RECHAZADA','EJECUTADA') AND `resueltoPorId` IS NOT NULL AND `resolucion` IS NOT NULL AND `resolvedAt` IS NOT NULL) OR (`estado` IN ('ABIERTA','EN_REVISION')))
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -116,7 +116,7 @@ CREATE TABLE `LoteSupresion` (
   INDEX `LoteSupresion_categoria_estado_createdAt_idx`(`categoria`,`estado`,`createdAt`),
   PRIMARY KEY (`id`),
   CONSTRAINT `LoteSupresion_creadoPorId_fkey` FOREIGN KEY (`creadoPorId`) REFERENCES `Usuario`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
-  CONSTRAINT `LoteSupresion_autorizadoPorId_fkey` FOREIGN KEY (`autorizadoPorId`) REFERENCES `Usuario`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `LoteSupresion_autorizadoPorId_fkey` FOREIGN KEY (`autorizadoPorId`) REFERENCES `Usuario`(`id`) ON DELETE RESTRICT ON UPDATE RESTRICT,
   CONSTRAINT `LoteSupresion_counts_chk` CHECK (`totalElementos` >= 0 AND `ejecutados` >= 0 AND `omitidos` >= 0 AND `fallidos` >= 0),
   CONSTRAINT `LoteSupresion_authorization_chk` CHECK ((`estado` = 'BORRADOR' AND `autorizadoPorId` IS NULL AND `authorizedAt` IS NULL) OR (`estado` <> 'BORRADOR' AND `autorizadoPorId` IS NOT NULL AND `authorizedAt` IS NOT NULL))
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;

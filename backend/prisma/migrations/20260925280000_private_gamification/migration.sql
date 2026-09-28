@@ -55,7 +55,7 @@ CREATE TABLE `EventoGamificacion` (
   CONSTRAINT `EventoGamificacion_actorId_fkey` FOREIGN KEY (`actorId`) REFERENCES `Usuario`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT `EventoGamificacion_actividadId_fkey` FOREIGN KEY (`actividadId`) REFERENCES `ActividadKairos`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT `EventoGamificacion_reglaId_fkey` FOREIGN KEY (`reglaId`) REFERENCES `ReglaGamificacion`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
-  CONSTRAINT `EventoGamificacion_reversaDeId_fkey` FOREIGN KEY (`reversaDeId`) REFERENCES `EventoGamificacion`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `EventoGamificacion_reversaDeId_fkey` FOREIGN KEY (`reversaDeId`) REFERENCES `EventoGamificacion`(`id`) ON DELETE RESTRICT ON UPDATE RESTRICT,
   CONSTRAINT `EventoGamificacion_puntos_chk` CHECK (`puntos` <> 0),
   CONSTRAINT `EventoGamificacion_reversal_sign_chk` CHECK ((`tipo` = 'REVERSO' AND `puntos` < 0 AND `reversaDeId` IS NOT NULL) OR (`tipo` <> 'REVERSO' AND `puntos` > 0 AND `reversaDeId` IS NULL))
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;

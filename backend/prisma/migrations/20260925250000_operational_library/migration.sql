@@ -27,9 +27,9 @@ CREATE TABLE `DocumentoBiblioteca` (
     (`alcance` = 'AREA' AND `sedeId` IS NOT NULL AND `areaId` IS NOT NULL AND `proyectoId` IS NULL) OR
     (`alcance` = 'PROYECTO' AND `sedeId` IS NULL AND `areaId` IS NULL AND `proyectoId` IS NOT NULL)
   ),
-  CONSTRAINT `DocumentoBiblioteca_sedeId_fkey` FOREIGN KEY (`sedeId`) REFERENCES `Sede`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
-  CONSTRAINT `DocumentoBiblioteca_areaId_fkey` FOREIGN KEY (`areaId`) REFERENCES `Area`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
-  CONSTRAINT `DocumentoBiblioteca_proyectoId_fkey` FOREIGN KEY (`proyectoId`) REFERENCES `ProyectoKairos`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `DocumentoBiblioteca_sedeId_fkey` FOREIGN KEY (`sedeId`) REFERENCES `Sede`(`id`) ON DELETE RESTRICT ON UPDATE RESTRICT,
+  CONSTRAINT `DocumentoBiblioteca_areaId_fkey` FOREIGN KEY (`areaId`) REFERENCES `Area`(`id`) ON DELETE RESTRICT ON UPDATE RESTRICT,
+  CONSTRAINT `DocumentoBiblioteca_proyectoId_fkey` FOREIGN KEY (`proyectoId`) REFERENCES `ProyectoKairos`(`id`) ON DELETE RESTRICT ON UPDATE RESTRICT,
   CONSTRAINT `DocumentoBiblioteca_creadoPorId_fkey` FOREIGN KEY (`creadoPorId`) REFERENCES `Usuario`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT `DocumentoBiblioteca_archivadoPorId_fkey` FOREIGN KEY (`archivadoPorId`) REFERENCES `Usuario`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;

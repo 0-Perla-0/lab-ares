@@ -73,6 +73,6 @@ CREATE TABLE `BloqueContenidoPublico` (
   INDEX `BloqueContenidoPublico_activoPublicoId_idx`(`activoPublicoId`),
   PRIMARY KEY (`id`),
   CONSTRAINT `BloqueContenidoPublico_versionId_fkey` FOREIGN KEY (`versionId`) REFERENCES `VersionContenidoPublico`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
-  CONSTRAINT `BloqueContenidoPublico_activoPublicoId_fkey` FOREIGN KEY (`activoPublicoId`) REFERENCES `ActivoPublico`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `BloqueContenidoPublico_activoPublicoId_fkey` FOREIGN KEY (`activoPublicoId`) REFERENCES `ActivoPublico`(`id`) ON DELETE RESTRICT ON UPDATE RESTRICT,
   CONSTRAINT `BloqueContenidoPublico_image_asset_chk` CHECK ((`tipo` = 'IMAGEN' AND `activoPublicoId` IS NOT NULL) OR (`tipo` <> 'IMAGEN' AND `activoPublicoId` IS NULL))
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;

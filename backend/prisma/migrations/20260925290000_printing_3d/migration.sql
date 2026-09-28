@@ -23,9 +23,9 @@ CREATE TABLE `TrabajoImpresion3D` (
   PRIMARY KEY (`id`),
   CONSTRAINT `TrabajoImpresion3D_solicitanteId_fkey` FOREIGN KEY (`solicitanteId`) REFERENCES `Usuario`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT `TrabajoImpresion3D_archivoId_fkey` FOREIGN KEY (`archivoId`) REFERENCES `Archivo`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
-  CONSTRAINT `TrabajoImpresion3D_operadorAsignadoId_fkey` FOREIGN KEY (`operadorAsignadoId`) REFERENCES `Usuario`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
-  CONSTRAINT `TrabajoImpresion3D_revisadoPorId_fkey` FOREIGN KEY (`revisadoPorId`) REFERENCES `Usuario`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
-  CONSTRAINT `TrabajoImpresion3D_canceladoPorId_fkey` FOREIGN KEY (`canceladoPorId`) REFERENCES `Usuario`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `TrabajoImpresion3D_operadorAsignadoId_fkey` FOREIGN KEY (`operadorAsignadoId`) REFERENCES `Usuario`(`id`) ON DELETE RESTRICT ON UPDATE RESTRICT,
+  CONSTRAINT `TrabajoImpresion3D_revisadoPorId_fkey` FOREIGN KEY (`revisadoPorId`) REFERENCES `Usuario`(`id`) ON DELETE RESTRICT ON UPDATE RESTRICT,
+  CONSTRAINT `TrabajoImpresion3D_canceladoPorId_fkey` FOREIGN KEY (`canceladoPorId`) REFERENCES `Usuario`(`id`) ON DELETE RESTRICT ON UPDATE RESTRICT,
   CONSTRAINT `TrabajoImpresion3D_review_state_chk` CHECK (
     (`estado` = 'SOLICITADO' AND `revisadoPorId` IS NULL AND `reviewedAt` IS NULL)
     OR (`estado` = 'EN_REVISION' AND `revisadoPorId` IS NOT NULL AND `reviewedAt` IS NULL)

@@ -10,6 +10,17 @@
   },
   "event": [
     {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (!pm.collectionVariables.get(\"runSuffix\")) {",
+          "    pm.collectionVariables.set(\"runSuffix\", Date.now().toString(36) + Math.random().toString(36).slice(2, 8));",
+          "}"
+        ]
+      }
+    },
+    {
       "listen": "test",
       "script": {
         "type": "text/javascript",
@@ -192,7 +203,10 @@
                 "exec": [
                   "pm.test(\"Backend listo\", function () {",
                   "    pm.response.to.have.status(200);",
-                  "    pm.expect(pm.response.json()).to.eql({ status: \"ok\", database: \"connected\" });",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.include({ status: \"ok\", database: \"connected\", storage: \"connected\", scanner: \"connected\" });",
+                  "    pm.expect(body.dependencies).to.eql({ database: \"connected\", storage: \"connected\", scanner: \"connected\" });",
+                  "    pm.expect(body.recovery).to.include({ writeBarrier: \"inactive\" });",
                   "});"
                 ]
               }
@@ -1022,7 +1036,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"codigo\": \"USR{{runSuffix}}\",\n  \"email\": \"postman.{{runSuffix}}@ares.local\",\n  \"password\": \"Postman-Test-Password-123!\",\n  \"rol\": \"PRESTADOR\",\n  \"estado\": \"ACTIVO\",\n  \"sedeId\": {{sedeId}},\n  \"areaId\": {{areaId}},\n  \"turnoId\": {{turnoId}}\n}",
+              "raw": "{\n  \"codigo\": \"USR{{runSuffix}}\",\n  \"email\": \"postman.{{runSuffix}}@ares.local\",\n  \"password\": \"Postman-Test-Password-123!\",\n  \"rol\": \"PRESTADOR\",\n  \"estado\": \"ACTIVA\",\n  \"sedeId\": {{sedeId}},\n  \"areaId\": {{areaId}},\n  \"turnoId\": {{turnoId}}\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1104,7 +1118,7 @@
               }
             ],
             "url": "{{baseUrl}}/users",
-            "description": "ADMIN ve todos los usuarios que no están en BAJA. Otros roles reciben solo su área o sede según RBAC."
+            "description": "ADMIN ve todos los usuarios que no están en DESACTIVADA. Otros roles reciben solo su área o sede según RBAC."
           },
           "event": [
             {
@@ -1170,7 +1184,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"codigo\": \"USR-UPD-{{runSuffix}}\",\n  \"email\": \"postman.updated.{{runSuffix}}@ares.local\",\n  \"password\": \"Postman-Updated-Password-456!\",\n  \"estado\": \"INACTIVO\"\n}",
+              "raw": "{\n  \"codigo\": \"USR-UPD-{{runSuffix}}\",\n  \"email\": \"postman.updated.{{runSuffix}}@ares.local\",\n  \"password\": \"Postman-Updated-Password-456!\",\n  \"estado\": \"SUSPENDIDA\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1191,7 +1205,7 @@
                   "    const user = pm.response.json().data;",
                   "    pm.expect(user.codigo).to.eql(\"USR-UPD-\" + pm.collectionVariables.get(\"runSuffix\"));",
                   "    pm.expect(user.email).to.eql(\"postman.updated.\" + pm.collectionVariables.get(\"runSuffix\") + \"@ares.local\");",
-                  "    pm.expect(user.estado).to.eql(\"INACTIVO\");",
+                  "    pm.expect(user.estado).to.eql(\"SUSPENDIDA\");",
                   "    pm.expect(user).not.to.have.property(\"passwordHash\");",
                   "});"
                 ]
@@ -1210,7 +1224,7 @@
               }
             ],
             "url": "{{baseUrl}}/users/{{userId}}",
-            "description": "Borrado lógico: cambia estado a BAJA. No permite que el usuario autenticado se elimine a sí mismo."
+            "description": "Borrado lógico: cambia estado a DESACTIVADA. No permite que el usuario autenticado se elimine a sí mismo."
           },
           "event": [
             {
@@ -1220,7 +1234,7 @@
                 "exec": [
                   "pm.test(\"Usuario dado de baja\", function () {",
                   "    pm.response.to.have.status(200);",
-                  "    pm.expect(pm.response.json().data.estado).to.eql(\"BAJA\");",
+                  "    pm.expect(pm.response.json().data.estado).to.eql(\"DESACTIVADA\");",
                   "});"
                 ]
               }
@@ -1228,7 +1242,7 @@
           ]
         },
         {
-          "name": "Obtener usuario en BAJA",
+          "name": "Obtener usuario DESACTIVADA",
           "request": {
             "method": "GET",
             "header": [
@@ -1248,7 +1262,7 @@
                 "exec": [
                   "pm.test(\"La baja conserva el registro\", function () {",
                   "    pm.response.to.have.status(200);",
-                  "    pm.expect(pm.response.json().data.estado).to.eql(\"BAJA\");",
+                  "    pm.expect(pm.response.json().data.estado).to.eql(\"DESACTIVADA\");",
                   "});"
                 ]
               }
@@ -1266,7 +1280,7 @@
               }
             ],
             "url": "{{baseUrl}}/users",
-            "description": "Los usuarios en BAJA no aparecen en el listado normal."
+            "description": "Los usuarios en DESACTIVADA no aparecen en el listado normal."
           },
           "event": [
             {

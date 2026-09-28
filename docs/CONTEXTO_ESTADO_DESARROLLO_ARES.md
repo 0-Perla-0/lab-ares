@@ -13,7 +13,9 @@
 
 ### Checkpoint del 27 de septiembre de 2026
 
-- Docker local quedó reparado y verificado con MinIO compatible, MariaDB en el host `3307`, 11/11 migraciones y respuestas HTTP 200 de backend, frontend, MinIO y Mailpit.
+- Docker Compose quedó desplegado limpiamente como proyecto `ares-validation` con MariaDB 11.8, MinIO, ClamAV y Mailpit; health live/ready/frontend devolvieron 200, las dependencias de readiness quedaron conectadas y la barrera de recuperación inactiva.
+- Se aplicaron desde cero las 25 migraciones. Se corrigieron compatibilidades de migración con collation explícita en cinco tablas de Kairos y `ON UPDATE RESTRICT` en las FKs usadas por `CHECK` de biblioteca, CMS, gamificación, impresión y retención.
+- El bootstrap administrativo se creó desde el target `migrate`.
 - El perfil académico/adscripción histórica, el expediente documental funcional, la base de proyectos/membresías y las actividades/evidencias de Kairos de Backend 2 quedan cerrados y verificados.
 - Kanban queda implementado y verificado como proyección de las actividades, incluido su frontend e integración E2E.
 - Los reportes operativos quedan **COMPLETADOS y verificados** de extremo a extremo.
@@ -21,7 +23,7 @@
 - Operación, auditoría, integridad y observabilidad de Backend 2 quedan **COMPLETADAS y verificadas en backend**; la migración fue creada y validada, pero no aplicada a un entorno real.
 - Los dominios de Backend 1 quedan excluidos de este bloque.
 - Recuperación y reconciliación de Backend 2 quedan **COMPLETADAS y verificadas en backend**; la migración fue creada y validada, pero no aplicada a un entorno real.
-- Este checkpoint sustituye las menciones históricas de “frontend/E2E pendiente” conservadas en los cierres incrementales inferiores: el alcance asignado a Backend 2 ya quedó implementado en backend y frontend. Sólo faltan despliegue, integración contra servicios reales, simulacros operativos y fusión de ramas.
+- Este checkpoint sustituye las menciones históricas de “frontend/E2E pendiente” conservadas en los cierres incrementales inferiores: el alcance asignado a Backend 2 ya quedó implementado y validado en backend, base de datos, frontend, integración y pruebas desplegadas. Sólo queda rollout/fusión y operación externa autorizada.
 
 ### Traspaso operativo de Backend 2: realizado, pendiente y cómo continuar
 
@@ -37,33 +39,28 @@ Esta sección es la fuente de traspaso para continuar el trabajo sin reconstruir
 - **Secuencia estricta:** plan → freeze → registro de restore externo → preview sin efectos → reconciliación exacta → verificación de auditoría → importación del journal → reaplicación → aprobación independiente → unfreeze → complete. También existen terminaciones `FAILED` y `CANCELLED`; nunca liberan silenciosamente una barrera activa.
 - **Reconciliación segura:** el preview durable es obligatorio antes de ejecutar; se verifica hash del plan y versión/propietario de barrera antes de cada efecto. Se protegen referencias de archivos y anclas de auditoría; el bucket del journal queda fuera del barrido de objetos ordinario.
 - **Journal independiente de supresiones:** el registro de supresión y su outbox se crean en la misma transacción de MariaDB. El worker, desactivado por defecto, firma HMAC, mantiene cadena SHA-256 y escribe con condición de no sobrescritura en el bucket privado `ares-suppression-journal`. No se afirma atomicidad entre MariaDB y S3; leases y reintentos cierran esa brecha.
-- **Contratos y pruebas:** migración `20260927020000_recovery_reconciliation`, permisos globales `RECOVERY_READ`, `RECOVERY_MANAGE` y `RECOVERY_EXECUTE`, OpenAPI modular y carpeta 20 de Postman con 17 solicitudes. Gate final: Prisma validate/generate, typecheck, build, diff-check y 64 archivos con 716/716 pruebas backend aprobadas. El JSON de Postman parsea correctamente.
+- **Contratos y pruebas:** migración `20260927020000_recovery_reconciliation`, permisos globales `RECOVERY_READ`, `RECOVERY_MANAGE` y `RECOVERY_EXECUTE`, OpenAPI modular y carpeta 20 de Postman con 17 solicitudes. La colección ahora autogenera `runSuffix`, actualiza readiness y usa los estados de usuario `ACTIVA`, `SUSPENDIDA` y `DESACTIVADA`. Newman del gate Backend 2 ejecutó 31 requests y 62 assertions, con 0 fallos, cubriendo carpetas públicas, auth, sedes, áreas, turnos, usuarios y cleanup; asistencia quedó excluida por pertenecer a Backend 1. Gate final: Prisma validate/generate, check/build backend, 65 archivos con 718/718 pruebas backend aprobadas, check/build frontend, 37/37 pruebas frontend y JSON de Postman válido.
 
 #### Trabajo que todavía falta
 
 1. **Fusionar ramas, no reimplementar:** abrir revisión y fusionar `feature/frontend/backend2-full-scope` y `feature/backend/backend2-full-scope` hacia la rama de integración definida por el equipo. No se creó PR automáticamente.
-2. **Aplicar migraciones en un entorno autorizado:** respaldar primero y desplegar, en orden, `20260925300000_retention_suppression`, `20260927010000_operations_audit_integrity` y `20260927020000_recovery_reconciliation`. En este corte fueron validadas y generadas, no aplicadas contra una MariaDB real.
-3. **Validar infraestructura real:** comprobar MariaDB, MinIO/S3, bucket privado del journal, ClamAV y SMTP con credenciales no ejemplificadas. Confirmar políticas de acceso y ciclo de vida antes de habilitar workers.
-4. **Preparar auditoría histórica:** los `AuditEvent` anteriores al encadenamiento necesitan un backfill controlado antes de generar manifiestos de esos periodos. El ancla privada actual no usa WORM/object-lock y representa integridad técnica, no firma legal.
-5. **Ejecutar un simulacro real de recuperación:** el proveedor o el operador realiza PITR/restore fuera de Ares; la API sólo registra y gobierna evidencia. Deben medirse RPO/RTO, usar dos personas para freeze/aprobación y verificar scanner, outbox, journal, objetos y módulos secundarios antes de unfreeze.
-6. **Pruebas desplegadas:** ejecutar Newman contra la API levantada y un E2E cross-stack con MariaDB/MinIO/ClamAV reales. Los 13 E2E de frontend ya aprobados son deterministas con API interceptada y no sustituyen el simulacro de infraestructura.
-7. **Activación controlada:** `SUPPRESSION_JOURNAL_WORKER_ENABLED`, `RETENTION_WORKER_ENABLED`, `AUDIT_MANIFEST_WORKER_ENABLED` y los demás workers continúan apagados por defecto donde corresponde. Habilitarlos sólo después de migraciones, secretos y buckets verificados.
+2. **Rollout productivo controlado:** promover las imágenes y configuración desde el entorno validado, con respaldo y aprobación operativa.
+3. **Operación externa opcional:** un PITR/restore destructivo del proveedor, una auditoría histórica real/WORM y la activación productiva de workers requieren infraestructura y autoridad externa; no son pendientes de desarrollo de código.
 
 #### Orden para retomar
 
 1. Obtener ambas ramas remotas y revisar primero los commits anteriores; no mezclar dominios de Backend 1.
-2. Levantar dependencias con `docker compose up -d`, configurar un `.env` real y comprobar `GET /api/health/ready`. La respuesta ahora incluye el estado de la barrera de recuperación.
-3. En un entorno desechable, aplicar las migraciones pendientes con `npm run prisma:migrate:deploy --workspace @ares/backend`; nunca probar por primera vez sobre datos únicos.
-4. Ejecutar `npm run check --workspace @ares/backend`, `npm run build --workspace @ares/backend` y `npm test --workspace @ares/backend`; después validar la carpeta 20 de [`Ares-Backend.postman_collection.json`](../postman/Ares-Backend.postman_collection.json).
-5. Realizar el simulacro siguiendo el orden documentado. `POST /api/recovery/:id/restore` sólo registra el restore externo: no llama al proveedor ni ejecuta una restauración destructiva.
-6. Con el simulacro y Newman en verde, fusionar las ramas y actualizar este bloque con ambiente, fecha, evidencia y resultado real.
+2. Para reproducir la validación, levantar `ares-validation` con Docker Compose y comprobar `GET /api/health/ready`; ese entorno ya quedó en verde con las 25 migraciones aplicadas desde cero.
+3. Los gates y Newman ya quedaron ejecutados en verde; cualquier repetición debe conservar el entorno desechable y no usar datos únicos.
+4. Realizar sólo cuando exista autorización el simulacro externo siguiendo el orden documentado. `POST /api/recovery/:id/restore` registra el restore externo: no llama al proveedor ni ejecuta una restauración destructiva.
+5. Fusionar las ramas y registrar el rollout; no reabrir tareas de implementación local.
 
 #### Riesgos y límites que no deben perderse
 
 - Una barrera activa es fail-closed. Si un run termina en fallo o cancelación mientras sigue congelado, no se libera automáticamente; se requiere una decisión operativa explícita y segura.
 - La separación de deberes impide que quien congeló o fue responsable apruebe readiness, y quien congeló tampoco puede ejecutar el unfreeze.
 - El journal no contiene identificadores crudos del recurso suprimido; usa fingerprints. Un HMAC inválido, key version desconocida, hueco de secuencia o entrada anterior al restore point bloquea la importación.
-- No se ejecutaron migraciones reales, Newman ni restauraciones de proveedor en este corte. Los gates verdes prueban código y contratos locales, no disponibilidad productiva.
+- No se ejecutó PITR destructivo/proveedor, auditoría histórica real/WORM ni activación productiva de workers; requieren infraestructura y autoridad externa. El entorno `ares-validation` sí fue desplegado y validado, incluyendo Newman, migraciones desde cero y gates completos.
 
 ### Cierre verificado: perfil académico y adscripción histórica
 
@@ -159,7 +156,7 @@ Esta sección es la fuente de traspaso para continuar el trabajo sin reconstruir
 - El estado operativo privado diferencia MariaDB, almacenamiento y scanner, y agrega métricas de jobs, alertas e incidentes. Rutas: `GET /api/operations/status`, `GET|POST /api/operations/jobs`, `POST /api/operations/jobs/:id/claim|complete|fail`, `GET /api/operations/alerts`, `POST /api/operations/alerts/:id/acknowledge|resolve`, `GET|POST /api/operations/incidents` y `PATCH /api/operations/incidents/:id`.
 - El contrato se documentó en [`operations.openapi.ts`](../backend/src/openapi/operations.openapi.ts) y en la carpeta 19 de [`Ares-Backend.postman_collection.json`](../postman/Ares-Backend.postman_collection.json), con 15 solicitudes; el JSON de Postman quedó parseado correctamente.
 - Gate verde del corte: Prisma `generate`/`validate`, typecheck, build, formato focal y diff-check aprobados; 58 archivos y 690/690 pruebas backend aprobadas.
-- Riesgos residuales: los eventos históricos previos al encadenamiento requieren backfill controlado y un manifiesto se bloquea si el periodo contiene eventos legacy sin cadena; el ancla privada no usa WORM/object-lock y no se presenta como firma legal; no se ejecutaron pruebas contra MariaDB, MinIO o ClamAV reales ni Newman en este corte.
+- Riesgos residuales: los eventos históricos previos al encadenamiento requieren backfill controlado y un manifiesto se bloquea si el periodo contiene eventos legacy sin cadena; el ancla privada no usa WORM/object-lock y no se presenta como firma legal. La validación desplegada actual sí cubre MariaDB 11.8, MinIO, ClamAV, Mailpit y Newman; no cubre PITR destructivo/proveedor, auditoría histórica real/WORM ni activación productiva de workers.
 
 ## 1. Alcance y criterio de comparación
 
@@ -997,10 +994,10 @@ El contrato funcional principal ya produjo el primer recorrido backend implement
 
 **Decisiones funcionales pendientes: ninguna.** Las decisiones externas al control del repositorio se omiten de esta secuencia y se resolverán por separado cuando corresponda; no bloquean los contratos ni la implementación local.
 
-1. Aplicar las migraciones pendientes en un entorno autorizado y validar MariaDB, almacenamiento, scanner, SMTP y workers con configuración real.
-2. Ejecutar Newman, un recorrido cross-stack y un simulacro de restauración externo siguiendo la secuencia gobernada antes de fusionar a la rama de integración.
+1. Fusionar las ramas revisadas hacia la rama de integración definida por el equipo.
+2. Ejecutar el rollout productivo y las operaciones externas sólo con la autorización e infraestructura correspondientes.
 
-El Incremento 1 quedó integrado en `develop`. Backend 1 y Frontend 1 deben continuar con validación, ausencias y calendario sin duplicar las reglas ya centralizadas. Backend 2 queda en fase de validación desplegada y fusión; no debe ampliar alcance ni incorporar visitas o inventario, que permanecen bajo Backend 1.
+El Incremento 1 quedó integrado en `develop`. Backend 1 y Frontend 1 deben continuar con validación, ausencias y calendario sin duplicar las reglas ya centralizadas. Backend 2 queda con desarrollo local y validación desplegada terminados; sólo resta rollout/fusión. No debe ampliar alcance ni incorporar visitas o inventario, que permanecen bajo Backend 1.
 
 ## 13. Referencias del repositorio actual
 
