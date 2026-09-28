@@ -23,7 +23,7 @@
 - Operación, auditoría, integridad y observabilidad de Backend 2 quedan **COMPLETADAS y verificadas en backend**; la migración fue creada y validada, pero no aplicada a un entorno real.
 - Los dominios de Backend 1 quedan excluidos de este bloque.
 - Recuperación y reconciliación de Backend 2 quedan **COMPLETADAS y verificadas en backend**; la migración fue creada y validada, pero no aplicada a un entorno real.
-- Este checkpoint sustituye las menciones históricas de “frontend/E2E pendiente” conservadas en los cierres incrementales inferiores: el alcance asignado a Backend 2 ya quedó implementado y validado en backend, base de datos, frontend, integración y pruebas desplegadas. Sólo queda rollout/fusión y operación externa autorizada.
+- Este checkpoint sustituye las menciones históricas de “frontend/E2E pendiente” conservadas en los cierres incrementales inferiores: el alcance asignado a Backend 2 ya quedó implementado, validado e integrado en `develop`. Sólo quedan el rollout y la operación externa autorizada.
 
 ### Traspaso operativo de Backend 2: realizado, pendiente y cómo continuar
 
@@ -43,17 +43,16 @@ Esta sección es la fuente de traspaso para continuar el trabajo sin reconstruir
 
 #### Trabajo que todavía falta
 
-1. **Fusionar ramas, no reimplementar:** abrir revisión y fusionar `feature/frontend/backend2-full-scope` y `feature/backend/backend2-full-scope` hacia la rama de integración definida por el equipo. No se creó PR automáticamente.
-2. **Rollout productivo controlado:** promover las imágenes y configuración desde el entorno validado, con respaldo y aprobación operativa.
-3. **Operación externa opcional:** un PITR/restore destructivo del proveedor, una auditoría histórica real/WORM y la activación productiva de workers requieren infraestructura y autoridad externa; no son pendientes de desarrollo de código.
+1. **Rollout productivo controlado:** promover las imágenes y configuración desde el entorno validado, con respaldo y aprobación operativa.
+2. **Operación externa opcional:** un PITR/restore destructivo del proveedor, una auditoría histórica real/WORM y la activación productiva de workers requieren infraestructura y autoridad externa; no son pendientes de desarrollo de código.
 
 #### Orden para retomar
 
-1. Obtener ambas ramas remotas y revisar primero los commits anteriores; no mezclar dominios de Backend 1.
+1. Partir de `develop` en `7274a7b` o posterior; las ramas de Backend 2 ya están integradas y no deben reimplementarse.
 2. Para reproducir la validación, levantar `ares-validation` con Docker Compose y comprobar `GET /api/health/ready`; ese entorno ya quedó en verde con las 25 migraciones aplicadas desde cero.
 3. Los gates y Newman ya quedaron ejecutados en verde; cualquier repetición debe conservar el entorno desechable y no usar datos únicos.
 4. Realizar sólo cuando exista autorización el simulacro externo siguiendo el orden documentado. `POST /api/recovery/:id/restore` registra el restore externo: no llama al proveedor ni ejecuta una restauración destructiva.
-5. Fusionar las ramas y registrar el rollout; no reabrir tareas de implementación local.
+5. Registrar el rollout autorizado; no reabrir tareas de implementación local.
 
 #### Riesgos y límites que no deben perderse
 
@@ -182,7 +181,7 @@ Las instrucciones o recomendaciones contenidas en los PDF se trataron como mater
 
 ## 2. Resumen ejecutivo
 
-Ares ya cuenta con una base administrativa sólida y verificable, aunque todavía no es funcionalmente equivalente a todo el sistema legado documentado. El alcance asignado a Backend 2 ya cubre backend, frontend, integración y E2E de perfil académico, expediente, directorio, Kairos, reportes, biblioteca, CMS público, gamificación, impresión 3D y retención/supresión; operación, auditoría, integridad, observabilidad y recuperación/reconciliación también quedaron cerradas en backend en este corte. Los dominios asignados a Backend 1 conservan su propio estado y no se contabilizan como deuda de este bloque. Para Backend 2 sólo permanecen las actividades externas de despliegue, servicios reales, simulacro y fusión descritas en el traspaso operativo.
+Ares ya cuenta con una base administrativa sólida y verificable, aunque todavía no es funcionalmente equivalente a todo el sistema legado documentado. El alcance asignado a Backend 2 ya cubre backend, frontend, integración y E2E de perfil académico, expediente, directorio, Kairos, reportes, biblioteca, CMS público, gamificación, impresión 3D y retención/supresión; operación, auditoría, integridad, observabilidad y recuperación/reconciliación también quedaron cerradas en backend en este corte. Los dominios asignados a Backend 1 conservan su propio estado y no se contabilizan como deuda de este bloque. Backend 2 ya está integrado en `develop`; sólo permanecen las actividades externas de rollout, servicios reales y simulacro descritas en el traspaso operativo.
 
 Las brechas principales restantes pertenecen al recorrido de Servicio Social asignado a Backend 1 y a la operación transversal pendiente. El siguiente objetivo de producto sigue siendo completar este recorrido vertical:
 
