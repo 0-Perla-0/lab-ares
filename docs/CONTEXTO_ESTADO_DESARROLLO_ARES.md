@@ -4,8 +4,8 @@
 
 | Dato                        | Valor                                                                                                             |
 | --------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| Fecha de revisión           | 27 de septiembre de 2026                                                                                          |
-| Rama de trabajo             | `develop` (integración Git Flow de Backend 2)                                                                     |
+| Fecha de revisión           | 28 de septiembre de 2026                                                                                          |
+| Rama de trabajo             | `feature/frontend/password-recovery` sobre `develop`                                                              |
 | Commit base revisado        | `9c50668` (cierre backend desplegado) y `606a136` (frontend Backend 2)                                             |
 | Sistema actual              | Monorepo con Next.js App Router, NestJS, Prisma y MariaDB                                                         |
 | Fuentes funcionales         | Cinco PDF del sistema heredado: plan, análisis integral, reporte de estado, documento técnico y manual de usuario |
@@ -33,6 +33,7 @@ Esta sección es la fuente de traspaso para continuar el trabajo sin reconstruir
 
 - **Backend funcional completo del alcance Backend 2:** perfil académico, expediente documental, directorio, proyectos/membresías/actividades/evidencias/Kanban de Kairos, reportes, biblioteca, CMS público, gamificación privada, impresión 3D, retención/supresión, operación/auditoría e integridad y recuperación/reconciliación. Los dominios de Backend 1 no se modificaron como parte de este alcance.
 - **Frontend completo para usar ese backend:** rama remota `feature/frontend/backend2-full-scope`, commit `606a136`. Incluye las diez áreas funcionales de Backend 2, integración de permisos de `/auth/me`, 37/37 pruebas unitarias, 13/13 recorridos Playwright deterministas, build y typecheck aprobados.
+- **Recuperación de contraseña utilizable desde frontend:** la rama `feature/frontend/password-recovery` agrega el enlace desde el login y el recorrido para solicitar el token, capturarlo y establecer la contraseña nueva mediante los contratos existentes `/api/auth/recovery/request` y `/api/auth/recovery/reset`. La respuesta visible no permite enumerar cuentas. El corte quedó en verde con 38/38 pruebas Vitest, `check`, `build` y el E2E enfocado 1/1.
 - **Backend publicado en su rama Git Flow:** rama `feature/backend/backend2-full-scope`. Los cortes principales son `0c390be` para retención/supresión, `066f48b` para operación/auditoría e integridad y `c075367` para recuperación/reconciliación.
 - **Recuperación gobernada:** `RecoveryRun`, pasos, checks, medición RPO/RTO y simulacros; scope `IMPORTANTE` con objetivo RPO 60 minutos/RTO 480 minutos y `SECUNDARIO` con RPO 1440 minutos/RTO 480 minutos, equivalente al día hábil técnico adoptado.
 - **Barrera global durable:** las mutaciones HTTP ordinarias responden 503 con snapshot coherente; sólo pasan las rutas exactas del plano de control, autenticación necesaria y manifiesto. Los workers de almacenamiento, reportes, retención, outbox, manifiestos y journal dejan de reclamar trabajo durante el freeze.
