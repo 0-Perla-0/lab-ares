@@ -4,9 +4,9 @@
 
 | Dato                        | Valor                                                                                                             |
 | --------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| Fecha de revisión           | 27 de septiembre de 2026                                                                                          |
-| Rama de trabajo             | `develop` (integración Git Flow de Backend 2)                                                                     |
-| Commit base revisado        | `9c50668` (cierre backend desplegado) y `606a136` (frontend Backend 2)                                             |
+| Fecha de revisión           | 1 de octubre de 2026                                                                                               |
+| Rama de trabajo             | `develop` (integración final de Backend 2 y correcciones frontend)                                                 |
+| Commit base revisado        | `b645648` (integración Backend 2), `2039fd0` (recuperación) y `f82f34a` (modales)                                  |
 | Sistema actual              | Monorepo con Next.js App Router, NestJS, Prisma y MariaDB                                                         |
 | Fuentes funcionales         | Cinco PDF del sistema heredado: plan, análisis integral, reporte de estado, documento técnico y manual de usuario |
 | Evidencia de implementación | Código, esquema Prisma, migraciones, OpenAPI, pruebas, CI, Docker y Postman del repositorio actual                |
@@ -32,7 +32,9 @@ Esta sección es la fuente de traspaso para continuar el trabajo sin reconstruir
 #### Trabajo terminado
 
 - **Backend funcional completo del alcance Backend 2:** perfil académico, expediente documental, directorio, proyectos/membresías/actividades/evidencias/Kanban de Kairos, reportes, biblioteca, CMS público, gamificación privada, impresión 3D, retención/supresión, operación/auditoría e integridad y recuperación/reconciliación. Los dominios de Backend 1 no se modificaron como parte de este alcance.
-- **Frontend completo para usar ese backend:** rama remota `feature/frontend/backend2-full-scope`, commit `606a136`. Incluye las diez áreas funcionales de Backend 2, integración de permisos de `/auth/me`, 37/37 pruebas unitarias, 13/13 recorridos Playwright deterministas, build y typecheck aprobados.
+- **Frontend completo para usar ese backend:** integrado en `develop`; incluye las diez áreas funcionales de Backend 2, permisos efectivos de `/auth/me`, recuperación de contraseña y modales globales responsivos. El gate vigente aprobó 38/38 pruebas Vitest, 16/16 recorridos Playwright, build y typecheck.
+- **Recuperación de contraseña utilizable desde frontend:** integrada en `develop` con enlace desde el login y recorrido para solicitar el token, capturarlo y establecer la contraseña nueva mediante los contratos existentes `/api/auth/recovery/request` y `/api/auth/recovery/reset`. La respuesta visible no permite enumerar cuentas.
+- **Modales globales corregidos:** el componente compartido renderiza los diálogos en un portal sobre `document.body`, fuera de los contenedores animados que alteraban el posicionamiento `fixed`. La capa cubre el portal completo, conserva encabezado y acciones dentro de `100dvh` y quedó validada con E2E en escritorio y viewport móvil (2/2).
 - **Backend publicado en su rama Git Flow:** rama `feature/backend/backend2-full-scope`. Los cortes principales son `0c390be` para retención/supresión, `066f48b` para operación/auditoría e integridad y `c075367` para recuperación/reconciliación.
 - **Recuperación gobernada:** `RecoveryRun`, pasos, checks, medición RPO/RTO y simulacros; scope `IMPORTANTE` con objetivo RPO 60 minutos/RTO 480 minutos y `SECUNDARIO` con RPO 1440 minutos/RTO 480 minutos, equivalente al día hábil técnico adoptado.
 - **Barrera global durable:** las mutaciones HTTP ordinarias responden 503 con snapshot coherente; sólo pasan las rutas exactas del plano de control, autenticación necesaria y manifiesto. Los workers de almacenamiento, reportes, retención, outbox, manifiestos y journal dejan de reclamar trabajo durante el freeze.
@@ -67,9 +69,9 @@ Esta sección es la fuente de traspaso para continuar el trabajo sin reconstruir
 - La integración consume la base accesible de Ares y conserva la autoridad del backend: `/auth/me` expone los grants efectivos sin ampliar autorizaciones en cliente.
 - Los flujos de archivos utilizan la API multipart existente; no se aplicaron migraciones reales durante esta fase.
 - La cobertura E2E usa Playwright 1.63 con Chromium y APIs interceptadas de forma determinista para validar navegación, permisos, formularios, carga/escaneo, exportaciones síncronas y asíncronas, estados deshabilitados, confirmaciones administrativas, accesibilidad de teclado y comportamiento móvil; la configuración y los escenarios están en [`frontend/playwright.config.ts`](../frontend/playwright.config.ts) y [`frontend/e2e/`](../frontend/e2e/).
-- Gates del corte: 37/37 pruebas Vitest frontend, 13/13 pruebas E2E, 672/672 pruebas backend, además de `check`, `build`, Prisma y diff-check aprobados. El formato del corte también quedó aprobado.
+- Gates del corte: 38/38 pruebas Vitest frontend, 16/16 pruebas E2E y 718/718 pruebas backend, además de `check`, `build`, Prisma y diff-check aprobados. El formato del corte también quedó aprobado.
 - La deuda global previa de 80 archivos backend fuera del diff queda registrada como deuda técnica no bloqueante.
-- Al reanudar el trabajo backend quedan como siguiente bloque la operación/auditoría y la recuperación/reconciliación.
+- Operación/auditoría y recuperación/reconciliación ya quedaron cerradas en backend; desde este corte sólo permanecen los pasos operativos externos descritos en “Trabajo que todavía falta”.
 
 ### Cierre verificado: perfil académico y adscripción histórica
 

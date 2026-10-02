@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { ArrowRight, Eye, EyeOff, LoaderCircle } from "lucide-react";
 
 import { apiRequest, getApiErrorMessage } from "@/lib/api";
@@ -65,9 +66,12 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
           >
             Contraseña
           </label>
-          <span className="text-xs font-semibold text-[#7a8580]">
-            Acceso seguro
-          </span>
+          <Link
+            href="/recuperar-contrasena"
+            className="focus-ring rounded-md text-xs font-bold text-[#668721] hover:text-[#486217]"
+          >
+            ¿Olvidaste tu contraseña?
+          </Link>
         </div>
         <div className="relative mt-2">
           <input

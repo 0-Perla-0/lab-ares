@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import Link from "next/link";
+import { createPortal } from "react-dom";
 import {
   AlertTriangle,
   Inbox,
@@ -357,11 +358,11 @@ export function Modal({
     };
   }, [open, onClose]);
 
-  if (!open) return null;
+  if (!open || typeof document === "undefined") return null;
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 grid items-end bg-[#0b1712]/55 p-0 backdrop-blur-sm sm:place-items-center sm:p-5"
+      className="fixed inset-0 z-[100] grid items-end overflow-y-auto overscroll-contain bg-[#0b1712]/55 px-0 pb-0 pt-4 backdrop-blur-sm sm:place-items-center sm:p-5"
       role="presentation"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
@@ -373,7 +374,7 @@ export function Modal({
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={description ? descriptionId : undefined}
-        className="max-h-[92vh] w-full overflow-y-auto rounded-t-[1.7rem] bg-[#fcfbf7] shadow-2xl sm:max-w-2xl sm:rounded-[1.7rem]"
+        className="max-h-[calc(100dvh-1rem)] w-full overflow-y-auto rounded-t-[1.7rem] bg-[#fcfbf7] shadow-2xl sm:max-h-[calc(100dvh-2.5rem)] sm:max-w-2xl sm:rounded-[1.7rem]"
       >
         <header className="sticky top-0 z-10 flex items-start justify-between border-b border-[#12221b]/10 bg-[#fcfbf7]/95 px-5 py-5 backdrop-blur sm:px-7">
           <div>
@@ -400,7 +401,8 @@ export function Modal({
         </header>
         <div className="p-5 sm:p-7">{children}</div>
       </section>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

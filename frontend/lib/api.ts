@@ -59,6 +59,8 @@ async function parseJson<T>(response: Response): Promise<T | undefined> {
 
 const apiMessages: Record<string, string> = {
   INVALID_CREDENTIALS: "El correo o la contraseña no son correctos.",
+  RECOVERY_TOKEN_INVALID:
+    "El token no es válido, ya fue utilizado o expiró. Solicita uno nuevo.",
   VALIDATION_ERROR: "Revisa los datos capturados e inténtalo nuevamente.",
   FORBIDDEN: "No tienes permisos para realizar esta acción.",
   UNAUTHORIZED: "Tu sesión terminó. Inicia sesión nuevamente.",
