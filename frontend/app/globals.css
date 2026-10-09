@@ -1,22 +1,30 @@
 @import "tailwindcss";
 
 :root {
-  --ares-ink: #12221b;
-  --ares-ink-soft: #243d32;
-  --ares-cream: #f4f0e7;
-  --ares-paper: #fcfbf7;
-  --ares-lime: #c8f169;
-  --ares-lime-deep: #95c62d;
-  --ares-orange: #f4834f;
-  --ares-muted: #66736d;
+  /* Paleta Ares: azul tinta, índigo profundo y mandarina. */
+  --ares-ink-blue: #17174a;
+  --ares-indigo-deep: #25256d;
+  --ares-gray-blue: #667085;
+  --ares-mandarin: #f97316;
+  --ares-mandarin-hover: #ea580c;
+  --ares-peach: #fff1e8;
+  --ares-accent: #f97316;
+  --ares-accent-strong: #ea580c;
+  --ares-accent-soft: #fff1e8;
+  --ares-canvas: #f6f7fb;
+  --ares-ink: var(--ares-ink-blue);
+  --ares-ink-soft: var(--ares-indigo-deep);
+  --ares-paper: #ffffff;
+  --ares-muted: #667085;
   --ares-surface: #ffffff;
-  --ares-surface-subtle: #f7f7f3;
-  --ares-border: rgba(18, 34, 27, 0.12);
-  --ares-border-strong: rgba(18, 34, 27, 0.24);
-  --ares-focus: #769a27;
+  --ares-surface-subtle: #f6f7fb;
+  --ares-surface-soft: #f0f1f7;
+  --ares-border: #dde1ea;
+  --ares-border-strong: #cbd1de;
+  --ares-focus: #ea580c;
   --ares-danger: #b91c1c;
   --ares-warning: #92400e;
-  --ares-success: #166534;
+  --ares-success: #10b981;
   --ares-info: #075985;
   --ares-motion-fast: 150ms;
   --ares-motion-standard: 250ms;
@@ -64,29 +72,34 @@ textarea:disabled {
 }
 
 ::selection {
-  background: var(--ares-lime);
+  background: var(--ares-accent);
   color: var(--ares-ink);
 }
 
 .grid-texture {
   background-image:
-    linear-gradient(rgba(18, 34, 27, 0.055) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(18, 34, 27, 0.055) 1px, transparent 1px);
+    linear-gradient(rgba(23, 23, 74, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(23, 23, 74, 0.055) 1px, transparent 1px);
   background-size: 40px 40px;
 }
 
 .brand-mark {
+  position: relative;
   display: inline-grid;
-  width: 2.5rem;
-  height: 2.5rem;
+  width: 3.25rem;
+  height: 3rem;
+  flex: 0 0 auto;
   place-items: center;
   border-radius: 0.8rem;
-  background: var(--ares-lime);
-  color: var(--ares-ink);
-  font-size: 1rem;
-  font-weight: 900;
-  letter-spacing: -0.08em;
-  box-shadow: inset 0 0 0 1px rgba(18, 34, 27, 0.12);
+  overflow: hidden;
+  background: var(--ares-accent-soft);
+  padding: 0.125rem;
+  box-shadow: inset 0 0 0 1px rgba(23, 23, 74, 0.12);
+}
+
+.brand-mark-compact {
+  width: 2.75rem;
+  height: 2.75rem;
 }
 
 .focus-ring:focus-visible {
@@ -122,7 +135,7 @@ textarea:disabled {
 }
 
 .ares-progress::-webkit-progress-bar {
-  background: #e4e7e2;
+  background: #dde1ea;
   border-radius: 999px;
 }
 
@@ -140,14 +153,14 @@ textarea:disabled {
   background:
     radial-gradient(
       circle at 85% 0%,
-      rgba(200, 241, 105, 0.16),
+      rgba(249, 115, 22, 0.16),
       transparent 26rem
     ),
-    #f7f7f3;
+    #f6f7fb;
 }
 
 .table-scroll {
-  scrollbar-color: #c7cec9 transparent;
+  scrollbar-color: #cbd1de transparent;
   scrollbar-width: thin;
 }
 

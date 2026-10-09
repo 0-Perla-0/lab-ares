@@ -39,9 +39,23 @@ type EditorData = {
   turnos: Turno[];
 };
 
-type Props = { mode: "create" } | { mode: "edit"; userId: number };
+type Props =
+  | {
+      mode: "create";
+      presentation?: "page" | "modal";
+      onCancel?: () => void;
+      onSaved?: () => void | Promise<void>;
+    }
+  | { mode: "edit"; userId: number };
 
-const editableStates = ["ACTIVO", "PENDIENTE", "INACTIVO", "LIBERADO"] as const;
+const creatableStates: UserState[] = ["INVITADA", "ACTIVA"];
+const editableStates: UserState[] = [
+  "INVITADA",
+  "ACTIVA",
+  "SUSPENDIDA",
+  "DESACTIVADA",
+  "BLOQUEADA",
+];
 const areaScopedRoles: UserRole[] = ["COORDINADOR", "JEFE_AREA"];
 
 export function UserEditorPage(props: Props) {
@@ -55,6 +69,7 @@ export function UserEditorPage(props: Props) {
   const [areaId, setAreaId] = useState<number | null>(null);
   const [turnoId, setTurnoId] = useState<number | null>(null);
   const editUserId = props.mode === "edit" ? props.userId : null;
+  const isModal = props.mode === "create" && props.presentation === "modal";
 
   const load = useCallback(async () => {
     if (!canReadUsers(user)) return;
@@ -135,13 +150,13 @@ export function UserEditorPage(props: Props) {
     setFormError("");
     const form = new FormData(event.currentTarget);
     const password = String(form.get("password") ?? "");
-    if (!isEdit && password.length < 12) {
-      setFormError("La contraseña debe tener al menos 12 caracteres.");
+    if (!isEdit && password.length < 15) {
+      setFormError("La contraseña debe tener al menos 15 caracteres.");
       setSaving(false);
       return;
     }
-    if (password && new TextEncoder().encode(password).length > 72) {
-      setFormError("La contraseña excede el límite seguro de 72 bytes.");
+    if (password && [...password].length > 128) {
+      setFormError("La contraseña no puede superar 128 caracteres.");
       setSaving(false);
       return;
     }
@@ -162,8 +177,12 @@ export function UserEditorPage(props: Props) {
         method: isEdit ? "PUT" : "POST",
         body: JSON.stringify(payload),
       });
-      router.push("/portal/usuarios");
-      router.refresh();
+      if (isModal && props.mode === "create") {
+        await props.onSaved?.();
+      } else {
+        router.push("/portal/usuarios");
+        router.refresh();
+      }
     } catch (error) {
       setFormError(getApiErrorMessage(error, "save"));
     } finally {
@@ -171,27 +190,225 @@ export function UserEditorPage(props: Props) {
     }
   }
 
+  const form = (
+    <form
+      onSubmit={save}
+      className={
+        isModal
+          ? ""
+          : "mt-8 rounded-[1.6rem] border border-[#dde1ea] bg-white p-5 shadow-[0_8px_30px_rgba(23,23,74,0.035)] sm:p-8"
+      }
+    >
+      <fieldset>
+        <legend className="text-base font-black">Identidad y acceso</legend>
+        <p className="mt-1 text-xs text-[#667085]">
+          Datos utilizados para identificar e iniciar sesión.
+        </p>
+        <div className="mt-5 grid gap-5 md:grid-cols-2">
+          <Field label="Código" required>
+            <input
+              name="codigo"
+              required
+              maxLength={50}
+              defaultValue={item?.codigo ?? ""}
+              className={inputClassName}
+              placeholder="Ej. INV-001"
+            />
+          </Field>
+          <Field label="Correo electrónico" required>
+            <input
+              name="email"
+              type="email"
+              required
+              maxLength={191}
+              defaultValue={item?.email ?? ""}
+              className={inputClassName}
+              placeholder="persona@ejemplo.com"
+            />
+          </Field>
+          <Field
+            label={isEdit ? "Nueva contraseña" : "Contraseña"}
+            required={!isEdit}
+            hint={
+              isEdit
+                ? "Déjala vacía para conservar la actual."
+                : "Mínimo 15 y máximo 128 caracteres."
+            }
+          >
+            <input
+              name="password"
+              type="password"
+              required={!isEdit}
+              minLength={isEdit ? undefined : 15}
+              maxLength={128}
+              autoComplete="new-password"
+              className={inputClassName}
+              placeholder={
+                isEdit ? "Sin cambios" : "Contraseña temporal segura"
+              }
+            />
+          </Field>
+          <Field label="Estado" required>
+            <select
+              name="estado"
+              required
+              defaultValue={item?.estado ?? "INVITADA"}
+              className={inputClassName}
+            >
+              {(isEdit ? editableStates : creatableStates).map((state) => (
+                <option key={state} value={state}>
+                  {stateLabels[state]}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
+      </fieldset>
+
+      <div className="my-8 border-t border-[#dde1ea]" />
+
+      <fieldset>
+        <legend className="text-base font-black">
+          Responsabilidad y ubicación
+        </legend>
+        <p className="mt-1 text-xs text-[#667085]">
+          La jerarquía limita los roles y asignaciones que puedes administrar.
+        </p>
+        <div className="mt-5 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+          <Field label="Rol" required>
+            <select
+              name="rol"
+              required
+              defaultValue={item?.rol ?? "PRESTADOR"}
+              className={inputClassName}
+            >
+              {manageableRoles(user).map((role) => (
+                <option key={role} value={role}>
+                  {roleLabels[role]}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Sede" required={scopedSede}>
+            <select
+              value={sedeId ?? ""}
+              onChange={(event) => {
+                const value = toNullableId(event.target.value);
+                setSedeId(value);
+                setAreaId(null);
+                setTurnoId(null);
+              }}
+              disabled={scopedSede}
+              className={inputClassName}
+            >
+              {!scopedSede && <option value="">Sin sede</option>}
+              {availableSedes.map((sede) => (
+                <option key={sede.id} value={sede.id}>
+                  {sede.nombre}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Área" required={scopedArea}>
+            <select
+              value={areaId ?? ""}
+              onChange={(event) => {
+                setAreaId(toNullableId(event.target.value));
+                setTurnoId(null);
+              }}
+              disabled={sedeId === null || scopedArea}
+              className={inputClassName}
+            >
+              {!scopedArea && <option value="">Sin área</option>}
+              {availableAreas.map((area) => (
+                <option key={area.id} value={area.id}>
+                  {area.nombre}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Turno">
+            <select
+              value={turnoId ?? ""}
+              onChange={(event) => setTurnoId(toNullableId(event.target.value))}
+              disabled={areaId === null}
+              className={inputClassName}
+            >
+              <option value="">Sin turno</option>
+              {availableTurnos.map((turno) => (
+                <option key={turno.id} value={turno.id}>
+                  {turno.nombre} · {turno.horaInicio}–{turno.horaFin}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
+      </fieldset>
+
+      <div className="mt-7">
+        <ErrorBanner message={formError} />
+      </div>
+      <div className="mt-8 flex flex-col-reverse gap-3 border-t border-[#dde1ea] pt-6 sm:flex-row sm:justify-end">
+        {isModal && props.mode === "create" ? (
+          <button
+            type="button"
+            onClick={props.onCancel}
+            disabled={saving}
+            className="focus-ring rounded-xl border border-[#dde1ea] px-5 py-2.5 text-center text-sm font-extrabold hover:bg-[#eef0f6] disabled:opacity-50"
+          >
+            Cancelar
+          </button>
+        ) : (
+          <Link
+            href="/portal/usuarios"
+            className="focus-ring rounded-xl border border-[#dde1ea] px-5 py-2.5 text-center text-sm font-extrabold hover:bg-[#eef0f6]"
+          >
+            Cancelar
+          </Link>
+        )}
+        <button
+          type="submit"
+          disabled={saving}
+          className="focus-ring inline-flex items-center justify-center gap-2 rounded-xl bg-[#17174a] px-5 py-2.5 text-sm font-black text-white hover:bg-[#25256d] disabled:cursor-wait disabled:opacity-65"
+        >
+          {saving ? (
+            <LoaderCircle size={16} className="animate-spin" />
+          ) : (
+            <Save size={16} />
+          )}
+          {saving
+            ? "Guardando…"
+            : isEdit
+              ? "Guardar cambios"
+              : "Registrar usuario"}
+        </button>
+      </div>
+    </form>
+  );
+
+  if (isModal) return form;
+
   return (
     <div className="animate-fade-up">
       <Link
         href="/portal/usuarios"
-        className="focus-ring inline-flex items-center gap-2 rounded-lg text-xs font-black text-[#66736d] hover:text-[#12221b]"
+        className="focus-ring inline-flex items-center gap-2 rounded-lg text-xs font-black text-[#667085] hover:text-[#17174a]"
       >
         <ArrowLeft size={15} /> Volver a usuarios
       </Link>
 
       <div className="mt-6 flex items-start gap-4">
-        <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#c8f169]">
+        <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#f97316]">
           <UserRoundPlus size={22} />
         </span>
         <div>
-          <p className="text-[11px] font-black uppercase tracking-[0.19em] text-[#769a27]">
+          <p className="text-[11px] font-black uppercase tracking-[0.19em] text-[#ea580c]">
             Equipo
           </p>
           <h1 className="mt-1 text-3xl font-black tracking-[-0.045em] sm:text-4xl">
             {isEdit ? `Editar ${item?.codigo}` : "Registrar usuario"}
           </h1>
-          <p className="mt-2 text-sm leading-6 text-[#66736d]">
+          <p className="mt-2 text-sm leading-6 text-[#667085]">
             {isEdit
               ? "Actualiza identidad, acceso y ubicación dentro de la organización."
               : "Crea un acceso nuevo dentro del alcance permitido por tu rol."}
@@ -199,186 +416,7 @@ export function UserEditorPage(props: Props) {
         </div>
       </div>
 
-      <form
-        onSubmit={save}
-        className="mt-8 rounded-[1.6rem] border border-[#12221b]/10 bg-white p-5 shadow-[0_8px_30px_rgba(18,34,27,0.035)] sm:p-8"
-      >
-        <fieldset>
-          <legend className="text-base font-black">Identidad y acceso</legend>
-          <p className="mt-1 text-xs text-[#7a8580]">
-            Datos utilizados para identificar e iniciar sesión.
-          </p>
-          <div className="mt-5 grid gap-5 md:grid-cols-2">
-            <Field label="Código" required>
-              <input
-                name="codigo"
-                required
-                maxLength={50}
-                defaultValue={item?.codigo ?? ""}
-                className={inputClassName}
-                placeholder="Ej. INV-001"
-              />
-            </Field>
-            <Field label="Correo electrónico" required>
-              <input
-                name="email"
-                type="email"
-                required
-                maxLength={191}
-                defaultValue={item?.email ?? ""}
-                className={inputClassName}
-                placeholder="persona@ejemplo.com"
-              />
-            </Field>
-            <Field
-              label={isEdit ? "Nueva contraseña" : "Contraseña"}
-              required={!isEdit}
-              hint={
-                isEdit
-                  ? "Déjala vacía para conservar la actual."
-                  : "Mínimo 12 caracteres y máximo 72 bytes."
-              }
-            >
-              <input
-                name="password"
-                type="password"
-                required={!isEdit}
-                minLength={isEdit ? undefined : 12}
-                maxLength={128}
-                autoComplete="new-password"
-                className={inputClassName}
-                placeholder={
-                  isEdit ? "Sin cambios" : "Contraseña temporal segura"
-                }
-              />
-            </Field>
-            <Field label="Estado" required>
-              <select
-                name="estado"
-                required
-                defaultValue={item?.estado ?? "PENDIENTE"}
-                className={inputClassName}
-              >
-                {editableStates.map((state) => (
-                  <option key={state} value={state}>
-                    {stateLabels[state]}
-                  </option>
-                ))}
-              </select>
-            </Field>
-          </div>
-        </fieldset>
-
-        <div className="my-8 border-t border-[#12221b]/10" />
-
-        <fieldset>
-          <legend className="text-base font-black">
-            Responsabilidad y ubicación
-          </legend>
-          <p className="mt-1 text-xs text-[#7a8580]">
-            La jerarquía limita los roles y asignaciones que puedes administrar.
-          </p>
-          <div className="mt-5 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-            <Field label="Rol" required>
-              <select
-                name="rol"
-                required
-                defaultValue={item?.rol ?? "PRESTADOR"}
-                className={inputClassName}
-              >
-                {manageableRoles(user).map((role) => (
-                  <option key={role} value={role}>
-                    {roleLabels[role]}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Sede" required={scopedSede}>
-              <select
-                value={sedeId ?? ""}
-                onChange={(event) => {
-                  const value = toNullableId(event.target.value);
-                  setSedeId(value);
-                  setAreaId(null);
-                  setTurnoId(null);
-                }}
-                disabled={scopedSede}
-                className={inputClassName}
-              >
-                {!scopedSede && <option value="">Sin sede</option>}
-                {availableSedes.map((sede) => (
-                  <option key={sede.id} value={sede.id}>
-                    {sede.nombre}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Área" required={scopedArea}>
-              <select
-                value={areaId ?? ""}
-                onChange={(event) => {
-                  setAreaId(toNullableId(event.target.value));
-                  setTurnoId(null);
-                }}
-                disabled={sedeId === null || scopedArea}
-                className={inputClassName}
-              >
-                {!scopedArea && <option value="">Sin área</option>}
-                {availableAreas.map((area) => (
-                  <option key={area.id} value={area.id}>
-                    {area.nombre}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Turno">
-              <select
-                value={turnoId ?? ""}
-                onChange={(event) =>
-                  setTurnoId(toNullableId(event.target.value))
-                }
-                disabled={areaId === null}
-                className={inputClassName}
-              >
-                <option value="">Sin turno</option>
-                {availableTurnos.map((turno) => (
-                  <option key={turno.id} value={turno.id}>
-                    {turno.nombre} · {turno.horaInicio}–{turno.horaFin}
-                  </option>
-                ))}
-              </select>
-            </Field>
-          </div>
-        </fieldset>
-
-        <div className="mt-7">
-          <ErrorBanner message={formError} />
-        </div>
-        <div className="mt-8 flex flex-col-reverse gap-3 border-t border-[#12221b]/10 pt-6 sm:flex-row sm:justify-end">
-          <Link
-            href="/portal/usuarios"
-            className="focus-ring rounded-xl border border-[#12221b]/15 px-5 py-2.5 text-center text-sm font-extrabold hover:bg-[#f0f1ed]"
-          >
-            Cancelar
-          </Link>
-          <button
-            type="submit"
-            disabled={saving}
-            className="focus-ring inline-flex items-center justify-center gap-2 rounded-xl bg-[#12221b] px-5 py-2.5 text-sm font-black text-white hover:bg-[#243d32] disabled:cursor-wait disabled:opacity-65"
-          >
-            {saving ? (
-              <LoaderCircle size={16} className="animate-spin" />
-            ) : (
-              <Save size={16} />
-            )}
-            {saving
-              ? "Guardando…"
-              : isEdit
-                ? "Guardar cambios"
-                : "Registrar usuario"}
-          </button>
-        </div>
-      </form>
+      {form}
     </div>
   );
 }

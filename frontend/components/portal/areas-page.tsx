@@ -156,9 +156,9 @@ export function AreasPage() {
             description="Las áreas registradas aparecerán en esta sección."
           />
         ) : (
-          <div className="table-scroll overflow-x-auto rounded-2xl border border-[#12221b]/10 bg-white shadow-[0_8px_30px_rgba(18,34,27,0.035)]">
+          <div className="table-scroll overflow-x-auto rounded-2xl border border-[#dde1ea] bg-white shadow-[0_8px_30px_rgba(23,23,74,0.035)]">
             <table className="w-full min-w-[650px] text-left">
-              <thead className="border-b border-[#12221b]/10 bg-[#f4f5f1] text-[10px] font-black uppercase tracking-[0.16em] text-[#748078]">
+              <thead className="border-b border-[#dde1ea] bg-[#f0f1f7] text-[10px] font-black uppercase tracking-[0.16em] text-[#667085]">
                 <tr>
                   <th className="px-5 py-4">Área</th>
                   <th className="px-5 py-4">Sede</th>
@@ -168,25 +168,25 @@ export function AreasPage() {
                   )}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#12221b]/8">
+              <tbody className="divide-y divide-[#dde1ea]">
                 {areas.map((item) => {
                   const manageable = canManageSede(user, item.sedeId);
                   return (
-                    <tr key={item.id} className="transition hover:bg-[#fafbf7]">
+                    <tr key={item.id} className="transition hover:bg-[#fafaff]">
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-3">
-                          <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#fff0e9] text-[#c75b2a]">
+                          <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#fff1e8] text-[#ea580c]">
                             <Layers3 size={18} />
                           </span>
                           <div>
                             <p className="text-sm font-black">{item.nombre}</p>
-                            <p className="mt-0.5 text-[11px] text-[#8a948e]">
+                            <p className="mt-0.5 text-[11px] text-[#858ca0]">
                               ID {item.id}
                             </p>
                           </div>
                         </div>
                       </td>
-                      <td className="px-5 py-4 text-sm font-semibold text-[#536159]">
+                      <td className="px-5 py-4 text-sm font-semibold text-[#667085]">
                         {sedeName(item.sedeId)}
                       </td>
                       <td className="px-5 py-4">
@@ -205,7 +205,7 @@ export function AreasPage() {
                                 setSuccess("");
                                 setEditor({ mode: "edit", item });
                               }}
-                              className="focus-ring rounded-lg p-2 text-[#66736d] hover:bg-[#eef8d5] hover:text-[#55721e] disabled:cursor-not-allowed disabled:opacity-25"
+                              className="focus-ring rounded-lg p-2 text-[#667085] hover:bg-[#fff1e8] hover:text-[#c2410c] disabled:cursor-not-allowed disabled:opacity-25"
                               aria-label={`Editar ${item.nombre}`}
                             >
                               <Pencil size={17} />
@@ -214,7 +214,7 @@ export function AreasPage() {
                               type="button"
                               disabled={!manageable}
                               onClick={() => setDeleteTarget(item)}
-                              className="focus-ring rounded-lg p-2 text-[#66736d] hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-25"
+                              className="focus-ring rounded-lg p-2 text-[#667085] hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-25"
                               aria-label={`Dar de baja ${item.nombre}`}
                             >
                               <Trash2 size={17} />

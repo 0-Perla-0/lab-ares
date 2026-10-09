@@ -231,7 +231,7 @@ export function GamificationPage() {
           aria-valuenow={profile.puntos % profile.puntosPorNivel}
         >
           <div
-            className="h-full rounded-full bg-[#769a27] transition-[width]"
+            className="h-full rounded-full bg-[#ea580c] transition-[width]"
             style={{ width: `${progress}%` }}
           />
         </div>
@@ -310,7 +310,7 @@ function Metric({
   return (
     <article className="rounded-2xl border border-[var(--ares-border)] bg-[var(--ares-surface)] p-5 shadow-sm">
       <div
-        className="grid h-11 w-11 place-items-center rounded-xl bg-[#e9f6cb] text-[#557416]"
+        className="grid h-11 w-11 place-items-center rounded-xl bg-[#ffe0d0] text-[#c2410c]"
         aria-hidden="true"
       >
         {icon}

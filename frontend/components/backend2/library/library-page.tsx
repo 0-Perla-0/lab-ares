@@ -276,7 +276,7 @@ export function LibraryPage() {
               ))}
             </select>
           </Field>
-          <button className="focus-ring min-h-11 self-end rounded-xl bg-[#12221b] px-4 text-sm font-black text-white">
+          <button className="focus-ring min-h-11 self-end rounded-xl bg-[#17174a] px-4 text-sm font-black text-white">
             Aplicar filtros
           </button>
         </form>
@@ -290,7 +290,7 @@ export function LibraryPage() {
                 role="listitem"
                 type="button"
                 onClick={() => void detail(document.id)}
-                className="focus-ring min-h-24 rounded-2xl border border-[var(--ares-border)] p-4 text-left hover:border-[#769a27]"
+                className="focus-ring min-h-24 rounded-2xl border border-[var(--ares-border)] p-4 text-left hover:border-[#ea580c]"
               >
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <h2 className="font-black">{document.titulo}</h2>
@@ -302,7 +302,7 @@ export function LibraryPage() {
                 <p className="mt-2 text-sm text-[var(--ares-muted)]">
                   {document.descripcion || "Sin descripción"}
                 </p>
-                <p className="mt-3 text-xs font-extrabold uppercase tracking-wide text-[#769a27]">
+                <p className="mt-3 text-xs font-extrabold uppercase tracking-wide text-[#ea580c]">
                   {label(document.categoria)} · {label(document.alcance)}
                 </p>
               </button>
@@ -457,7 +457,7 @@ export function LibraryPage() {
           </label>
           <button
             disabled={busy || !draft.archivoId}
-            className="focus-ring min-h-11 w-full rounded-xl bg-[#12221b] px-5 text-sm font-black text-white disabled:opacity-50"
+            className="focus-ring min-h-11 w-full rounded-xl bg-[#17174a] px-5 text-sm font-black text-white disabled:opacity-50"
           >
             {busy ? "Creando…" : "Crear borrador"}
           </button>
@@ -479,7 +479,7 @@ export function LibraryPage() {
                   setVersionDocument(selected);
                   setSelected(null);
                 }}
-                className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#12221b] px-4 text-sm font-black text-white"
+                className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#17174a] px-4 text-sm font-black text-white"
               >
                 <FilePlus2 size={16} /> Nueva versión
               </button>
@@ -526,7 +526,7 @@ export function LibraryPage() {
                           "Versión enviada a revisión.",
                         )
                       }
-                      className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#12221b] px-3 text-sm font-black text-white"
+                      className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#17174a] px-3 text-sm font-black text-white"
                     >
                       <Send size={16} /> Enviar a revisión
                     </button>
@@ -594,7 +594,7 @@ export function LibraryPage() {
                             "Versión publicada.",
                           );
                         }}
-                        className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#769a27] px-3 text-sm font-black text-[#12221b]"
+                        className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#ea580c] px-3 text-sm font-black text-[#17174a]"
                       >
                         <ShieldCheck size={16} /> Publicar
                       </button>
@@ -704,7 +704,7 @@ export function LibraryPage() {
           </div>
           <button
             disabled={busy || !versionDraft.archivoId}
-            className="focus-ring min-h-11 w-full rounded-xl bg-[#12221b] px-5 text-sm font-black text-white disabled:opacity-50"
+            className="focus-ring min-h-11 w-full rounded-xl bg-[#17174a] px-5 text-sm font-black text-white disabled:opacity-50"
           >
             {busy ? "Creando…" : "Crear versión"}
           </button>

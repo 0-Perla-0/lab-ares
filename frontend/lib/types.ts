@@ -8,11 +8,11 @@ export const userRoles = [
 ] as const;
 
 export const userStates = [
-  "ACTIVO",
-  "PENDIENTE",
-  "INACTIVO",
-  "LIBERADO",
-  "BAJA",
+  "INVITADA",
+  "ACTIVA",
+  "SUSPENDIDA",
+  "DESACTIVADA",
+  "BLOQUEADA",
 ] as const;
 
 export const weekDays = [

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Eye, EyeOff, LoaderCircle } from "lucide-react";
+import { Eye, EyeOff, LoaderCircle } from "lucide-react";
 
 import { apiRequest, getApiErrorMessage } from "@/lib/api";
 
@@ -41,7 +41,7 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
       <div>
         <label
           htmlFor="email"
-          className="text-sm font-extrabold text-[#243d32]"
+          className="text-sm font-extrabold text-[#25256d]"
         >
           Correo electrónico
         </label>
@@ -53,7 +53,7 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
           required
           autoFocus
           placeholder="inventor@ejemplo.com"
-          className="mt-2 h-13 w-full rounded-2xl border border-[#12221b]/15 bg-white px-4 text-sm outline-none transition placeholder:text-[#9ba59f] focus:border-[#769a27] focus:ring-4 focus:ring-[#c8f169]/25"
+          className="mt-2 h-13 w-full rounded-2xl border border-[#dde1ea] bg-white px-4 text-sm outline-none transition placeholder:text-[#98a2b3] focus:border-[#ea580c] focus:ring-4 focus:ring-[#f97316]/25"
         />
       </div>
 
@@ -61,11 +61,11 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
         <div className="flex items-center justify-between">
           <label
             htmlFor="password"
-            className="text-sm font-extrabold text-[#243d32]"
+            className="text-sm font-extrabold text-[#25256d]"
           >
             Contraseña
           </label>
-          <span className="text-xs font-semibold text-[#7a8580]">
+          <span className="text-xs font-semibold text-[#667085]">
             Acceso seguro
           </span>
         </div>
@@ -78,12 +78,12 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
             required
             maxLength={128}
             placeholder="Tu contraseña"
-            className="h-13 w-full rounded-2xl border border-[#12221b]/15 bg-white px-4 pr-12 text-sm outline-none transition placeholder:text-[#9ba59f] focus:border-[#769a27] focus:ring-4 focus:ring-[#c8f169]/25"
+            className="h-13 w-full rounded-2xl border border-[#dde1ea] bg-white px-4 pr-12 text-sm outline-none transition placeholder:text-[#98a2b3] focus:border-[#ea580c] focus:ring-4 focus:ring-[#f97316]/25"
           />
           <button
             type="button"
             onClick={() => setShowPassword((visible) => !visible)}
-            className="focus-ring absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-2 text-[#66736d] hover:bg-[#f4f0e7]"
+            className="focus-ring absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-2 text-[#667085] hover:bg-[#f6f7fb]"
             aria-label={
               showPassword ? "Ocultar contraseña" : "Mostrar contraseña"
             }
@@ -106,21 +106,15 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
       <button
         type="submit"
         disabled={loading}
-        className="focus-ring group flex h-13 w-full items-center justify-center gap-3 rounded-2xl bg-[#12221b] px-5 text-sm font-black text-white transition hover:bg-[#243d32] disabled:cursor-wait disabled:opacity-70"
+        className="focus-ring flex h-13 w-full items-center justify-center gap-2 rounded-2xl bg-[#f97316] px-5 text-base font-black tracking-[-0.035em] text-[#17174a] transition hover:bg-[#ea580c] disabled:cursor-wait disabled:opacity-70 sm:text-lg"
       >
         {loading ? (
           <>
             <LoaderCircle size={18} className="animate-spin" />
-            Iniciando sesión…
+            Ingresando…
           </>
         ) : (
-          <>
-            Entrar a Ares
-            <ArrowRight
-              size={18}
-              className="transition group-hover:translate-x-1"
-            />
-          </>
+          "Ingresar"
         )}
       </button>
     </form>

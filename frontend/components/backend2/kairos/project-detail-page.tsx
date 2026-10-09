@@ -161,7 +161,7 @@ export function KairosProjectDetailPage({ projectId }: { projectId: string }) {
       <header className="rounded-3xl border border-[var(--ares-border)] bg-[var(--ares-surface)] p-5 shadow-sm sm:p-7">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <p className="text-xs font-black uppercase tracking-[.18em] text-[#769a27]">
+            <p className="text-xs font-black uppercase tracking-[.18em] text-[#ea580c]">
               Proyecto Kairós
             </p>
             <h1 className="mt-2 text-3xl font-black tracking-[-.04em]">
@@ -1142,7 +1142,7 @@ function ActivityModal({
                   {history.map((item) => (
                     <li
                       key={item.id}
-                      className="border-l-2 border-[#c8f169] pl-3"
+                      className="border-l-2 border-[#f97316] pl-3"
                     >
                       <div className="flex flex-wrap gap-2">
                         <strong className="text-sm">{item.type}</strong>

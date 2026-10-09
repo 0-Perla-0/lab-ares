@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { Mail, Search, ShieldCheck } from "lucide-react";
+import { Mail, Maximize2, Search, ShieldCheck } from "lucide-react";
 
 import {
   EmptyState,
@@ -9,6 +9,7 @@ import {
   Field,
   LoadError,
   LoadingTable,
+  Modal,
   PageHeader,
   Pagination,
   Panel,
@@ -19,6 +20,7 @@ import {
   getDirectory,
   getDirectoryPreferences,
   updateDirectoryPreferences,
+  type DirectoryEntry,
   type DirectoryPage as DirectoryResponse,
   type DirectoryPreferences,
   type DirectoryScope,
@@ -38,6 +40,7 @@ export function DirectoryPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [resultsOpen, setResultsOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -70,6 +73,7 @@ export function DirectoryPage() {
       return;
     }
     setError("");
+    setResultsOpen(false);
     setPageNumber(1);
     setAppliedQuery(query.trim());
   }
@@ -110,139 +114,137 @@ export function DirectoryPage() {
         </div>
       )}
 
-      <Panel
-        title="Buscar personas"
-        description="El alcance global sólo funciona cuando el backend lo permite."
-      >
-        <form onSubmit={search} className="grid gap-4 md:grid-cols-3">
-          <Field label="Alcance">
-            <select
-              className={inputClassName}
-              value={scope}
-              onChange={(event) => {
-                setScope(event.target.value as DirectoryScope);
-                setPageNumber(1);
-              }}
-            >
-              <option value="area">Mi área</option>
-              <option value="project">Proyecto Kairos</option>
-              <option value="all">Toda la organización</option>
-            </select>
-          </Field>
-          {scope === "project" && (
-            <Field label="ID del proyecto" required>
+      <div className="grid items-stretch gap-5 lg:grid-cols-3">
+        <Panel
+          className="h-full"
+          title="Buscar personas"
+          description="El alcance global sólo funciona cuando el backend lo permite."
+        >
+          <form onSubmit={search} className="space-y-4">
+            <Field label="Alcance">
+              <select
+                className={inputClassName}
+                value={scope}
+                onChange={(event) => {
+                  setScope(event.target.value as DirectoryScope);
+                  setPageNumber(1);
+                }}
+              >
+                <option value="area">Mi área</option>
+                <option value="project">Proyecto Kairos</option>
+                <option value="all">Toda la organización</option>
+              </select>
+            </Field>
+            {scope === "project" && (
+              <Field label="ID del proyecto" required>
+                <input
+                  className={inputClassName}
+                  value={projectId}
+                  onChange={(event) => setProjectId(event.target.value)}
+                  placeholder="cuid del proyecto"
+                />
+              </Field>
+            )}
+            <Field label="Código o correo">
               <input
                 className={inputClassName}
-                value={projectId}
-                onChange={(event) => setProjectId(event.target.value)}
-                placeholder="cuid del proyecto"
+                maxLength={80}
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Buscar…"
               />
             </Field>
-          )}
-          <Field label="Código o correo">
-            <input
-              className={inputClassName}
-              maxLength={80}
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Buscar…"
-            />
-          </Field>
-          <button className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#12221b] px-5 text-sm font-black text-white md:self-end">
-            <Search size={17} /> Buscar
-          </button>
-        </form>
-      </Panel>
-
-      {preferences && (
-        <Panel
-          title="Privacidad"
-          description="El correo permanece oculto a terceros salvo que autorices mostrarlo."
-        >
-          <div className="grid gap-3 md:grid-cols-3">
-            <Toggle
-              checked={preferences.visibleEnArea}
-              label="Visible en mi área"
-              onChange={(checked) =>
-                setPreferences(
-                  (old) => old && { ...old, visibleEnArea: checked },
-                )
-              }
-            />
-            <Toggle
-              checked={preferences.visibleEnProyectos}
-              label="Visible en proyectos"
-              onChange={(checked) =>
-                setPreferences(
-                  (old) => old && { ...old, visibleEnProyectos: checked },
-                )
-              }
-            />
-            <Toggle
-              checked={preferences.mostrarEmail}
-              label="Mostrar mi correo"
-              onChange={(checked) =>
-                setPreferences(
-                  (old) => old && { ...old, mostrarEmail: checked },
-                )
-              }
-            />
-          </div>
-          <button
-            type="button"
-            disabled={saving}
-            onClick={() => void savePreferences()}
-            className="focus-ring mt-4 inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#12221b] px-5 text-sm font-black text-white"
-          >
-            <ShieldCheck size={17} />{" "}
-            {saving ? "Guardando…" : "Guardar privacidad"}
-          </button>
+            <button className="focus-ring inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#17174a] px-5 text-sm font-black text-white">
+              <Search size={17} /> Buscar
+            </button>
+          </form>
         </Panel>
-      )}
 
-      <Panel
-        title={`Resultados (${page?.total ?? 0})`}
-        description="Los datos ausentes están ocultos por preferencia o por alcance."
+        {preferences && (
+          <Panel
+            className="h-full"
+            title="Privacidad"
+            description="El correo permanece oculto a terceros salvo que autorices mostrarlo."
+          >
+            <div className="space-y-3">
+              <Toggle
+                checked={preferences.visibleEnArea}
+                label="Visible en mi área"
+                onChange={(checked) =>
+                  setPreferences(
+                    (old) => old && { ...old, visibleEnArea: checked },
+                  )
+                }
+              />
+              <Toggle
+                checked={preferences.visibleEnProyectos}
+                label="Visible en proyectos"
+                onChange={(checked) =>
+                  setPreferences(
+                    (old) => old && { ...old, visibleEnProyectos: checked },
+                  )
+                }
+              />
+              <Toggle
+                checked={preferences.mostrarEmail}
+                label="Mostrar mi correo"
+                onChange={(checked) =>
+                  setPreferences(
+                    (old) => old && { ...old, mostrarEmail: checked },
+                  )
+                }
+              />
+            </div>
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => void savePreferences()}
+              className="focus-ring mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#17174a] px-5 text-sm font-black text-white"
+            >
+              <ShieldCheck size={17} />{" "}
+              {saving ? "Guardando…" : "Guardar privacidad"}
+            </button>
+          </Panel>
+        )}
+
+        <Panel
+          className="h-full"
+          title={`Resultados (${page?.total ?? 0})`}
+          description="Los datos ausentes están ocultos por preferencia o por alcance."
+          action={
+            page?.items.length ? (
+              <button
+                type="button"
+                onClick={() => setResultsOpen(true)}
+                className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#dde1ea] px-4 text-sm font-black text-[#17174a] transition hover:border-[#f97316] hover:bg-[#fff1e8]"
+              >
+                <Maximize2 size={16} aria-hidden="true" /> Expandir
+              </button>
+            ) : undefined
+          }
+        >
+          {page?.items.length ? (
+            <DirectoryEntryCard entry={page.items[0]} />
+          ) : (
+            <EmptyState
+              title="Sin coincidencias"
+              description="Prueba otro alcance o término de búsqueda."
+            />
+          )}
+        </Panel>
+      </div>
+
+      <Modal
+        open={resultsOpen}
+        onClose={() => setResultsOpen(false)}
+        title={`Resultados del directorio (${page?.total ?? 0})`}
+        description="Lista de personas que coinciden con el alcance y la búsqueda seleccionados."
+        size="wide"
       >
         {page?.items.length ? (
-          <div
-            role="list"
-            aria-label="Personas del directorio"
-            className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3"
-          >
+          <div className="space-y-3">
             {page.items.map((entry) => (
-              <article
-                role="listitem"
-                key={entry.id}
-                className="rounded-2xl border border-[var(--ares-border)] p-4"
-              >
-                <div
-                  className="grid h-11 w-11 place-items-center rounded-full bg-[#c8f169] font-black text-[#12221b]"
-                  aria-hidden="true"
-                >
-                  {entry.codigo.slice(0, 2).toUpperCase()}
-                </div>
-                <h3 className="mt-3 font-black">{entry.codigo}</h3>
-                <p className="mt-1 text-xs font-bold uppercase tracking-wide text-[var(--ares-muted)]">
-                  {entry.rol.replaceAll("_", " ")}
-                </p>
-                <p className="mt-3 text-sm text-[var(--ares-muted)]">
-                  {entry.area?.nombre ?? "Sin área"} ·{" "}
-                  {entry.sede?.nombre ?? "Sin sede"}
-                </p>
-                {entry.email ? (
-                  <a
-                    href={`mailto:${entry.email}`}
-                    className="focus-ring mt-3 inline-flex min-h-11 items-center gap-2 rounded-xl border border-[var(--ares-border-strong)] px-3 text-sm font-black"
-                  >
-                    <Mail size={16} /> {entry.email}
-                  </a>
-                ) : (
-                  <p className="mt-3 text-sm font-semibold text-[var(--ares-muted)]">
-                    Correo privado
-                  </p>
-                )}
-              </article>
+              <DirectoryEntryCard key={entry.id} entry={entry} />
             ))}
           </div>
         ) : (
@@ -262,8 +264,41 @@ export function DirectoryPage() {
             />
           </div>
         )}
-      </Panel>
+      </Modal>
     </div>
+  );
+}
+
+function DirectoryEntryCard({ entry }: { entry: DirectoryEntry }) {
+  return (
+    <article className="rounded-2xl border border-[var(--ares-border)] p-4">
+      <div
+        className="grid h-11 w-11 place-items-center rounded-full bg-[#f97316] font-black text-[#17174a]"
+        aria-hidden="true"
+      >
+        {entry.codigo.slice(0, 2).toUpperCase()}
+      </div>
+      <h3 className="mt-3 font-black">{entry.codigo}</h3>
+      <p className="mt-1 text-xs font-bold uppercase tracking-wide text-[var(--ares-muted)]">
+        {entry.rol.replaceAll("_", " ")}
+      </p>
+      <p className="mt-3 text-sm text-[var(--ares-muted)]">
+        {entry.area?.nombre ?? "Sin área"} · {entry.sede?.nombre ?? "Sin sede"}
+      </p>
+      {entry.email ? (
+        <a
+          href={`mailto:${entry.email}`}
+          className="focus-ring mt-3 inline-flex min-h-11 max-w-full items-center gap-2 break-all rounded-xl border border-[var(--ares-border-strong)] px-3 text-sm font-black"
+        >
+          <Mail size={16} className="shrink-0" aria-hidden="true" />
+          {entry.email}
+        </a>
+      ) : (
+        <p className="mt-3 text-sm font-semibold text-[var(--ares-muted)]">
+          Correo privado
+        </p>
+      )}
+    </article>
   );
 }
 

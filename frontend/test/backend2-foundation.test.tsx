@@ -23,7 +23,7 @@ function user(overrides: Partial<AuthUser> = {}): AuthUser {
     codigo: "A0017",
     email: "user@example.com",
     rol: "ADMIN",
-    estado: "ACTIVO",
+    estado: "ACTIVA",
     sedeId: 1,
     areaId: 2,
     turnoId: 3,

@@ -24,13 +24,18 @@ export type Backend2NavigationItem = {
 };
 
 export type Backend2NavigationGroup = {
+  id: "people" | "knowledge" | "services";
   label: string;
+  description: string;
   items: readonly Backend2NavigationItem[];
 };
 
 export const backend2NavigationGroups: readonly Backend2NavigationGroup[] = [
   {
+    id: "people",
     label: "Personas y trayectoria",
+    description:
+      "Consulta perfiles, documentos, proyectos y el directorio del equipo.",
     items: [
       {
         href: "/portal/directorio",
@@ -71,7 +76,10 @@ export const backend2NavigationGroups: readonly Backend2NavigationGroup[] = [
     ],
   },
   {
+    id: "knowledge",
     label: "Conocimiento y resultados",
+    description:
+      "Revisa reportes, biblioteca, contenido público y reconocimientos.",
     items: [
       {
         href: "/portal/reportes",
@@ -119,7 +127,10 @@ export const backend2NavigationGroups: readonly Backend2NavigationGroup[] = [
     ],
   },
   {
-    label: "Servicios y gobierno",
+    id: "services",
+    label: "Servicios",
+    description:
+      "Administra impresión 3D y solicitudes de retención o supresión.",
     items: [
       {
         href: "/portal/impresion-3d",

@@ -115,11 +115,11 @@ export function FileUploadField({
     <div>
       <label
         htmlFor={inputId}
-        className="text-sm font-extrabold text-[#32473d]"
+        className="text-sm font-extrabold text-[#25256d]"
       >
         {label}
         {required && (
-          <span className="ml-1 text-[#b94d1f]" aria-hidden="true">
+          <span className="ml-1 text-[#ea580c]" aria-hidden="true">
             *
           </span>
         )}
@@ -200,7 +200,7 @@ export function FileUploadField({
         )}
       </div>
       {hint && (
-        <p id={hintId} className="mt-1.5 text-xs font-medium text-[#5f6d66]">
+        <p id={hintId} className="mt-1.5 text-xs font-medium text-[#667085]">
           {hint}
         </p>
       )}
