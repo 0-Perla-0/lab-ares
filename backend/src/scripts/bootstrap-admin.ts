@@ -11,6 +11,7 @@ import {
 import { parseDatabaseUrl } from "../database/database-url";
 import { PrismaClient } from "../generated/prisma/client";
 import { EstadoUsuario, RolUsuario } from "../generated/prisma/enums";
+import { recordOperationalHistory } from "../common/domain/operational-history";
 
 config({ path: [".env", "../.env"], quiet: true });
 
@@ -39,25 +40,34 @@ class PrismaBootstrapAdminRepository implements BootstrapAdminRepository {
   }
 
   create(input: { codigo: string; email: string; passwordHash: string }) {
-    return this.prisma.usuario.create({
-      data: {
-        ...input,
-        rol: RolUsuario.ADMIN,
-        estado: EstadoUsuario.ACTIVA,
-      },
-      select: { id: true },
+    return this.prisma.$transaction(async (tx) => {
+      const row = await tx.usuario.create({
+        data: {
+          ...input,
+          rol: RolUsuario.ADMIN,
+          estado: EstadoUsuario.ACTIVA,
+        },
+        select: { id: true },
+      });
+      await recordOperationalHistory(tx, "USER", row.id);
+      return row;
     });
   }
 
   recover(id: number, input: { passwordHash: string }) {
-    return this.prisma.usuario.update({
-      where: { id },
-      data: {
-        passwordHash: input.passwordHash,
-        rol: RolUsuario.ADMIN,
-        estado: EstadoUsuario.ACTIVA,
-      },
-      select: { id: true },
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM Usuario WHERE id = ${id} FOR UPDATE`;
+      const row = await tx.usuario.update({
+        where: { id },
+        data: {
+          passwordHash: input.passwordHash,
+          rol: RolUsuario.ADMIN,
+          estado: EstadoUsuario.ACTIVA,
+        },
+        select: { id: true },
+      });
+      await recordOperationalHistory(tx, "USER", row.id);
+      return row;
     });
   }
 }

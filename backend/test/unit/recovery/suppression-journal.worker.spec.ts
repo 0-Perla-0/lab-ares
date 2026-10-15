@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { Readable } from "node:stream";
 
 import { SuppressionJournalWorker } from "../../../src/recovery/suppression-journal.worker";
 
@@ -36,6 +37,8 @@ function fixture(storageError?: Error) {
     },
   };
   const prisma = {
+    $queryRaw: vi.fn().mockResolvedValue([]),
+    $transaction: vi.fn(async (fn: any) => fn(prisma)),
     recoveryWriteBarrier: {
       findUnique: vi.fn(async () => ({
         active: false,
@@ -52,15 +55,16 @@ function fixture(storageError?: Error) {
         ...candidate,
         state: "PROCESSING",
         leaseOwner: owner,
+        leaseUntil: new Date(Date.now() + 120000),
       })),
     },
   };
   const storage = {
     putSuppressionJournal: storageError
-      ? vi.fn(async () => {
+      ? vi.fn(async (_key: string, _body: Buffer) => {
           throw storageError;
         })
-      : vi.fn(async () => undefined),
+      : vi.fn(async (_key: string, _body: Buffer) => undefined),
     getSuppressionJournal: vi.fn(),
   };
   return {
@@ -105,5 +109,131 @@ describe("SuppressionJournalWorker", () => {
         }),
       }),
     );
+  });
+  it("does not reclaim or append while the barrier is active or missing", async () => {
+    for (const barrier of [null, { active: true, version: 2 }]) {
+      const h = fixture();
+      h.prisma.recoveryWriteBarrier.findUnique.mockResolvedValue(
+        barrier as any,
+      );
+      expect(await h.worker.tick()).toBe(0);
+      expect(h.updateMany).not.toHaveBeenCalled();
+      expect(h.storage.putSuppressionJournal).not.toHaveBeenCalled();
+    }
+  });
+  it("does not publish or mark failed after a freeze/unfreeze during external append", async () => {
+    const h = fixture();
+    h.storage.putSuppressionJournal.mockImplementation(async () => {
+      h.prisma.recoveryWriteBarrier.findUnique.mockResolvedValue({
+        active: false,
+        version: 2,
+      } as any);
+    });
+    expect(await h.worker.tick()).toBe(0);
+    expect(
+      h.updateMany.mock.calls.some(
+        ([input]) => input.data.state === "EXPORTED",
+      ),
+    ).toBe(false);
+    expect(
+      h.updateMany.mock.calls.some(
+        ([input]) =>
+          input.data.lastErrorCode === "RECOVERY_WRITE_BARRIER_ACTIVE",
+      ),
+    ).toBe(false);
+  });
+  it("never revives an expired owned lease or counts it as exported", async () => {
+    const h = fixture();
+    const entry = await h.prisma.suppressionJournalEntry.findUnique();
+    h.prisma.suppressionJournalEntry.findUnique.mockResolvedValue({
+      ...entry,
+      leaseOwner: "old-owner",
+      leaseUntil: new Date(0),
+    });
+    expect(await h.worker.tick()).toBe(0);
+    expect(h.storage.putSuppressionJournal).not.toHaveBeenCalled();
+    expect(
+      h.updateMany.mock.calls.some(
+        ([input]) => input.data.state === "EXPORTED",
+      ),
+    ).toBe(false);
+  });
+  it("reconciles an identical immutable object after a lost append response", async () => {
+    const h = fixture();
+    h.storage.putSuppressionJournal.mockImplementation(
+      async (_key: string, body: Buffer) => {
+        h.storage.getSuppressionJournal.mockResolvedValue(
+          Readable.from([body]),
+        );
+        throw Object.assign(new Error("exists"), {
+          name: "PreconditionFailed",
+        });
+      },
+    );
+    expect(await h.worker.tick()).toBe(1);
+  });
+  it.each(["different", "oversize"])(
+    "rejects %s immutable object without publishing",
+    async (mode) => {
+      const h = fixture(
+        Object.assign(new Error("exists"), { name: "PreconditionFailed" }),
+      );
+      h.storage.getSuppressionJournal.mockResolvedValue(
+        Readable.from([
+          mode === "different"
+            ? Buffer.from("wrong content")
+            : Buffer.alloc(1048577),
+        ]),
+      );
+      expect(await h.worker.tick()).toBe(0);
+      expect(h.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            lastErrorCode:
+              mode === "different"
+                ? "JOURNAL_APPEND_CONFLICT"
+                : "JOURNAL_OBJECT_TOO_LARGE",
+          }),
+        }),
+      );
+    },
+  );
+  it("renews a long append serially and refuses publication after renewal fails", async () => {
+    vi.useFakeTimers();
+    try {
+      const h = fixture();
+      let release!: () => void, entered!: () => void;
+      const ready = new Promise<void>((r) => {
+        entered = r;
+      });
+      h.storage.putSuppressionJournal.mockImplementation(async () => {
+        entered();
+        await new Promise<void>((r) => {
+          release = r;
+        });
+      });
+      const running = h.worker.tick();
+      await ready;
+      await vi.advanceTimersByTimeAsync(40000);
+      expect(h.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            leaseUntil: { gt: expect.any(Date) },
+          }),
+          data: { leaseUntil: expect.any(Date) },
+        }),
+      );
+      h.updateMany.mockResolvedValue({ count: 0 });
+      await vi.advanceTimersByTimeAsync(40000);
+      release();
+      expect(await running).toBe(0);
+      expect(
+        h.updateMany.mock.calls.some(
+          ([input]) => input.data.state === "EXPORTED",
+        ),
+      ).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

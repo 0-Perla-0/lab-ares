@@ -8,7 +8,15 @@ import { UsersPolicy } from "../../../src/users/users.policy";
 
 describe("identity DI smoke", () => {
   it("resolves invitation service without opening a database connection", async () => {
-    const module = await Test.createTestingModule({ providers: [InvitationsService, { provide: PrismaService, useValue: {} }, { provide: OutboxService, useValue: {} }, { provide: UsersPolicy, useValue: {} }, { provide: AuditService, useValue: {} }] }).compile();
+    const module = await Test.createTestingModule({
+      providers: [
+        InvitationsService,
+        { provide: PrismaService, useValue: {} },
+        { provide: OutboxService, useValue: {} },
+        { provide: UsersPolicy, useValue: {} },
+        { provide: AuditService, useValue: {} },
+      ],
+    }).compile();
     expect(module.get(InvitationsService)).toBeInstanceOf(InvitationsService);
     await module.close();
   });

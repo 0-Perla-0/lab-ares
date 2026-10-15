@@ -219,7 +219,7 @@ export function RetentionPage() {
             </Field>
             <button
               disabled={busy}
-              className="focus-ring min-h-11 rounded-xl bg-[#12221b] px-5 text-sm font-black text-white"
+              className="focus-ring min-h-11 rounded-xl bg-[#17174a] px-5 text-sm font-black text-white"
             >
               Enviar solicitud
             </button>
@@ -756,7 +756,7 @@ export function RetentionPage() {
           </label>
           <button
             disabled={busy}
-            className="focus-ring min-h-11 rounded-xl bg-[#12221b] px-5 text-sm font-black text-white sm:col-span-2"
+            className="focus-ring min-h-11 rounded-xl bg-[#17174a] px-5 text-sm font-black text-white sm:col-span-2"
           >
             Crear borrador
           </button>

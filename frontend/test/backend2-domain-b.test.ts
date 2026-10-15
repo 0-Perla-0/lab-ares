@@ -114,7 +114,7 @@ describe("private gamification adapter", () => {
   });
 
   it("uses a stable idempotency key while a recognition retry is unresolved", async () => {
-    vi.stubGlobal("window", {});
+    vi.stubGlobal("window", { dispatchEvent: vi.fn() });
     vi.stubGlobal("sessionStorage", storage());
     const fetchMock = vi
       .fn()
@@ -138,7 +138,7 @@ describe("private gamification adapter", () => {
   });
 
   it("uses a new idempotency key after a successful recognition", async () => {
-    vi.stubGlobal("window", {});
+    vi.stubGlobal("window", { dispatchEvent: vi.fn() });
     vi.stubGlobal("sessionStorage", storage());
     const fetchMock = vi
       .fn()
@@ -159,7 +159,7 @@ describe("private gamification adapter", () => {
   });
 
   it("reverses events through a private admin endpoint with a reason", async () => {
-    vi.stubGlobal("window", {});
+    vi.stubGlobal("window", { dispatchEvent: vi.fn() });
     vi.stubGlobal("sessionStorage", storage());
     const fetchMock = vi
       .fn()

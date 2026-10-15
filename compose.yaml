@@ -43,10 +43,11 @@ services:
   database:
     image: mariadb:11.8
     environment:
-      MARIADB_DATABASE: ares_dev
+      MARIADB_DATABASE: ${ARES_DATABASE_NAME:-ares_dev}
       MARIADB_USER: ares_app
       MARIADB_PASSWORD: ${MARIADB_PASSWORD:-ares-local-password}
       MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:-ares-local-root-password}
+      MARIADB_ROOT_HOST: "%"
     ports:
       # 3307 avoids colliding with an existing local MySQL/MariaDB service.
       - "127.0.0.1:${MARIADB_HOST_PORT:-3307}:3306"
@@ -66,7 +67,7 @@ services:
       dockerfile: backend/Dockerfile
       target: migrate
     environment:
-      DATABASE_URL: mysql://ares_app:${MARIADB_PASSWORD:-ares-local-password}@database:3306/ares_dev
+      DATABASE_URL: mysql://ares_app:${MARIADB_PASSWORD:-ares-local-password}@database:3306/${ARES_DATABASE_NAME:-ares_dev}
     depends_on:
       database:
         condition: service_healthy
@@ -81,14 +82,39 @@ services:
       # This Compose file is the local development stack (Mailpit, local MinIO).
       # Override NODE_ENV and all secrets explicitly for a real deployment.
       NODE_ENV: ${NODE_ENV:-development}
-      DATABASE_URL: mysql://ares_app:${MARIADB_PASSWORD:-ares-local-password}@database:3306/ares_dev
+      DATABASE_URL: mysql://ares_runtime:${RUNTIME_DB_PASSWORD:-development_runtime_password_change_me_32}@database:3306/${ARES_DATABASE_NAME:-ares_dev}
       BACKEND_HOST: 0.0.0.0
       BACKEND_PORT: 3000
       FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:-http://localhost:4321}
       APP_TIME_ZONE: ${APP_TIME_ZONE:-America/Mexico_City}
       ATTENDANCE_ALERT_HOURS: ${ATTENDANCE_ALERT_HOURS:-12}
+      ATTENDANCE_WORKER_ENABLED: ${ATTENDANCE_WORKER_ENABLED:-false}
+      ABSENCE_WORKER_ENABLED: ${ABSENCE_WORKER_ENABLED:-false}
+      ABSENCE_EVALUATION_START_DATE: ${ABSENCE_EVALUATION_START_DATE:-}
+      VISITS_ENABLED: ${VISITS_ENABLED:-false}
+      INVENTORY_ENABLED: ${INVENTORY_ENABLED:-false}
+      INVENTORY_CHECK_WORKER_ENABLED: ${INVENTORY_CHECK_WORKER_ENABLED:-false}
+      INVENTORY_CHECK_INTERVAL_MS: ${INVENTORY_CHECK_INTERVAL_MS:-300000}
+      VISITS_TOKEN_KEY: ${VISITS_TOKEN_KEY:-development-only-visits-token-key-change-me}
+      VISITS_TOKEN_KEYRING: ${VISITS_TOKEN_KEYRING:-}
+      VISITS_TOKEN_ACTIVE_VERSION: ${VISITS_TOKEN_ACTIVE_VERSION:-legacy}
+      TRUSTED_PROXY_CIDRS: ${TRUSTED_PROXY_CIDRS:-}
+      OPERATIONAL_PILOT_SEDE_IDS: ${OPERATIONAL_PILOT_SEDE_IDS:-}
+      OPERATIONAL_PILOT_AREA_IDS: ${OPERATIONAL_PILOT_AREA_IDS:-}
+      OUTBOX_WORKER_ENABLED: ${OUTBOX_WORKER_ENABLED:-false}
+      STORAGE_WORKER_ENABLED: ${STORAGE_WORKER_ENABLED:-false}
+      STORAGE_MAX_CONCURRENT_UPLOADS: ${STORAGE_MAX_CONCURRENT_UPLOADS:-4}
+      STORAGE_WORKER_INTERVAL_MS: ${STORAGE_WORKER_INTERVAL_MS:-5000}
+      REPORTS_WORKER_ENABLED: ${REPORTS_WORKER_ENABLED:-false}
+      REPORTS_MAX_BYTES: ${REPORTS_MAX_BYTES:-268435456}
+      REPORTS_WORKER_INTERVAL_MS: ${REPORTS_WORKER_INTERVAL_MS:-5000}
       SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET in .env before starting the backend}
+      PASSWORD_DENY_SHA256: ${PASSWORD_DENY_SHA256:-}
+      DATABASE_TLS_ENABLED: ${DATABASE_TLS_ENABLED:-false}
+      DATABASE_TLS_CA: ${DATABASE_TLS_CA:-}
+      DATABASE_TLS_SERVERNAME: ${DATABASE_TLS_SERVERNAME:-}
       S3_ENDPOINT: http://storage:9000
+      S3_DOWNLOAD_ENDPOINT: ${S3_DOWNLOAD_ENDPOINT:-http://localhost:9000}
       S3_REGION: ${S3_REGION:-us-east-1}
       S3_ACCESS_KEY: ${S3_ACCESS_KEY:-ares-local}
       S3_SECRET_KEY: ${S3_SECRET_KEY:-ares-local-secret}
@@ -121,6 +147,9 @@ services:
       OPERATIONS_JOB_MAX_ATTEMPTS: ${OPERATIONS_JOB_MAX_ATTEMPTS:-3}
       OPERATIONS_JOB_LEASE_MS: ${OPERATIONS_JOB_LEASE_MS:-120000}
       OPERATIONS_RETRY_BASE_MS: ${OPERATIONS_RETRY_BASE_MS:-60000}
+      OPERATIONS_QUEUE_MONITOR_ENABLED: ${OPERATIONS_QUEUE_MONITOR_ENABLED:-false}
+      OPERATIONS_QUEUE_MONITOR_INTERVAL_MS: ${OPERATIONS_QUEUE_MONITOR_INTERVAL_MS:-60000}
+      OPERATIONS_QUEUE_SLO_JSON: ${OPERATIONS_QUEUE_SLO_JSON:-}
       MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:-development-only-mfa-key-change-me-32chars}
       OUTBOX_ENCRYPTION_KEY: ${OUTBOX_ENCRYPTION_KEY:-development-only-outbox-key-change-me-32chars}
       SMTP_ENABLED: ${SMTP_ENABLED:-true}
@@ -131,6 +160,8 @@ services:
       - "3000:3000"
     depends_on:
       migrate:
+        condition: service_completed_successfully
+      runtime-grants:
         condition: service_completed_successfully
       storage:
         condition: service_healthy
@@ -180,6 +211,22 @@ services:
       retries: 5
       start_period: 10s
     restart: unless-stopped
+
+  runtime-grants:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: migrate
+    environment:
+      DB_ADMIN_URL: mysql://root:${MARIADB_ROOT_PASSWORD:-ares-local-root-password}@database:3306/${ARES_DATABASE_NAME:-ares_dev}
+      RUNTIME_DB_USER: ares_runtime
+      RUNTIME_DB_HOST: "%"
+      RUNTIME_DB_PASSWORD: ${RUNTIME_DB_PASSWORD:-development_runtime_password_change_me_32}
+    command: ["node", "backend/dist/scripts/provision-runtime-db.js", "--apply"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: "no"
 
 volumes:
   ares-database:

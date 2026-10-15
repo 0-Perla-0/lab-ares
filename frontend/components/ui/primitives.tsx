@@ -8,8 +8,8 @@ import {
   type ReactElement,
   type ReactNode,
 } from "react";
-import Link from "next/link";
 import { createPortal } from "react-dom";
+import Link from "next/link";
 import {
   AlertTriangle,
   Inbox,
@@ -20,17 +20,17 @@ import {
 } from "lucide-react";
 
 export const inputClassName =
-  "mt-2 h-11 w-full rounded-xl border border-[#12221b]/15 bg-white px-3.5 text-sm text-[#12221b] outline-none transition placeholder:text-[#9ba59f] focus:border-[#769a27] focus:ring-4 focus:ring-[#c8f169]/20 disabled:cursor-not-allowed disabled:bg-[#f0f1ed] disabled:text-[#8b948f]";
+  "mt-2 h-11 w-full rounded-xl border border-[#dde1ea] bg-white px-3.5 text-sm text-[#17174a] outline-none transition placeholder:text-[#98a2b3] focus:border-[#ea580c] focus:ring-4 focus:ring-[#f97316]/20 disabled:cursor-not-allowed disabled:bg-[#eef0f6] disabled:text-[#98a2b3]";
 
 export const textareaClassName =
-  "mt-2 min-h-24 w-full resize-y rounded-xl border border-[#12221b]/15 bg-white px-3.5 py-3 text-sm text-[#12221b] outline-none transition placeholder:text-[#9ba59f] focus:border-[#769a27] focus:ring-4 focus:ring-[#c8f169]/20";
+  "mt-2 min-h-24 w-full resize-y rounded-xl border border-[#dde1ea] bg-white px-3.5 py-3 text-sm text-[#17174a] outline-none transition placeholder:text-[#98a2b3] focus:border-[#ea580c] focus:ring-4 focus:ring-[#f97316]/20";
 
 const touchButtonClassName = "min-h-11";
 
 export type StatusTone = "neutral" | "info" | "warning" | "success" | "danger";
 
 const statusToneClass: Record<StatusTone, string> = {
-  neutral: "border-[#12221b]/15 bg-[#f0f1ed] text-[#32473d]",
+  neutral: "border-[#dde1ea] bg-[#eef0f6] text-[#25256d]",
   info: "border-sky-200 bg-sky-50 text-sky-900",
   warning: "border-amber-200 bg-amber-50 text-amber-900",
   success: "border-emerald-200 bg-emerald-50 text-emerald-900",
@@ -212,13 +212,13 @@ export function PageHeader({
   return (
     <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
       <div>
-        <p className="text-[11px] font-black uppercase tracking-[0.19em] text-[#769a27]">
+        <p className="text-[11px] font-black uppercase tracking-[0.19em] text-[var(--ares-accent-text)]">
           {eyebrow}
         </p>
         <h1 className="mt-2 text-3xl font-black tracking-[-0.045em] sm:text-4xl">
           {title}
         </h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-[#66736d]">
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-[#667085]">
           {description}
         </p>
       </div>
@@ -226,7 +226,7 @@ export function PageHeader({
         (action.href !== undefined ? (
           <Link
             href={action.href}
-            className="focus-ring inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-[#12221b] px-4 py-3 text-sm font-black text-white transition hover:bg-[#243d32]"
+            className="focus-ring inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-[#17174a] px-4 py-3 text-sm font-black text-white transition hover:bg-[#25256d]"
           >
             <Plus size={17} /> {action.label}
           </Link>
@@ -234,7 +234,7 @@ export function PageHeader({
           <button
             type="button"
             onClick={action.onClick}
-            className="focus-ring inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-[#12221b] px-4 py-3 text-sm font-black text-white transition hover:bg-[#243d32]"
+            className="focus-ring inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-[#17174a] px-4 py-3 text-sm font-black text-white transition hover:bg-[#25256d]"
           >
             <Plus size={17} /> {action.label}
           </button>
@@ -268,11 +268,11 @@ export function Field({
   const errorId = error ? `${fieldId}-error` : undefined;
   const describedBy = [hintId, errorId].filter(Boolean).join(" ") || undefined;
   return (
-    <div className="block text-sm font-extrabold text-[#32473d]">
+    <div className="block text-sm font-extrabold text-[#25256d]">
       <label htmlFor={fieldId}>
         {label}
         {required && (
-          <span className="ml-1 text-[#b94d1f]" aria-hidden="true">
+          <span className="ml-1 text-[#ea580c]" aria-hidden="true">
             *
           </span>
         )}
@@ -286,7 +286,7 @@ export function Field({
       {hint && (
         <span
           id={hintId}
-          className="mt-1.5 block text-xs font-medium text-[#5f6d66]"
+          className="mt-1.5 block text-xs font-medium text-[#667085]"
         >
           {hint}
         </span>
@@ -307,12 +307,14 @@ export function Modal({
   open,
   title,
   description,
+  size = "default",
   onClose,
   children,
 }: {
   open: boolean;
   title: string;
   description?: string;
+  size?: "default" | "wide";
   onClose: () => void;
   children: React.ReactNode;
 }) {
@@ -362,7 +364,7 @@ export function Modal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] grid items-end overflow-y-auto overscroll-contain bg-[#0b1712]/55 px-0 pb-0 pt-4 backdrop-blur-sm sm:place-items-center sm:p-5"
+      className="fixed inset-0 z-[100] grid items-end overflow-y-auto overscroll-contain bg-[#0b0b2e]/55 px-0 pb-0 pt-4 backdrop-blur-sm sm:place-items-center sm:p-5"
       role="presentation"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
@@ -374,9 +376,11 @@ export function Modal({
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={description ? descriptionId : undefined}
-        className="max-h-[calc(100dvh-1rem)] w-full overflow-y-auto rounded-t-[1.7rem] bg-[#fcfbf7] shadow-2xl sm:max-h-[calc(100dvh-2.5rem)] sm:max-w-2xl sm:rounded-[1.7rem]"
+        className={`max-h-[calc(100dvh-1rem)] w-full overflow-y-auto overscroll-contain rounded-t-[1.7rem] bg-[#ffffff] shadow-2xl sm:max-h-[calc(100dvh-2.5rem)] sm:rounded-[1.7rem] ${
+          size === "wide" ? "sm:max-w-6xl" : "sm:max-w-2xl"
+        }`}
       >
-        <header className="sticky top-0 z-10 flex items-start justify-between border-b border-[#12221b]/10 bg-[#fcfbf7]/95 px-5 py-5 backdrop-blur sm:px-7">
+        <header className="sticky top-0 z-10 flex items-start justify-between border-b border-[#dde1ea] bg-[#ffffff]/95 px-5 py-5 backdrop-blur sm:px-7">
           <div>
             <h2 id={titleId} className="text-xl font-black tracking-[-0.03em]">
               {title}
@@ -384,7 +388,7 @@ export function Modal({
             {description && (
               <p
                 id={descriptionId}
-                className="mt-1 text-sm leading-6 text-[#66736d]"
+                className="mt-1 text-sm leading-6 text-[#667085]"
               >
                 {description}
               </p>
@@ -393,7 +397,7 @@ export function Modal({
           <button
             type="button"
             onClick={onClose}
-            className="focus-ring grid min-h-11 min-w-11 place-items-center rounded-xl text-[#66736d] hover:bg-[#eeeee9]"
+            className="focus-ring grid min-h-11 min-w-11 place-items-center rounded-xl text-[#667085] hover:bg-[#eef0f6]"
             aria-label="Cerrar"
           >
             <X size={20} />
@@ -416,19 +420,19 @@ export function FormActions({
   onCancel: () => void;
 }) {
   return (
-    <div className="mt-7 flex flex-col-reverse gap-3 border-t border-[#12221b]/10 pt-5 sm:flex-row sm:justify-end">
+    <div className="mt-7 flex flex-col-reverse gap-3 border-t border-[#dde1ea] pt-5 sm:flex-row sm:justify-end">
       <button
         type="button"
         onClick={onCancel}
         disabled={saving}
-        className="focus-ring min-h-11 rounded-xl border border-[#12221b]/15 px-5 text-sm font-extrabold hover:bg-[#f0f1ed]"
+        className="focus-ring min-h-11 rounded-xl border border-[#dde1ea] px-5 text-sm font-extrabold hover:bg-[#eef0f6]"
       >
         Cancelar
       </button>
       <button
         type="submit"
         disabled={saving}
-        className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#12221b] px-5 text-sm font-black text-white hover:bg-[#243d32] disabled:cursor-wait disabled:opacity-65"
+        className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#17174a] px-5 text-sm font-black text-white hover:bg-[#25256d] disabled:cursor-wait disabled:opacity-65"
       >
         {saving && <LoaderCircle size={16} className="animate-spin" />}
         {saving ? "Guardando…" : submitLabel}
@@ -472,7 +476,7 @@ export function ConfirmDialog({
           type="button"
           onClick={onClose}
           disabled={busy}
-          className="focus-ring min-h-11 rounded-xl border border-[#12221b]/15 px-5 text-sm font-extrabold"
+          className="focus-ring min-h-11 rounded-xl border border-[#dde1ea] px-5 text-sm font-extrabold"
         >
           Cancelar
         </button>
@@ -508,12 +512,12 @@ export function LoadingTable() {
       role="status"
       aria-live="polite"
       aria-busy="true"
-      className="grid min-h-56 place-items-center rounded-2xl border border-[#12221b]/10 bg-white"
+      className="grid min-h-56 place-items-center rounded-2xl border border-[#dde1ea] bg-white"
     >
-      <div className="text-center text-[#66736d]">
+      <div className="text-center text-[#667085]">
         <LoaderCircle
           size={25}
-          className="mx-auto animate-spin text-[#769a27]"
+          className="mx-auto animate-spin text-[#ea580c]"
         />
         <p className="mt-3 text-sm font-bold">Cargando información…</p>
       </div>
@@ -529,11 +533,11 @@ export function EmptyState({
   description: string;
 }) {
   return (
-    <div className="grid min-h-56 place-items-center rounded-2xl border border-dashed border-[#12221b]/20 bg-white px-6 text-center">
+    <div className="grid min-h-56 place-items-center rounded-2xl border border-dashed border-[#dde1ea] bg-white px-6 text-center">
       <div>
-        <Inbox size={28} className="mx-auto text-[#95a19a]" />
+        <Inbox size={28} className="mx-auto text-[#98a2b3]" />
         <p className="mt-3 font-black">{title}</p>
-        <p className="mt-1 text-sm text-[#66736d]">{description}</p>
+        <p className="mt-1 text-sm text-[#667085]">{description}</p>
       </div>
     </div>
   );
@@ -574,7 +578,7 @@ export function ForbiddenState() {
         <h1 className="mt-4 text-3xl font-black tracking-[-0.04em]">
           Acceso restringido
         </h1>
-        <p className="mt-3 text-sm leading-6 text-[#66736d]">
+        <p className="mt-3 text-sm leading-6 text-[#667085]">
           Tu cuenta no cuenta con permisos para consultar esta sección.
         </p>
       </div>

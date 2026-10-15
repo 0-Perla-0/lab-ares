@@ -11,11 +11,15 @@ import { AuditService } from "./audit.service";
 import { MfaService } from "./mfa.service";
 import { EmailService } from "./email.service";
 import { OutboxDispatcherService } from "./outbox-dispatcher.service";
+import { AuthThrottleService } from "./auth-throttle.service";
+import { PasswordPolicyBootstrap } from "./password-policy.bootstrap";
 
 @Module({
   controllers: [AuthController],
   providers: [
     AuthService,
+    PasswordPolicyBootstrap,
+    AuthThrottleService,
     UserRepository,
     PrismaSessionStore,
     LoginRateLimiter,
@@ -27,6 +31,14 @@ import { OutboxDispatcherService } from "./outbox-dispatcher.service";
     EmailService,
     OutboxDispatcherService,
   ],
-  exports: [AuthService, UserRepository, PrismaSessionStore, OutboxService, AuditService, MfaService, EmailService],
+  exports: [
+    AuthService,
+    UserRepository,
+    PrismaSessionStore,
+    OutboxService,
+    AuditService,
+    MfaService,
+    EmailService,
+  ],
 })
 export class AuthModule {}

@@ -6,6 +6,8 @@ import { LoaderCircle, RefreshCw } from "lucide-react";
 
 import { ApiError, apiRequest, getApiErrorMessage } from "@/lib/api";
 import type { ApiEnvelope, AuthUser } from "@/lib/types";
+import { ReauthenticationDialog } from "./reauthentication-dialog";
+import { SessionExpirationWarning } from "./session-expiration-warning";
 
 type AuthContextValue = {
   user: AuthUser;
@@ -50,24 +52,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       window.removeEventListener("ares:unauthorized", handleUnauthorized);
     };
     // Authentication is revalidated when the protected shell is mounted.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const value = useMemo(
     () => (user ? { user, refreshUser: loadUser } : null),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [user],
   );
 
   if (loading) {
     return (
-      <main className="grid min-h-screen place-items-center bg-[#f4f0e7]">
+      <main className="grid min-h-screen place-items-center bg-[#f6f7fb]">
         <div className="text-center">
           <LoaderCircle
-            className="mx-auto animate-spin text-[#769a27]"
+            className="mx-auto animate-spin text-[#ea580c]"
             size={30}
           />
-          <p className="mt-4 text-sm font-bold text-[#66736d]">
+          <p className="mt-4 text-sm font-bold text-[#667085]">
             Preparando tu espacio…
           </p>
         </div>
@@ -77,14 +77,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   if (error || !value) {
     return (
-      <main className="grid min-h-screen place-items-center bg-[#f4f0e7] px-5">
+      <main className="grid min-h-screen place-items-center bg-[#f6f7fb] px-5">
         <div className="max-w-sm text-center">
           <h1 className="text-2xl font-black">No pudimos abrir el portal</h1>
-          <p className="mt-3 text-sm leading-6 text-[#66736d]">{error}</p>
+          <p className="mt-3 text-sm leading-6 text-[#667085]">{error}</p>
           <button
             type="button"
             onClick={() => void loadUser()}
-            className="focus-ring mt-6 inline-flex items-center gap-2 rounded-full bg-[#12221b] px-5 py-3 text-sm font-black text-white"
+            className="focus-ring mt-6 inline-flex items-center gap-2 rounded-full bg-[#17174a] px-5 py-3 text-sm font-black text-white"
           >
             <RefreshCw size={16} /> Reintentar
           </button>
@@ -93,7 +93,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      <ReauthenticationDialog />
+      <SessionExpirationWarning />
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuth() {

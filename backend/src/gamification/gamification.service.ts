@@ -2,6 +2,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Optional,
   NotFoundException,
   ServiceUnavailableException,
 } from "@nestjs/common";
@@ -11,6 +12,7 @@ import type { AuthUser } from "../auth/auth-user";
 import { getAccessScope, Permission } from "../auth/permissions";
 import type { Environment } from "../config/environment";
 import { PrismaService } from "../database/prisma.service";
+import { FeaturePoliciesService } from "../common/domain/feature-policies.service";
 import {
   EstadoUsuario,
   RolUsuario,
@@ -31,6 +33,7 @@ export class GamificationService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly config: ConfigService<Environment, true>,
+    @Optional() private readonly features?: FeaturePoliciesService,
   ) {}
 
   private enabledOrThrow() {
@@ -370,6 +373,20 @@ export class GamificationService {
     });
     if (duplicate) return duplicate;
     await tx.$executeRaw`SELECT id FROM Usuario WHERE id=${input.userId} FOR UPDATE`;
+    if (this.features) {
+      const subject = await tx.usuario.findUnique({
+        where: { id: input.userId },
+      });
+      if (
+        !subject ||
+        !(await this.features.allowsInTransaction(
+          tx,
+          "GAMIFICATION.KAIROS_AWARD",
+          subject,
+        ))
+      )
+        return null;
+    }
     const rule = await tx.reglaGamificacion.findFirst({
       where: { origen: "KAIROS_TERMINADA", activa: true },
       orderBy: { version: "desc" },
@@ -415,7 +432,7 @@ export class GamificationService {
       reason: string;
     },
   ) {
-    if (!this.enabled()) return null;
+    // Compensate grants that already exist even when new awards are disabled.
     const sourceKey = `kairos-reopened:${input.historyId}`;
     const duplicate = await tx.eventoGamificacion.findUnique({
       where: { sourceKey },

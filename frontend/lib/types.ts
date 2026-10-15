@@ -8,11 +8,11 @@ export const userRoles = [
 ] as const;
 
 export const userStates = [
-  "ACTIVO",
-  "PENDIENTE",
-  "INACTIVO",
-  "LIBERADO",
-  "BAJA",
+  "INVITADA",
+  "ACTIVA",
+  "SUSPENDIDA",
+  "DESACTIVADA",
+  "BLOQUEADA",
 ] as const;
 
 export const weekDays = [
@@ -39,6 +39,11 @@ export type AuthUser = {
   areaId: number | null;
   turnoId: number | null;
   permissions?: Partial<Record<string, "self" | "area" | "sede" | "global">>;
+  capabilities?: Partial<Record<string, boolean>>;
+  authentication?: {
+    authenticatedAt: number | null;
+    factor: "password" | "mfa" | null;
+  };
 };
 
 export type PublicUser = AuthUser & {

@@ -1,11 +1,11 @@
 import type { UserState, WeekDay } from "./types";
 
 export const stateLabels: Record<UserState, string> = {
-  ACTIVO: "Activo",
-  PENDIENTE: "Pendiente",
-  INACTIVO: "Inactivo",
-  LIBERADO: "Liberado",
-  BAJA: "Baja",
+  INVITADA: "Invitada",
+  ACTIVA: "Activa",
+  SUSPENDIDA: "Suspendida",
+  DESACTIVADA: "Desactivada",
+  BLOQUEADA: "Bloqueada",
 };
 
 export const dayLabels: Record<WeekDay, string> = {

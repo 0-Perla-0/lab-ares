@@ -1,143 +1,56 @@
 # Ares
 
-Monorepo de la plataforma Ares. El frontend y el backend se despliegan como aplicaciones independientes:
+Plataforma de Servicio Social, proyectos Kairos y servicios del laboratorio.
+Monorepo con Next.js/React en `frontend/` y NestJS/Prisma/MariaDB en `backend/`.
 
-- `frontend/`: Next.js App Router, React y Tailwind CSS.
-- `backend/`: NestJS, Prisma y MariaDB.
+## Inicio local
 
-## Requisitos
-
-- Node.js 24.19.0
-- npm 11.17.0
-- MariaDB o MySQL compatible
-
-## Instalación
+Usar la versión de Node de [`.nvmrc`](.nvmrc) y npm compatible con el lockfile.
 
 ```bash
 npm ci
 cp .env.example .env
 npm run prisma:generate
-npm run prisma:migrate
+npm run prisma:migrate:deploy
 npm run admin:bootstrap
 ```
 
-Antes de ejecutar Prisma, edita `.env`: `DATABASE_URL` debe contener un usuario y una contraseña reales de MariaDB; `ares_app` y `CHANGE_ME` son marcadores, no credenciales funcionales. También reemplaza `SESSION_SECRET` por una cadena aleatoria de al menos 32 caracteres antes de desplegar. El valor de desarrollo incluido por defecto nunca es aceptado en producción.
+Editar `.env` antes de migrar: configurar una base **local nueva**, `DATABASE_URL` y un `SESSION_SECRET` aleatorio de al menos 32 caracteres.
+El bootstrap requiere temporalmente `BOOTSTRAP_ADMIN_CODE`, `BOOTSTRAP_ADMIN_EMAIL` y `BOOTSTRAP_ADMIN_PASSWORD`; no imprime la contraseña.
+No usar la cuenta migradora como runtime productivo; Compose separa migración y permisos por tabla.
 
-Para crear el primer administrador, define temporalmente
-`BOOTSTRAP_ADMIN_CODE`, `BOOTSTRAP_ADMIN_EMAIL` y
-`BOOTSTRAP_ADMIN_PASSWORD`, y ejecuta `npm run admin:bootstrap`. El comando es
-idempotente: no modifica nada cuando ya existe un administrador activo y no
-imprime la contraseña.
-
-Una configuración local mínima puede crearse desde una sesión administrativa de MariaDB. Sustituye la contraseña del ejemplo y usa el mismo valor, codificado como URL si contiene caracteres especiales, en `DATABASE_URL`:
-
-```sql
-CREATE DATABASE IF NOT EXISTS ares_dev;
-CREATE USER IF NOT EXISTS 'ares_app'@'localhost' IDENTIFIED BY 'replace-with-a-local-password';
-GRANT ALL PRIVILEGES ON ares_dev.* TO 'ares_app'@'localhost';
-```
-
-Puedes validar las credenciales sin incluir la contraseña en el historial de la terminal:
-
-```bash
-mariadb --host=localhost --port=3306 --user=ares_app --password ares_dev
-```
-
-`npm run prisma:migrate` aplica las migraciones versionadas mediante `prisma migrate deploy`, sin crear una base sombra. Cuando modifiques `backend/prisma/schema.prisma` y necesites generar una migración nueva, usa `npm run prisma:migrate:dev -- --name nombre_de_la_migracion`; ese flujo requiere además los permisos de base sombra descritos por Prisma.
-
-En MariaDB para Windows, `Unknown authentication plugin auth_gssapi_client` normalmente significa que las credenciales de contraseña fallaron y el servidor intentó la autenticación integrada GSSAPI como alternativa. Corrige `DATABASE_URL`; no hace falta instalar un plugin en Prisma.
-
-## Desarrollo
-
-Inicia el backend:
+En terminales separadas, desde la raíz:
 
 ```bash
 npm run dev:backend
-```
-
-Inicia el frontend en otra terminal:
-
-```bash
 npm run dev:frontend
 ```
 
-Next.js escucha en `http://localhost:4321` y reescribe `/api/*` hacia NestJS en
-`http://localhost:3000`. Puedes crear `frontend/.env` a partir de
-`frontend/.env.example` para cambiar `API_PROXY_TARGET`.
+Frontend: `http://localhost:4321`; backend: `http://localhost:3000`.
+El proxy `/api/*` mantiene la cookie HTTP-only bajo el mismo origen. `API_PROXY_TARGET` permite configurar el destino.
+MariaDB, MinIO, ClamAV y Mailpit están definidos en [compose.yaml](compose.yaml); no superponer stacks de ensayo a entornos existentes.
+Ante `auth_gssapi_client`, revisar las credenciales de MariaDB, no instalar plugins en Prisma.
 
-El portal incluye inicio de sesión, tablero protegido, catálogo y administración
-de sedes, áreas y turnos, usuarios y el flujo de asistencia del incremento 1:
-entrada, salida, historial y cierre manual con motivo. Las acciones visibles se
-ajustan al rol y el backend conserva la autoridad final sobre cada permiso y
-alcance. El detalle está en [`backend/docs/attendance.md`](backend/docs/attendance.md).
+## Documentación por feature
 
-### Docker
+- [Índice de features y pendientes](docs/index.md).
+- [Flujo SDD y plantilla](docs/sdd/README.md).
+- [Memoria de continuidad](MEMORY.md) y [reglas para agentes](AGENTS.md).
+- Contrato HTTP: `GET /api/docs/openapi.json`; fuentes en [OpenAPI](backend/src/openapi/).
+- Modelo y migraciones: [Prisma](backend/prisma/). No duplicar contratos en documentos grandes.
 
-Con Docker y una `.env` que contenga un `SESSION_SECRET` real:
-
-```bash
-docker compose up --build
-```
-
-Compose levanta MariaDB, aplica primero las migraciones y después inicia las
-imágenes de producción del backend y del frontend. La aplicación completa queda
-disponible en `http://localhost:4321`; el backend también se expone directamente
-en `http://localhost:3000` para diagnóstico y Postman.
-
-## Rutas migradas
-
-- `GET /api/health`
-- `GET /api/health/live`
-- `GET /api/health/ready`
-- `POST /api/auth/login`
-- `POST /api/auth/logout`
-- `GET /api/auth/me`
-- `GET /api/docs/openapi.json`
-- `POST /api/attendance/check-in` con `Idempotency-Key`
-- `POST /api/attendance/check-out` con `Idempotency-Key`
-- `GET /api/attendance/me` con historial, sesión abierta y bolsa de horas
-- `GET /api/attendance/open` para sesiones abiertas dentro del alcance
-- `POST /api/attendance/:id/close` con `Idempotency-Key` y motivo
-- CRUD lógico de `/api/organization/sedes`
-- CRUD lógico de `/api/organization/areas`
-- CRUD lógico de `/api/organization/turnos`
-- CRUD de `/api/users` con baja lógica y alcance RBAC
-
-La autenticación utiliza una cookie HTTP-only y sesiones persistidas en MariaDB. Los permisos se aplican mediante guards de NestJS.
-
-La matriz de autorización está documentada en
-[`backend/docs/rbac.md`](backend/docs/rbac.md), y las decisiones de arquitectura
-de la fase inicial en
-[`backend/docs/phase-0-decisions.md`](backend/docs/phase-0-decisions.md). El
-contrato funcional y técnico de asistencia está en
-[`backend/docs/attendance.md`](backend/docs/attendance.md).
-
-## Comprobaciones
+## Verificación
 
 ```bash
+npm run docs:check
 npm run quality
 npm run test:integration
+npm run test:e2e
 ```
 
-`quality` comprueba formato, Prisma, pruebas unitarias/E2E aisladas, tipos y
-build. `test:integration` usa MariaDB real para comprobar el store de sesiones,
-las restricciones de Prisma y la idempotencia concurrente de asistencia. CI
-ejecuta ambos y también construye la imagen del backend.
+Integración requiere MariaDB aislada `_test`/`_ci`. El navegador determinista intercepta API; no sustituye aceptación real.
+La [feature de entrega](docs/sdd/entrega/spec.md) describe el gate full-stack y sus restricciones.
+Las [colecciones Postman](postman/README.md) usan cuentas sintéticas y claves estables por reintento.
 
-Las pruebas del backend viven bajo `backend/test/`: `unit/`, `e2e/` e
-`integration/`. El código productivo de `backend/src/` no contiene archivos de
-prueba.
-
-## Despliegue
-
-Configura el proxy o balanceador para servir el frontend y enviar todas las rutas `/api/*` al backend NestJS bajo el mismo dominio. Esto mantiene la cookie de sesión como first-party y evita depender de CORS entre dominios.
-
-Aplica las migraciones de `backend/prisma/migrations` antes de iniciar una nueva versión del backend.
-
-## Estrategia de ramas
-
-- `main`
-- `develop`
-- `feature/*`
-- `release/*`
-- `hotfix/*`
+Git Flow: `feature/<feature>` → `develop`; `release/*` y `hotfix/*` hacia la integración correspondiente.
+Código implementado no implica autorización de producción, supresión de datos ni aceptación institucional.

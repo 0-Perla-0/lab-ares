@@ -1,12 +1,37 @@
 import { apiRequest } from "@/lib/api";
 import type { ApiEnvelope } from "@/lib/types";
+import { criticalMutation } from "@/lib/service-social";
 
 export type DocumentState =
   | "PENDIENTE_CARGA"
   | "EN_REVISION"
   | "AUTORIZADO"
   | "RECHAZADO"
-  | "REQUIERE_CORRECCION";
+  | "REQUIERE_CORRECCION"
+  | "VENCIDO"
+  | "CANCELADO";
+export const DOCUMENT_MAX_BYTES = 10 * 1024 * 1024;
+export type Formalization = {
+  id: string;
+  usuarioId: number;
+  inicio: string;
+  createdAt: string;
+  formalizadoPorId: number;
+  academicSnapshot: { institucion: string; programa: string };
+};
+export async function getFormalizations(userId: number) {
+  return (
+    await apiRequest<ApiEnvelope<Formalization[]>>(
+      `/api/documents/formalizations?userId=${userId}`,
+    )
+  ).data;
+}
+export function formalizeExpedient(usuarioId: number, inicio: string) {
+  return criticalMutation<Formalization>("/api/documents/formalizations", {
+    usuarioId,
+    inicio,
+  });
+}
 
 export type DocumentFile = {
   id: string;
@@ -74,46 +99,34 @@ export async function createDocumentRequirement(input: {
   nombre: string;
   obligatorio: boolean;
 }) {
-  return (
-    await apiRequest<ApiEnvelope<DocumentRequirement>>(
-      "/api/documents/requirements",
-      {
-        method: "POST",
-        body: JSON.stringify(input),
-      },
-    )
-  ).data;
+  return criticalMutation<DocumentRequirement>(
+    "/api/documents/requirements",
+    input,
+  );
 }
 
 export async function attachDocumentVersion(
   requisitoId: number,
   archivoId: string,
 ) {
-  return (
-    await apiRequest<ApiEnvelope<DocumentVersion>>("/api/documents/versions", {
-      method: "POST",
-      body: JSON.stringify({ requisitoId, archivoId }),
-    })
-  ).data;
+  return criticalMutation<DocumentVersion>("/api/documents/versions", {
+    requisitoId,
+    archivoId,
+  });
 }
 
 export async function reviewDocumentVersion(
   versionId: string,
-  estado: Exclude<DocumentState, "PENDIENTE_CARGA" | "EN_REVISION">,
+  estado: "AUTORIZADO" | "RECHAZADO" | "REQUIERE_CORRECCION",
   comentario?: string,
 ) {
-  return (
-    await apiRequest<ApiEnvelope<DocumentVersion>>(
-      `/api/documents/versions/${encodeURIComponent(versionId)}/review`,
-      {
-        method: "POST",
-        body: JSON.stringify({
-          estado,
-          ...(comentario?.trim() ? { comentario: comentario.trim() } : {}),
-        }),
-      },
-    )
-  ).data;
+  return criticalMutation<DocumentVersion>(
+    `/api/documents/versions/${encodeURIComponent(versionId)}/review`,
+    {
+      estado,
+      ...(comentario?.trim() ? { comentario: comentario.trim() } : {}),
+    },
+  );
 }
 
 export async function getDocumentDownload(versionId: string) {

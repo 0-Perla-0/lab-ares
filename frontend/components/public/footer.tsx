@@ -4,7 +4,7 @@ import { Brand } from "./brand";
 
 export function PublicFooter() {
   return (
-    <footer className="bg-[#12221b] text-white">
+    <footer className="bg-[#17174a] text-white">
       <div className="mx-auto max-w-7xl px-5 py-14 sm:px-8 lg:px-10">
         <div className="grid gap-10 border-b border-white/10 pb-10 md:grid-cols-[1.4fr_1fr_1fr]">
           <div>
@@ -15,7 +15,7 @@ export function PublicFooter() {
             </p>
           </div>
           <div>
-            <h2 className="text-xs font-black uppercase tracking-[0.2em] text-[#c8f169]">
+            <h2 className="text-xs font-black uppercase tracking-[0.2em] text-[#f97316]">
               Explorar
             </h2>
             <div className="mt-5 grid gap-3 text-sm text-white/65">
@@ -31,7 +31,7 @@ export function PublicFooter() {
             </div>
           </div>
           <div>
-            <h2 className="text-xs font-black uppercase tracking-[0.2em] text-[#c8f169]">
+            <h2 className="text-xs font-black uppercase tracking-[0.2em] text-[#f97316]">
               Acceso
             </h2>
             <p className="mt-5 text-sm leading-7 text-white/55">
@@ -39,7 +39,7 @@ export function PublicFooter() {
             </p>
             <Link
               href="/login"
-              className="mt-3 inline-flex text-sm font-extrabold text-white hover:text-[#c8f169]"
+              className="mt-3 inline-flex text-sm font-extrabold text-white hover:text-[#f97316]"
             >
               Inicia sesión →
             </Link>

@@ -39,6 +39,11 @@ import { RetentionService } from "./retention.service";
 @Controller("retention")
 export class RetentionController {
   constructor(private readonly retention: RetentionService) {}
+  @Get("adapters")
+  @RequirePermissions(Permission.RETENTION_READ)
+  adapters(@Req() req: Request) {
+    return { data: this.retention.adapters(getAuthenticatedUser(req)) };
+  }
 
   private idempotencyKey(value: string | undefined) {
     const parsed = retentionIdempotencyKeySchema.safeParse(value);
@@ -52,6 +57,46 @@ export class RetentionController {
     return parsed.data;
   }
 
+  @Get("object-deletions")
+  @RequirePermissions(Permission.RETENTION_READ)
+  async objectDeletions(
+    @Req() req: Request,
+    @Query(
+      new ZodValidationPipe(
+        z
+          .object({
+            page: z.coerce.number().int().min(1).max(10000).default(1),
+            pageSize: z.coerce.number().int().min(1).max(100).default(20),
+          })
+          .strict(),
+      ),
+    )
+    query: { page: number; pageSize: number },
+  ) {
+    return {
+      data: await this.retention.listObjectDeletions(
+        getAuthenticatedUser(req),
+        query.page,
+        query.pageSize,
+      ),
+    };
+  }
+  @Post("object-deletions/:id/reconcile")
+  @RequirePermissions(Permission.RETENTION_EXECUTE)
+  async reconcileObject(
+    @Req() req: Request,
+    @Param("id", new ZodValidationPipe(z.string().regex(/^c[a-z0-9]{20,30}$/)))
+    id: string,
+    @Headers("idempotency-key") key: string | undefined,
+  ) {
+    return {
+      data: await this.retention.reconcileObjectDeletion(
+        getAuthenticatedUser(req),
+        id,
+        this.idempotencyKey(key),
+      ),
+    };
+  }
   @Get("rules")
   @RequirePermissions(Permission.RETENTION_READ)
   async listRules(

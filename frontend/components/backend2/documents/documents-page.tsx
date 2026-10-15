@@ -28,7 +28,10 @@ import {
   type DocumentRequirement,
   type DocumentsPage as DocumentsResponse,
   type DocumentState,
+  DOCUMENT_MAX_BYTES,
 } from "@/lib/backend2/documents";
+import { ExpedientFormalization } from "./expedient-formalization";
+import { ServicePeriods } from "./service-periods";
 
 const tone: Record<DocumentState, StatusTone> = {
   PENDIENTE_CARGA: "warning",
@@ -36,11 +39,13 @@ const tone: Record<DocumentState, StatusTone> = {
   AUTORIZADO: "success",
   RECHAZADO: "danger",
   REQUIERE_CORRECCION: "warning",
+  VENCIDO: "warning",
+  CANCELADO: "neutral",
 };
 
 export function DocumentsPage() {
   const { user } = useAuth();
-  const reviewer = user.rol === "ADMIN" || user.rol.startsWith("JEFE_");
+  const reviewer = !!user.permissions?.["documents:review"];
   const [ownerId, setOwnerId] = useState(user.id);
   const [page, setPage] = useState<DocumentsResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -129,16 +134,18 @@ export function DocumentsPage() {
                 onChange={(event) => setOwnerId(Number(event.target.value))}
               />
             </Field>
-            <button className="focus-ring min-h-11 rounded-xl bg-[#12221b] px-5 text-sm font-black text-white">
+            <button className="focus-ring min-h-11 rounded-xl bg-[#17174a] px-5 text-sm font-black text-white">
               Consultar
             </button>
           </form>
         </Panel>
       )}
 
-      {user.rol === "ADMIN" && (
+      {user.permissions?.["documents:review"] === "global" && (
         <RequirementForm defaultUserId={ownerId} onSaved={load} />
       )}
+      <ExpedientFormalization userId={ownerId} />
+      <ServicePeriods key={ownerId} userId={ownerId} />
 
       <Panel
         title={`Requisitos (${page?.total ?? 0})`}
@@ -175,7 +182,7 @@ export function DocumentsPage() {
                     />
                   </div>
                   {version ? (
-                    <div className="mt-4 rounded-xl bg-[#f4f0e7] p-3 text-sm">
+                    <div className="mt-4 rounded-xl bg-[#f6f7fb] p-3 text-sm">
                       <p className="font-bold">
                         Versión {version.version} ·{" "}
                         {version.archivo.originalName}
@@ -187,6 +194,10 @@ export function DocumentsPage() {
                       )}
                       <button
                         type="button"
+                        disabled={
+                          version.estado !== "AUTORIZADO" ||
+                          version.archivo.status !== "DISPONIBLE"
+                        }
                         onClick={() => void download(version.id)}
                         className="focus-ring mt-3 inline-flex min-h-11 items-center gap-2 rounded-xl border border-[var(--ares-border-strong)] bg-white px-4 text-sm font-black"
                       >
@@ -208,8 +219,11 @@ export function DocumentsPage() {
                         <FileUploadField
                           label="Nueva versión"
                           accept="application/pdf,image/jpeg,image/png"
-                          maxBytes={25 * 1024 * 1024}
-                          disabled={busy}
+                          maxBytes={DOCUMENT_MAX_BYTES}
+                          disabled={
+                            busy ||
+                            user.capabilities?.["DOCUMENTS.UPLOAD"] === false
+                          }
                           required
                           onFileReady={(fileId) =>
                             void attach(requirement, fileId)
@@ -318,7 +332,7 @@ function RequirementForm({
         </label>
         <button
           disabled={busy}
-          className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#12221b] px-5 text-sm font-black text-white"
+          className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#17174a] px-5 text-sm font-black text-white"
         >
           <PlusCircle size={16} /> {busy ? "Creando…" : "Crear requisito"}
         </button>
@@ -387,7 +401,7 @@ function ReviewForm({
       </Field>
       <button
         disabled={busy}
-        className="focus-ring min-h-11 w-full rounded-xl bg-[#12221b] px-4 text-sm font-black text-white"
+        className="focus-ring min-h-11 w-full rounded-xl bg-[#17174a] px-4 text-sm font-black text-white"
       >
         {busy ? "Guardando…" : "Registrar resolución"}
       </button>

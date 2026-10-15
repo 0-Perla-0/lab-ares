@@ -192,7 +192,7 @@ export function ReportsPage() {
           </Field>
           <button
             disabled={loading}
-            className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#12221b] px-5 text-sm font-black text-white sm:self-end"
+            className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#17174a] px-5 text-sm font-black text-white sm:self-end"
           >
             <RefreshCw size={16} />{" "}
             {loading ? "Actualizando…" : "Actualizar métricas"}
@@ -222,6 +222,29 @@ export function ReportsPage() {
                 .map((row) => `${row.estado}: ${row._count._all}`)
                 .join(" · ") || "Sin registros"
             }
+          />
+          <Metric
+            label="Ausencias"
+            value={
+              metrics.absences?.reduce(
+                (sum, row) => sum + row._count._all,
+                0,
+              ) ?? 0
+            }
+            detail={
+              metrics.absences
+                ?.map((row) => `${row.estado}: ${row._count._all}`)
+                .join(" · ") || "Sin registros"
+            }
+          />
+          <Metric
+            label="Asistencias que requieren revisión"
+            value={
+              metrics.attendanceReview
+                ?.filter((row) => row.requiresReview)
+                .reduce((sum, row) => sum + row._count._all, 0) ?? 0
+            }
+            detail="Incluye el estado de revisión, no implica horas aprobadas."
           />
           <Metric
             label="Actividades Kairos"
@@ -257,6 +280,7 @@ export function ReportsPage() {
               onChange={(event) => setType(event.target.value as ReportType)}
             >
               <option value="ATTENDANCE">Asistencia</option>
+              <option value="ABSENCES">Ausencias</option>
               <option value="DOCUMENTS">Documentos</option>
               <option value="KAIROS">Kairos</option>
             </select>
@@ -265,14 +289,14 @@ export function ReportsPage() {
             type="button"
             disabled={exporting}
             onClick={() => void exportReport()}
-            className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#12221b] px-5 text-sm font-black text-white"
+            className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#17174a] px-5 text-sm font-black text-white"
           >
             <FileSpreadsheet size={17} />{" "}
             {exporting ? "Solicitando…" : "Generar CSV"}
           </button>
         </div>
         {job && (
-          <div className="mt-5 flex flex-col gap-4 rounded-2xl border border-[var(--ares-border)] bg-[#f4f0e7] p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="mt-5 flex flex-col gap-4 rounded-2xl border border-[var(--ares-border)] bg-[#f6f7fb] p-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <p className="font-black">Exportación {job.id}</p>

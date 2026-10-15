@@ -42,6 +42,11 @@ export const operationsListSchema = z.object({
   name: z.string().trim().max(100).optional(),
 });
 
+export const absenceReprocessSchema = z.strictObject({
+  date: z.iso.date(),
+  reason: safeText(500).min(10),
+});
+
 export const createJobSchema = z.object({
   name: z.string().trim().min(1).max(100),
   idempotencyKey: z.string().trim().min(8).max(191),
@@ -72,6 +77,10 @@ export const failJobApiSchema = failJobSchema.omit({ owner: true });
 
 export const resolutionSchema = z.object({
   resolution: safeText(500),
+});
+export const retryJobSchema = z.strictObject({
+  attempts: z.number().int().min(0),
+  reason: safeText(500),
 });
 
 const communicationSchema = z.object({

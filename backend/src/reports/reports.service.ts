@@ -6,6 +6,9 @@ import {
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { randomUUID } from "node:crypto";
+import { ApiException } from "../common/errors/api.exception";
+import { withWorkerWriteBarrier } from "../common/domain/worker-write-barrier";
+import { withRenewingLease } from "../common/domain/renewing-lease";
 import { AuditService } from "../auth/audit.service";
 import type { AuthUser } from "../auth/auth-user";
 import { AccessScope, getAccessScope, Permission } from "../auth/permissions";
@@ -18,6 +21,7 @@ import {
 } from "../generated/prisma/enums";
 import { StorageService } from "../storage/storage.service";
 import { issueDownloadCapability } from "../storage/storage.types";
+import type { Prisma } from "../generated/prisma/client";
 
 type DateRange = { from: Date; to: Date };
 type ReportRow = Record<string, unknown>;
@@ -97,76 +101,146 @@ export class ReportsService {
     return { ...active, sedeId: actor.sedeId, areaId: actor.areaId };
   }
 
+  private historicalPlacementWhere(actor: AuthUser, scope: AccessScope) {
+    if (scope === AccessScope.GLOBAL) return {};
+    if (scope === AccessScope.SEDE) return { sedeId: actor.sedeId! };
+    return { sedeId: actor.sedeId!, areaId: actor.areaId! };
+  }
+
+  private documentaryPlacementWhere(actor: AuthUser, scope: AccessScope) {
+    return {
+      reportSnapshotAt: { not: null },
+      ...(scope === AccessScope.GLOBAL ? {} : { reportSedeId: actor.sedeId! }),
+      ...(scope === AccessScope.AREA ? { reportAreaId: actor.areaId! } : {}),
+    };
+  }
+
+  private reportWhere(
+    actor: AuthUser,
+    type: "ATTENDANCE",
+    range: DateRange,
+  ): Prisma.AsistenciaWhereInput;
+  private reportWhere(
+    actor: AuthUser,
+    type: "ABSENCES",
+    range: DateRange,
+  ): Prisma.AusenciaWhereInput;
+  private reportWhere(
+    actor: AuthUser,
+    type: "DOCUMENTS",
+    range: DateRange,
+  ): Prisma.DocumentoVersionWhereInput;
+  private reportWhere(
+    actor: AuthUser,
+    type: "KAIROS",
+    range: DateRange,
+  ): Prisma.ActividadKairosWhereInput;
   private reportWhere(
     actor: AuthUser,
     type: TipoReporteExportacion,
     range: DateRange,
-  ) {
+  ):
+    | Prisma.AsistenciaWhereInput
+    | Prisma.AusenciaWhereInput
+    | Prisma.DocumentoVersionWhereInput
+    | Prisma.ActividadKairosWhereInput {
     const scope = this.scope(actor, Permission.REPORTS_EXPORT);
-    const user = this.organizationUserWhere(actor, scope);
     if (type === TipoReporteExportacion.ATTENDANCE)
-      return { user, checkInAt: { gte: range.from, lt: range.to } };
+      return {
+        ...this.historicalPlacementWhere(actor, scope),
+        checkInAt: { gte: range.from, lt: range.to },
+      };
+    if (type === TipoReporteExportacion.ABSENCES)
+      return {
+        ...this.historicalPlacementWhere(actor, scope),
+        fecha: { gte: range.from, lt: range.to },
+      };
     if (type === TipoReporteExportacion.DOCUMENTS)
       return {
-        requisito: { usuario: user },
+        ...this.documentaryPlacementWhere(actor, scope),
         createdAt: { gte: range.from, lt: range.to },
       };
     return {
       createdAt: { gte: range.from, lt: range.to },
-      responsable: user,
+      ...this.documentaryPlacementWhere(actor, scope),
     };
   }
 
   async metrics(actor: AuthUser, input: { from?: string; to?: string }) {
     const scope = this.scope(actor, Permission.REPORTS_READ);
     const range = this.dates(input);
-    const user = this.organizationUserWhere(actor, scope);
     const attendanceWhere = {
-      user,
+      ...this.historicalPlacementWhere(actor, scope),
       checkInAt: { gte: range.from, lt: range.to },
     };
+    const absenceWhere = {
+      ...this.historicalPlacementWhere(actor, scope),
+      fecha: { gte: range.from, lt: range.to },
+    };
     const documentsWhere = {
-      requisito: { usuario: user },
+      ...this.documentaryPlacementWhere(actor, scope),
       createdAt: { gte: range.from, lt: range.to },
     };
     const kairosWhere = {
       createdAt: { gte: range.from, lt: range.to },
-      responsable: user,
+      ...this.documentaryPlacementWhere(actor, scope),
     };
-    const [attendance, documents, kairosByState, kairosOverdue] =
-      await Promise.all([
-        this.prisma.asistencia.groupBy({
-          by: ["status"],
-          where: attendanceWhere,
-          _count: { _all: true },
-          _sum: { durationSeconds: true },
-        }),
-        this.prisma.documentoVersion.groupBy({
-          by: ["estado"],
-          where: documentsWhere,
-          _count: { _all: true },
-        }),
-        this.prisma.actividadKairos.groupBy({
-          by: ["state"],
-          where: kairosWhere,
-          _count: { _all: true },
-        }),
-        this.prisma.actividadKairos.count({
-          where: {
-            ...kairosWhere,
-            dueAt: { lt: range.to },
-            state: { notIn: [...TERMINAL_KAIROS_STATES] },
-          },
-        }),
-      ]);
+    const [
+      attendance,
+      documents,
+      kairosByState,
+      kairosOverdue,
+      absences,
+      attendanceReview,
+    ] = await Promise.all([
+      this.prisma.asistencia.groupBy({
+        by: ["status"],
+        where: attendanceWhere,
+        _count: { _all: true },
+        _sum: { durationSeconds: true },
+      }),
+      this.prisma.documentoVersion.groupBy({
+        by: ["estado"],
+        where: documentsWhere,
+        _count: { _all: true },
+      }),
+      this.prisma.actividadKairos.groupBy({
+        by: ["state"],
+        where: kairosWhere,
+        _count: { _all: true },
+      }),
+      this.prisma.actividadKairos.count({
+        where: {
+          ...kairosWhere,
+          dueAt: { lt: range.to },
+          state: { notIn: [...TERMINAL_KAIROS_STATES] },
+        },
+      }),
+      this.prisma.ausencia.groupBy({
+        by: ["estado", "tipo"],
+        where: absenceWhere,
+        _count: { _all: true },
+      }),
+      this.prisma.asistencia.groupBy({
+        by: ["status", "requiresReview"],
+        where: attendanceWhere,
+        _count: { _all: true },
+      }),
+    ]);
     return {
       from: range.from.toISOString(),
       to: range.to.toISOString(),
       attendance,
+      attendanceReview,
+      absences,
       documents,
       kairos: { byState: kairosByState, overdue: kairosOverdue },
       semantics:
-        "from inclusive, to exclusive; overdue is dueAt < to and state not TERMINADA/CANCELADA",
+        "from inclusive, to exclusive; historical organizational snapshots include inactive/transferred subjects; absences range is UTC date; documents/Kairos retain placement at creation and report current state, not point-in-time state; records without captured placement are excluded, never inferred; overdue is dueAt < to and current state not TERMINADA/CANCELADA",
+      coverage: {
+        documentsKairos: "CAPTURED_PLACEMENT_ONLY",
+        unknownHistoryExcluded: true,
+      },
     };
   }
 
@@ -193,23 +267,79 @@ export class ReportsService {
     type: TipoReporteExportacion,
     range: DateRange,
   ) {
-    const where = this.reportWhere(actor, type, range);
     if (type === TipoReporteExportacion.ATTENDANCE)
-      return this.prisma.asistencia.count({ where });
+      return this.prisma.asistencia.count({
+        where: this.reportWhere(actor, type, range),
+      });
+    if (type === TipoReporteExportacion.ABSENCES)
+      return this.prisma.ausencia.count({
+        where: this.reportWhere(actor, type, range),
+      });
     if (type === TipoReporteExportacion.DOCUMENTS)
-      return this.prisma.documentoVersion.count({ where });
-    return this.prisma.actividadKairos.count({ where });
+      return this.prisma.documentoVersion.count({
+        where: this.reportWhere(actor, type, range),
+      });
+    return this.prisma.actividadKairos.count({
+      where: this.reportWhere(actor, type, range),
+    });
   }
 
   private async rows(
     actor: AuthUser,
     type: TipoReporteExportacion,
     range: DateRange,
+    take = SYNC_EXPORT_LIMIT + 1,
+    after?: string | number,
   ): Promise<ReportData> {
-    const where = this.reportWhere(actor, type, range);
+    if (type === TipoReporteExportacion.ABSENCES) {
+      const where = this.reportWhere(actor, type, range);
+      const rows = await this.prisma.ausencia.findMany({
+        where: {
+          ...where,
+          ...(after === undefined ? {} : { id: { gt: String(after) } }),
+        },
+        take,
+        orderBy: { id: "asc" },
+        select: {
+          id: true,
+          userId: true,
+          sedeId: true,
+          areaId: true,
+          fecha: true,
+          tipo: true,
+          estado: true,
+          plazoLimiteAt: true,
+          apelacionLimiteAt: true,
+        },
+      });
+      return {
+        rows: rows.map((row) => ({
+          ...row,
+          fecha: row.fecha.toISOString().slice(0, 10),
+          plazoLimiteAt: row.plazoLimiteAt.toISOString(),
+          apelacionLimiteAt: row.apelacionLimiteAt?.toISOString(),
+        })),
+        headers: [
+          "id",
+          "userId",
+          "sedeId",
+          "areaId",
+          "fecha",
+          "tipo",
+          "estado",
+          "plazoLimiteAt",
+          "apelacionLimiteAt",
+        ],
+      };
+    }
     if (type === TipoReporteExportacion.ATTENDANCE) {
+      const where = this.reportWhere(actor, type, range);
       const rows = await this.prisma.asistencia.findMany({
-        where,
+        where: {
+          ...where,
+          ...(after === undefined ? {} : { id: { gt: Number(after) } }),
+        },
+        take,
         orderBy: { id: "asc" },
         select: {
           id: true,
@@ -237,8 +367,13 @@ export class ReportsService {
       };
     }
     if (type === TipoReporteExportacion.DOCUMENTS) {
+      const where = this.reportWhere(actor, type, range);
       const rows = await this.prisma.documentoVersion.findMany({
-        where,
+        where: {
+          ...where,
+          ...(after === undefined ? {} : { id: { gt: String(after) } }),
+        },
+        take,
         orderBy: { id: "asc" },
         select: {
           id: true,
@@ -257,7 +392,11 @@ export class ReportsService {
       };
     }
     const rows = await this.prisma.actividadKairos.findMany({
-      where,
+      where: {
+        ...this.reportWhere(actor, type, range),
+        ...(after === undefined ? {} : { id: { gt: String(after) } }),
+      },
+      take,
       orderBy: { id: "asc" },
       select: {
         id: true,
@@ -283,22 +422,58 @@ export class ReportsService {
     const totalRows = await this.countRows(actor, type, range);
     if (totalRows <= SYNC_EXPORT_LIMIT) {
       const correlationId = `sync:${type}:${randomUUID()}`;
-      await this.audit.append({
-        actorId: actor.id,
-        subjectId: actor.id,
-        action: "REPORT_EXPORT_REQUESTED",
-        resource: "report_export",
-        correlationId,
-        metadata: { type, totalFilas: totalRows, mode: "sync" },
+      await withWorkerWriteBarrier(this.prisma, async (tx) => {
+        await tx.$queryRaw`SELECT id FROM Usuario WHERE id = ${actor.id} LOCK IN SHARE MODE`;
+        this.assertUnchangedScope(await this.requester(actor.id, tx), {
+          from: range.from.toISOString(),
+          to: range.to.toISOString(),
+          scope: requestedScope,
+          sedeId: actor.sedeId,
+          areaId: actor.areaId,
+        });
+        await this.audit.append(
+          {
+            actorId: actor.id,
+            subjectId: actor.id,
+            action: "REPORT_EXPORT_REQUESTED",
+            resource: "report_export",
+            correlationId,
+            metadata: { type, totalFilas: totalRows, mode: "sync" },
+          },
+          tx,
+        );
       });
       const data = await this.rows(actor, type, range);
-      await this.audit.append({
-        actorId: actor.id,
-        subjectId: actor.id,
-        action: "REPORT_EXPORT_COMPLETED",
-        resource: "report_export",
-        correlationId,
-        metadata: { type, totalFilas: data.rows.length, mode: "sync" },
+      // A concurrent insertion may cross the threshold after countRows(). Never
+      // turn the bounded synchronous path into an unbounded materialization.
+      if (data.rows.length > SYNC_EXPORT_LIMIT)
+        return this.createExportJob(
+          actor,
+          type,
+          range,
+          requestedScope,
+          totalRows,
+        );
+      await withWorkerWriteBarrier(this.prisma, async (tx) => {
+        await tx.$queryRaw`SELECT id FROM Usuario WHERE id = ${actor.id} LOCK IN SHARE MODE`;
+        this.assertUnchangedScope(await this.requester(actor.id, tx), {
+          from: range.from.toISOString(),
+          to: range.to.toISOString(),
+          scope: requestedScope,
+          sedeId: actor.sedeId,
+          areaId: actor.areaId,
+        });
+        await this.audit.append(
+          {
+            actorId: actor.id,
+            subjectId: actor.id,
+            action: "REPORT_EXPORT_COMPLETED",
+            resource: "report_export",
+            correlationId,
+            metadata: { type, totalFilas: data.rows.length, mode: "sync" },
+          },
+          tx,
+        );
       });
       return {
         sync: true as const,
@@ -306,7 +481,25 @@ export class ReportsService {
         filename: `reporte-${type.toLowerCase()}.csv`,
       };
     }
-    const job = await this.prisma.$transaction(async (tx) => {
+    return this.createExportJob(actor, type, range, requestedScope, totalRows);
+  }
+
+  private async createExportJob(
+    actor: AuthUser,
+    type: TipoReporteExportacion,
+    range: DateRange,
+    requestedScope: AccessScope,
+    totalRows: number,
+  ) {
+    const job = await withWorkerWriteBarrier(this.prisma, async (tx) => {
+      await tx.$queryRaw`SELECT id FROM Usuario WHERE id = ${actor.id} LOCK IN SHARE MODE`;
+      this.assertUnchangedScope(await this.requester(actor.id, tx), {
+        from: range.from.toISOString(),
+        to: range.to.toISOString(),
+        scope: requestedScope,
+        sedeId: actor.sedeId,
+        areaId: actor.areaId,
+      });
       const created = await tx.reporteExportacion.create({
         data: {
           requesterId: actor.id,
@@ -373,7 +566,12 @@ export class ReportsService {
       await tx.$executeRaw`SELECT id FROM ReporteExportacion WHERE id = ${id} FOR UPDATE`;
       const job = await tx.reporteExportacion.findFirst({
         where: { id, requesterId: actor.id },
-        select: { status: true, archivoId: true, expiresAt: true },
+        select: {
+          status: true,
+          archivoId: true,
+          expiresAt: true,
+          filters: true,
+        },
       });
       if (
         !job ||
@@ -383,6 +581,13 @@ export class ReportsService {
         job.expiresAt <= new Date()
       )
         throw new NotFoundException();
+      await tx.$queryRaw`SELECT id FROM Usuario WHERE id = ${actor.id} LOCK IN SHARE MODE`;
+      try {
+        const fresh = await this.requester(actor.id, tx);
+        this.assertUnchangedScope(fresh, job.filters as ReportFilters);
+      } catch {
+        throw new ForbiddenException("REPORT_SCOPE_CHANGED");
+      }
       await this.audit.append(
         {
           actorId: actor.id,
@@ -394,22 +599,26 @@ export class ReportsService {
         },
         tx,
       );
-      return job.archivoId;
+      // Sign while the account and report locks still protect authorization.
+      return this.storage.downloadUrl(
+        job.archivoId,
+        issueDownloadCapability({
+          subjectId: String(actor.id),
+          resourceId: job.archivoId,
+          purpose: "download",
+          issuedAt: new Date(),
+        }),
+        String(actor.id),
+      );
     });
-    return this.storage.downloadUrl(
-      fileId,
-      issueDownloadCapability({
-        subjectId: String(actor.id),
-        resourceId: fileId,
-        purpose: "download",
-        issuedAt: new Date(),
-      }),
-      String(actor.id),
-    );
+    return fileId;
   }
 
-  private async requester(id: number): Promise<AuthUser> {
-    const user = await this.prisma.usuario.findUnique({
+  private async requester(
+    id: number,
+    client: Prisma.TransactionClient | PrismaService = this.prisma,
+  ): Promise<AuthUser> {
+    const user = await client.usuario.findUnique({
       where: { id },
       select: {
         id: true,
@@ -433,7 +642,7 @@ export class ReportsService {
   }
 
   private assertUnchangedScope(actor: AuthUser, filters: ReportFilters) {
-    if (!Object.values(AccessScope).includes(filters.scope))
+    if (!filters || !Object.values(AccessScope).includes(filters.scope))
       throw new Error("REPORT_SCOPE_SNAPSHOT_MISSING");
     const currentScope = this.scope(actor, Permission.REPORTS_EXPORT);
     const organizationChanged =
@@ -456,34 +665,45 @@ export class ReportsService {
     const maxAttempts = this.setting("REPORTS_MAX_ATTEMPTS", 3);
     const leaseMs = this.setting("REPORTS_LEASE_MS", 120_000);
     const retryBaseMs = this.setting("REPORTS_RETRY_BASE_MS", 60_000);
-    await this.prisma.reporteExportacion.updateMany({
-      where: {
-        status: EstadoReporteExportacion.GENERANDO,
-        leaseUntil: { lt: now },
-        attempts: { lt: maxAttempts },
-      },
-      data: {
-        status: EstadoReporteExportacion.PENDIENTE,
-        leaseOwner: null,
-        leaseUntil: null,
-        nextAttemptAt: now,
-        errorCode: "LEASE_EXPIRED_RETRY",
-      },
-    });
-    await this.prisma.reporteExportacion.updateMany({
-      where: {
-        status: EstadoReporteExportacion.GENERANDO,
-        leaseUntil: { lt: now },
-        attempts: { gte: maxAttempts },
-      },
-      data: {
-        status: EstadoReporteExportacion.FALLIDO,
-        leaseOwner: null,
-        leaseUntil: null,
-        nextAttemptAt: null,
-        errorCode: "LEASE_EXPIRED_MAX_ATTEMPTS",
-      },
-    });
+    try {
+      await withWorkerWriteBarrier(this.prisma, async (tx) => {
+        await tx.reporteExportacion.updateMany({
+          where: {
+            status: EstadoReporteExportacion.GENERANDO,
+            leaseUntil: { lt: now },
+            attempts: { lt: maxAttempts },
+          },
+          data: {
+            status: EstadoReporteExportacion.PENDIENTE,
+            leaseOwner: null,
+            leaseUntil: null,
+            nextAttemptAt: now,
+            errorCode: "LEASE_EXPIRED_RETRY",
+          },
+        });
+        await tx.reporteExportacion.updateMany({
+          where: {
+            status: EstadoReporteExportacion.GENERANDO,
+            leaseUntil: { lt: now },
+            attempts: { gte: maxAttempts },
+          },
+          data: {
+            status: EstadoReporteExportacion.FALLIDO,
+            leaseOwner: null,
+            leaseUntil: null,
+            nextAttemptAt: null,
+            errorCode: "LEASE_EXPIRED_MAX_ATTEMPTS",
+          },
+        });
+      });
+    } catch (error) {
+      if (
+        error instanceof ApiException &&
+        error.code === "RECOVERY_WRITE_BARRIER_ACTIVE"
+      )
+        return 0;
+      throw error;
+    }
     const jobs = await this.prisma.reporteExportacion.findMany({
       where: {
         status: EstadoReporteExportacion.PENDIENTE,
@@ -495,22 +715,41 @@ export class ReportsService {
     });
     let claimed = 0;
     for (const job of jobs) {
-      const claim = await this.prisma.reporteExportacion.updateMany({
-        where: {
-          id: job.id,
-          status: EstadoReporteExportacion.PENDIENTE,
-          attempts: { lt: maxAttempts },
-          OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: now } }],
-        },
-        data: {
-          status: EstadoReporteExportacion.GENERANDO,
-          leaseOwner: this.owner,
-          leaseUntil: new Date(Date.now() + leaseMs),
-          attempts: { increment: 1 },
-          nextAttemptAt: null,
-          errorCode: null,
-        },
-      });
+      let barrierVersion: number;
+      let claim;
+      try {
+        const claimedJob = await withWorkerWriteBarrier(
+          this.prisma,
+          async (tx, version) => ({
+            version,
+            claim: await tx.reporteExportacion.updateMany({
+              where: {
+                id: job.id,
+                status: EstadoReporteExportacion.PENDIENTE,
+                attempts: { lt: maxAttempts },
+                OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: now } }],
+              },
+              data: {
+                status: EstadoReporteExportacion.GENERANDO,
+                leaseOwner: this.owner,
+                leaseUntil: new Date(Date.now() + leaseMs),
+                attempts: { increment: 1 },
+                nextAttemptAt: null,
+                errorCode: null,
+              },
+            }),
+          }),
+        );
+        claim = claimedJob.claim;
+        barrierVersion = claimedJob.version;
+      } catch (error) {
+        if (
+          error instanceof ApiException &&
+          error.code === "RECOVERY_WRITE_BARRIER_ACTIVE"
+        )
+          break;
+        throw error;
+      }
       if (!claim.count) continue;
       claimed += 1;
       const attempt = job.attempts + 1;
@@ -520,50 +759,136 @@ export class ReportsService {
         const filters = job.filters as ReportFilters;
         this.assertUnchangedScope(actor, filters);
         const range = this.dates(filters);
-        const data = await this.rows(actor, job.type, range);
-        const file = await this.storage.storeGeneratedCsv(
-          job.requesterId,
-          job.id,
-          this.csv(data.rows, data.headers),
-        );
-        generatedFileId = file.id;
-        await this.prisma.$transaction(async (tx) => {
-          const completed = await tx.reporteExportacion.updateMany({
-            where: {
-              id: job.id,
-              leaseOwner: this.owner,
-              status: EstadoReporteExportacion.GENERANDO,
-              leaseUntil: { gt: new Date() },
+        let totalFilas = 0;
+        const renew = async () =>
+          withWorkerWriteBarrier(
+            this.prisma,
+            async (tx) => {
+              const result = await tx.reporteExportacion.updateMany({
+                where: {
+                  id: job.id,
+                  status: EstadoReporteExportacion.GENERANDO,
+                  leaseOwner: this.owner,
+                  leaseUntil: { gt: new Date() },
+                },
+                data: { leaseUntil: new Date(Date.now() + leaseMs) },
+              });
+              if (result.count !== 1) throw new LeaseLostError();
+              this.assertUnchangedScope(
+                await this.requester(job.requesterId, tx),
+                filters,
+              );
             },
-            data: {
-              status: EstadoReporteExportacion.COMPLETADO,
-              archivoId: file.id,
-              totalFilas: data.rows.length,
-              expiresAt: new Date(Date.now() + DAY_MS),
-              leaseOwner: null,
-              leaseUntil: null,
-              nextAttemptAt: null,
-              errorCode: null,
-            },
-          });
-          if (!completed.count) throw new LeaseLostError();
-          await this.audit.append(
-            {
-              actorId: job.requesterId,
-              subjectId: job.requesterId,
-              action: "REPORT_EXPORT_COMPLETED",
-              resource: "report_export",
-              correlationId: job.id,
-              metadata: { totalFilas: data.rows.length },
-            },
-            tx,
+            barrierVersion,
           );
+        const service = this;
+        async function* chunks() {
+          let after: string | number | undefined;
+          let first = true;
+          while (true) {
+            await renew();
+            const data = await service.rows(
+              actor,
+              job.type,
+              range,
+              1000,
+              after,
+            );
+            if (first) {
+              yield service.csv([], data.headers);
+              first = false;
+            }
+            for (const row of data.rows) {
+              yield Buffer.from(
+                data.headers
+                  .map(
+                    (header) =>
+                      `"${service.safe(row[header]).replace(/"/g, '""')}"`,
+                  )
+                  .join(",") + "\r\n",
+                "utf8",
+              );
+            }
+            totalFilas += data.rows.length;
+            if (data.rows.length < 1000) break;
+            const last = data.rows.at(-1)!.id;
+            if (
+              (typeof last !== "string" && typeof last !== "number") ||
+              last === after
+            )
+              throw new Error("REPORT_CURSOR_INVALID");
+            after = last;
+          }
+          await renew();
+        }
+        const file = await withRenewingLease(leaseMs, renew, async () => {
+          const prepared = await this.storage.storeGeneratedCsvStream(
+            job.requesterId,
+            job.id,
+            chunks(),
+            barrierVersion,
+          );
+          generatedFileId = prepared.id;
+          return prepared;
         });
+        await withWorkerWriteBarrier(
+          this.prisma,
+          async (tx) => {
+            await tx.$queryRaw`SELECT id FROM Usuario WHERE id = ${job.requesterId} LOCK IN SHARE MODE`;
+            this.assertUnchangedScope(
+              await this.requester(job.requesterId, tx),
+              filters,
+            );
+            const completed = await tx.reporteExportacion.updateMany({
+              where: {
+                id: job.id,
+                leaseOwner: this.owner,
+                status: EstadoReporteExportacion.GENERANDO,
+                leaseUntil: { gt: new Date() },
+              },
+              data: {
+                status: EstadoReporteExportacion.COMPLETADO,
+                archivoId: file.id,
+                totalFilas,
+                expiresAt: new Date(Date.now() + DAY_MS),
+                leaseOwner: null,
+                leaseUntil: null,
+                nextAttemptAt: null,
+                errorCode: null,
+              },
+            });
+            if (!completed.count) throw new LeaseLostError();
+            await this.audit.append(
+              {
+                actorId: job.requesterId,
+                subjectId: job.requesterId,
+                action: "REPORT_EXPORT_COMPLETED",
+                resource: "report_export",
+                correlationId: job.id,
+                metadata: { totalFilas },
+              },
+              tx,
+            );
+          },
+          barrierVersion,
+        );
         generatedFileId = undefined;
       } catch (error) {
+        // A freeze/epoch change forbids cleanup writes too. Ownership metadata
+        // keeps any private preparation discoverable for later reconciliation.
+        if (
+          error instanceof ApiException &&
+          error.code === "RECOVERY_WRITE_BARRIER_ACTIVE"
+        )
+          break;
         if (generatedFileId) {
           try {
-            await this.storage.removeGenerated(generatedFileId);
+            await this.storage.removeGenerated(
+              generatedFileId!,
+              undefined,
+              undefined,
+              barrierVersion,
+            );
           } catch {
             // The orphan remains discoverable by ownership metadata for reconciliation.
           }
@@ -579,36 +904,41 @@ export class ReportsService {
         const nextAttemptAt = permanent
           ? null
           : new Date(Date.now() + retryBaseMs * 2 ** Math.max(0, attempt - 1));
-        await this.prisma.$transaction(async (tx) => {
-          const updated = await tx.reporteExportacion.updateMany({
-            where: {
-              id: job.id,
-              leaseOwner: this.owner,
-              status: EstadoReporteExportacion.GENERANDO,
-            },
-            data: {
-              status: permanent
-                ? EstadoReporteExportacion.FALLIDO
-                : EstadoReporteExportacion.PENDIENTE,
-              errorCode: code,
-              leaseOwner: null,
-              leaseUntil: null,
-              nextAttemptAt,
-            },
-          });
-          if (updated.count)
-            await this.audit.append(
-              {
-                actorId: job.requesterId,
-                subjectId: job.requesterId,
-                action: "REPORT_EXPORT_FAILED",
-                resource: "report_export",
-                correlationId: job.id,
-                metadata: { errorCode: code, retry: !permanent },
+        await withWorkerWriteBarrier(
+          this.prisma,
+          async (tx) => {
+            const updated = await tx.reporteExportacion.updateMany({
+              where: {
+                id: job.id,
+                leaseOwner: this.owner,
+                status: EstadoReporteExportacion.GENERANDO,
+                leaseUntil: { gt: new Date() },
               },
-              tx,
-            );
-        });
+              data: {
+                status: permanent
+                  ? EstadoReporteExportacion.FALLIDO
+                  : EstadoReporteExportacion.PENDIENTE,
+                errorCode: code,
+                leaseOwner: null,
+                leaseUntil: null,
+                nextAttemptAt,
+              },
+            });
+            if (updated.count)
+              await this.audit.append(
+                {
+                  actorId: job.requesterId,
+                  subjectId: job.requesterId,
+                  action: "REPORT_EXPORT_FAILED",
+                  resource: "report_export",
+                  correlationId: job.id,
+                  metadata: { errorCode: code, retry: !permanent },
+                },
+                tx,
+              );
+          },
+          barrierVersion,
+        );
       }
     }
     return claimed;
@@ -626,39 +956,56 @@ export class ReportsService {
     let expired = 0;
     for (const job of jobs) {
       try {
-        if (job.archivoId) await this.storage.removeGenerated(job.archivoId);
-      } catch {
+        // Intent/reservation, immutable S3 versions and verification are durable
+        // outside this final report metadata/audit transaction.
+        if (job.archivoId)
+          await this.storage.removeGenerated(job.archivoId, undefined, job.id);
+        await withWorkerWriteBarrier(this.prisma, async (tx) => {
+          await tx.$queryRaw`SELECT id FROM ReporteExportacion WHERE id = ${job.id} FOR UPDATE`;
+          const current = await tx.reporteExportacion.findFirst({
+            where: {
+              id: job.id,
+              status: EstadoReporteExportacion.COMPLETADO,
+              expiresAt: { lt: new Date() },
+            },
+          });
+          if (!current || current.archivoId !== job.archivoId) return;
+          const updated = await tx.reporteExportacion.updateMany({
+            where: {
+              id: job.id,
+              status: EstadoReporteExportacion.COMPLETADO,
+              archivoId: job.archivoId,
+              expiresAt: { lt: new Date() },
+            },
+            data: {
+              status: EstadoReporteExportacion.EXPIRADO,
+              archivoId: null,
+              errorCode: null,
+            },
+          });
+          if (updated.count) {
+            expired += 1;
+            await this.audit.append(
+              {
+                actorId: job.requesterId,
+                subjectId: job.requesterId,
+                action: "REPORT_EXPORT_EXPIRED",
+                resource: "report_export",
+                correlationId: job.id,
+                metadata: { result: "expired" },
+              },
+              tx,
+            );
+          }
+        });
+      } catch (error) {
+        if (
+          error instanceof ApiException &&
+          error.code === "RECOVERY_WRITE_BARRIER_ACTIVE"
+        )
+          break;
         continue;
       }
-      await this.prisma.$transaction(async (tx) => {
-        const updated = await tx.reporteExportacion.updateMany({
-          where: {
-            id: job.id,
-            status: EstadoReporteExportacion.COMPLETADO,
-            archivoId: job.archivoId,
-            expiresAt: { lt: new Date() },
-          },
-          data: {
-            status: EstadoReporteExportacion.EXPIRADO,
-            archivoId: null,
-            errorCode: null,
-          },
-        });
-        if (updated.count) {
-          expired += 1;
-          await this.audit.append(
-            {
-              actorId: job.requesterId,
-              subjectId: job.requesterId,
-              action: "REPORT_EXPORT_EXPIRED",
-              resource: "report_export",
-              correlationId: job.id,
-              metadata: { result: "expired" },
-            },
-            tx,
-          );
-        }
-      });
     }
     return expired;
   }

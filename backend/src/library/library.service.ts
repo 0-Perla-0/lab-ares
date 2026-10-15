@@ -6,6 +6,8 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { randomUUID } from "node:crypto";
+import { notificationContracts } from "../common/domain/operational-notification";
 import { AuditService } from "../auth/audit.service";
 import type { AuthUser } from "../auth/auth-user";
 import { AccessScope, getAccessScope, Permission } from "../auth/permissions";
@@ -649,18 +651,28 @@ export class LibraryService {
         tx,
         this.target(version.documento),
       );
-      if (recipientIds.length)
+      if (recipientIds.length) {
+        const notices = recipientIds.map((userId: number) => ({
+          id: randomUUID(),
+          userId,
+          type: "LIBRARY_PUBLISHED",
+          payload: notificationContracts.LIBRARY_PUBLISHED.parse({
+            documentId: version.documentoId,
+            versionId: id,
+            requiresAcknowledgement: version.documento.requiereAcuse,
+          }),
+        }));
         await tx.notification.createMany({
-          data: recipientIds.map((userId: number) => ({
-            userId,
-            type: "LIBRARY_PUBLISHED",
-            payload: {
-              documentId: version.documentoId,
-              versionId: id,
-              requiresAcknowledgement: version.documento.requiereAcuse,
-            },
+          data: notices,
+        });
+        await tx.outboxEvent.createMany({
+          data: notices.map((notice: { id: string }) => ({
+            type: "OPERATIONAL_NOTIFICATION",
+            aggregateId: notice.id,
+            payload: { notificationId: notice.id },
           })),
         });
+      }
       await this.audit.append(
         {
           actorId: actor.id,

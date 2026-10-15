@@ -40,14 +40,18 @@ export class UsersService {
     await this.ensureUniqueIdentity(input.codigo, input.email);
 
     const { password, ...user } = input;
-    const passwordHash = await hashPassword(password);
+    const passwordHash = await hashPassword(password, user);
 
     return this.withUniqueIdentity(() =>
       this.users.create({ ...user, passwordHash }),
     );
   }
 
-  async actualizar(id: number, input: ActualizarUsuarioInput) {
+  async actualizar(
+    id: number,
+    input: ActualizarUsuarioInput,
+    actorId?: number,
+  ) {
     const current = await this.obtener(id);
     const assignments: UserAssignments = {
       sedeId: input.sedeId === undefined ? current.sedeId : input.sedeId,
@@ -62,16 +66,27 @@ export class UsersService {
     const data = {
       ...changes,
       passwordHash:
-        password === undefined ? undefined : await hashPassword(password),
+        password === undefined
+          ? undefined
+          : await hashPassword(password, {
+              email: input.email ?? current.email,
+              codigo: input.codigo ?? current.codigo,
+            }),
     };
 
-    return this.withUniqueIdentity(() => this.users.update(id, data));
+    return this.withUniqueIdentity(() =>
+      actorId === undefined
+        ? this.users.update(id, data)
+        : this.users.update(id, data, actorId),
+    );
   }
 
-  async darDeBaja(id: number) {
+  async darDeBaja(id: number, actorId?: number) {
     const current = await this.obtener(id);
     if (current.estado === EstadoUsuario.DESACTIVADA) return current;
-    return this.users.update(id, { estado: EstadoUsuario.DESACTIVADA });
+    return actorId === undefined
+      ? this.users.update(id, { estado: EstadoUsuario.DESACTIVADA })
+      : this.users.update(id, { estado: EstadoUsuario.DESACTIVADA }, actorId);
   }
 
   private async ensureUniqueIdentity(

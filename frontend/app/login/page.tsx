@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { CheckCircle2 } from "lucide-react";
 
 import { LoginForm } from "@/components/auth/login-form";
+import { TermsAndConditions } from "@/components/auth/terms-and-conditions";
 import { Brand } from "@/components/public/brand";
 
 export const metadata: Metadata = {
@@ -23,62 +22,28 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const params = await searchParams;
 
   return (
-    <main className="min-h-screen bg-[#f4f0e7] lg:grid lg:grid-cols-[1.05fr_0.95fr]">
-      <section className="grid-texture relative hidden overflow-hidden bg-[#12221b] p-10 text-white lg:flex lg:flex-col xl:p-14">
-        <div className="absolute -bottom-36 -left-24 h-96 w-96 rounded-full bg-[#c8f169]/15 blur-3xl" />
+    <main className="grid-texture relative isolate flex min-h-screen min-h-[100svh] items-center justify-center overflow-hidden bg-[#17174a] px-5 py-28 sm:px-10 lg:py-10">
+      <div className="pointer-events-none absolute -bottom-40 -left-32 h-[28rem] w-[28rem] rounded-full bg-[#f97316]/18 blur-3xl" />
+      <div className="pointer-events-none absolute -right-40 -top-44 h-[32rem] w-[32rem] rounded-full bg-[#25256d] blur-3xl" />
+
+      <div className="absolute left-5 top-5 z-20 sm:left-10 sm:top-10 xl:left-14 xl:top-14">
         <Brand inverse />
+      </div>
 
-        <div className="relative my-auto max-w-xl py-16">
-          <p className="text-xs font-black uppercase tracking-[0.2em] text-[#c8f169]">
-            Tu espacio de trabajo
-          </p>
-          <h1 className="mt-5 text-5xl font-black leading-[1.04] tracking-[-0.06em] xl:text-6xl">
-            Las grandes ideas también necesitan un buen punto de partida.
-          </h1>
-          <div className="mt-10 space-y-4">
-            {[
-              "Consulta tu lugar dentro del equipo",
-              "Encuentra sedes, áreas y turnos",
-              "Gestiona de acuerdo con tu responsabilidad",
-            ].map((benefit) => (
-              <div
-                key={benefit}
-                className="flex items-center gap-3 text-sm text-white/70"
-              >
-                <CheckCircle2 size={18} className="text-[#c8f169]" />
-                {benefit}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <p className="relative text-xs text-white/35">
-          Laboratorio de Inventores · Operación interna
-        </p>
-      </section>
-
-      <section className="flex min-h-screen items-center justify-center px-5 py-10 sm:px-10">
-        <div className="w-full max-w-md animate-fade-up">
-          <div className="mb-10 lg:hidden">
-            <Brand />
-          </div>
-          <Link
-            href="/"
-            className="focus-ring inline-flex rounded-md text-xs font-black uppercase tracking-[0.16em] text-[#769a27] hover:text-[#55721e]"
+      <section
+        aria-labelledby="login-title"
+        className="relative z-10 w-full max-w-[30rem] animate-fade-up rounded-[2rem] border border-white/25 bg-white p-6 shadow-[0_32px_90px_rgba(5,5,35,0.42)] sm:p-9"
+      >
+        <div className="mx-auto h-1.5 w-40 rounded-full bg-[#f97316]" />
+        <div className="mt-7">
+          <h1
+            id="login-title"
+            className="text-center text-4xl font-black tracking-[-0.055em] text-[#17174a] sm:text-5xl"
           >
-            ← Volver al inicio
-          </Link>
-          <h2 className="mt-8 text-4xl font-black tracking-[-0.055em] text-[#12221b] sm:text-5xl">
-            Bienvenido de nuevo.
-          </h2>
-          <p className="mt-4 text-base leading-7 text-[#66736d]">
-            Ingresa tus credenciales para continuar al portal.
-          </p>
+            Bienvenido
+          </h1>
           <LoginForm redirectTo={safeRedirect(params.next)} />
-          <p className="mt-8 text-center text-xs leading-5 text-[#7a8580]">
-            El acceso es administrado por tu organización. Si no tienes cuenta,
-            solicita el alta a tu responsable.
-          </p>
+          <TermsAndConditions />
         </div>
       </section>
     </main>

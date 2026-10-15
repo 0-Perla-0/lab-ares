@@ -1,6 +1,7 @@
 import { INestApplication } from "@nestjs/common";
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from "@nestjs/core";
 import { Test } from "@nestjs/testing";
+import { ConfigService } from "@nestjs/config";
 import session from "express-session";
 import type { Server } from "node:http";
 import request from "supertest";
@@ -23,6 +24,7 @@ import { EstadoUsuario, RolUsuario } from "../../src/generated/prisma/enums";
 const admin = user(1, RolUsuario.ADMIN, "admin@ares.local");
 const prestador = user(2, RolUsuario.PRESTADOR, "worker@ares.local");
 const auth = {
+  completedAuthentication: vi.fn(),
   authenticate: vi.fn(async (email: string) =>
     email === prestador.email ? prestador : admin,
   ),
@@ -52,6 +54,10 @@ describe("Attendance API", () => {
     const module = await Test.createTestingModule({
       controllers: [AttendanceController, AuthController],
       providers: [
+        {
+          provide: ConfigService,
+          useValue: new ConfigService({ TRUSTED_PROXY_CIDRS: "" }),
+        },
         { provide: AuthService, useValue: auth },
         {
           provide: LoginRateLimiter,
@@ -131,13 +137,19 @@ describe("Attendance API", () => {
       .set("Idempotency-Key", key)
       .send({})
       .expect(200);
-    expect(attendance.checkIn).toHaveBeenLastCalledWith(prestador, key);
+    expect(attendance.checkIn).toHaveBeenLastCalledWith(prestador, key, {
+      clientIp: "127.0.0.1",
+      coords: undefined,
+    });
     await agent
       .post("/api/attendance/check-out")
       .set("Idempotency-Key", key)
       .send({ attendanceId: 7 })
       .expect(200);
-    expect(attendance.checkOut).toHaveBeenLastCalledWith(prestador, key, 7);
+    expect(attendance.checkOut).toHaveBeenLastCalledWith(prestador, key, 7, {
+      clientIp: "127.0.0.1",
+      coords: undefined,
+    });
     const manager = await login(admin.email);
     await manager.get("/api/attendance/open").expect(200);
     await manager

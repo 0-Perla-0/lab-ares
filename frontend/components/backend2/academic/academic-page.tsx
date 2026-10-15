@@ -7,15 +7,22 @@ import {
   useState,
   type FormEvent,
 } from "react";
-import { Check, History, LibraryBig, RefreshCw, X } from "lucide-react";
+import {
+  Check,
+  GraduationCap,
+  History,
+  Maximize2,
+  Send,
+  X,
+} from "lucide-react";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import {
-  EmptyState,
   ErrorBanner,
   Field,
   LoadError,
   LoadingTable,
+  Modal,
   PageHeader,
   Panel,
   StatusBadge,
@@ -66,6 +73,11 @@ export function AcademicPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [requestError, setRequestError] = useState("");
+  const [requestOpen, setRequestOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [pendingOpen, setPendingOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -124,10 +136,10 @@ export function AcademicPage() {
 
   async function submitProfile(event: FormEvent) {
     event.preventDefault();
-    setError("");
+    setRequestError("");
     setNotice("");
     if (!form.institucionId || !form.programaAcademicoId || !form.inicio) {
-      setError("Selecciona institución, programa y fecha de inicio.");
+      setRequestError("Selecciona institución, programa y fecha de inicio.");
       return;
     }
     setSaving(true);
@@ -146,8 +158,9 @@ export function AcademicPage() {
         "Solicitud enviada. El perfil actual no cambia hasta su aprobación.",
       );
       await load();
+      setRequestOpen(false);
     } catch (requestError) {
-      setError(getApiErrorMessage(requestError, "save"));
+      setRequestError(getApiErrorMessage(requestError, "save"));
     } finally {
       setSaving(false);
     }
@@ -194,33 +207,136 @@ export function AcademicPage() {
         </div>
       )}
 
-      <Panel
-        title="Adscripción vigente"
-        description="La solicitud pendiente no sustituye este registro hasta ser aprobada."
+      <div
+        className={`grid items-stretch gap-5 md:grid-cols-2 ${
+          admin ? "xl:grid-cols-4" : "xl:grid-cols-3"
+        }`}
       >
-        {profile ? (
-          <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Info label="Institución" value={label(profile.institucion)} />
-            <Info label="Unidad" value={label(profile.unidadAcademica)} />
-            <Info label="Programa" value={label(profile.programaAcademico)} />
-            <Info label="Cohorte" value={label(profile.cohorte)} />
-          </dl>
-        ) : (
-          <EmptyState
-            title="Sin perfil confirmado"
-            description="Captura una solicitud para iniciar tu historial académico."
-          />
+        <Panel
+          className="h-full"
+          title="Adscripción vigente"
+          description="El registro confirmado actualmente."
+          action={
+            profile ? (
+              <ExpandButton
+                label="Ver detalle"
+                onClick={() => setProfileOpen(true)}
+              />
+            ) : undefined
+          }
+        >
+          {profile ? (
+            <AcademicProfilePreview item={profile} />
+          ) : (
+            <CompactEmpty
+              title="Sin perfil confirmado"
+              description="Pide un cambio para iniciar tu historial académico."
+            />
+          )}
+        </Panel>
+
+        {catalogs && (
+          <Panel
+            className="h-full"
+            title="Solicitar cambio"
+            description="Actualiza tu adscripción mediante una solicitud trazable."
+          >
+            <div className="rounded-2xl bg-[#fff1e8] p-4">
+              <Send size={21} className="text-[#ea580c]" aria-hidden="true" />
+              <p className="mt-3 text-sm leading-6 text-[#667085]">
+                Completa la institución, el programa y las fechas desde una
+                ventana dedicada.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setRequestError("");
+                  setRequestOpen(true);
+                }}
+                className="focus-ring mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-[#f97316] px-4 text-sm font-black text-[#17174a] transition hover:bg-[#ea580c] hover:text-white"
+              >
+                Pedir cambio
+              </button>
+            </div>
+          </Panel>
         )}
-      </Panel>
+
+        {admin && pending && (
+          <Panel
+            className="h-full"
+            title={`Solicitudes pendientes (${pending.total})`}
+            description="Revisa la primera solicitud o abre la lista completa."
+            action={
+              pending.items.length ? (
+                <ExpandButton
+                  label="Ver todas"
+                  onClick={() => setPendingOpen(true)}
+                />
+              ) : undefined
+            }
+          >
+            {pending.items.length ? (
+              <PendingRequestPreview item={pending.items[0]} />
+            ) : (
+              <CompactEmpty
+                title="Cola al día"
+                description="No hay solicitudes académicas pendientes."
+              />
+            )}
+          </Panel>
+        )}
+
+        <Panel
+          className="h-full"
+          title={`Historial (${history?.total ?? 0})`}
+          description="Consulta el último movimiento o abre el historial completo."
+          action={
+            history?.items.length ? (
+              <ExpandButton
+                label="Ver historial"
+                onClick={() => setHistoryOpen(true)}
+              />
+            ) : undefined
+          }
+        >
+          {history?.items.length ? (
+            <AcademicHistoryItem item={history.items[0]} />
+          ) : (
+            <CompactEmpty
+              title="Sin historial"
+              description="Todavía no existen movimientos académicos."
+            />
+          )}
+        </Panel>
+      </div>
+
+      {admin && catalogs && (
+        <CatalogManager catalogs={catalogs} onSaved={load} />
+      )}
+
+      <Modal
+        open={profileOpen}
+        onClose={() => setProfileOpen(false)}
+        title="Adscripción vigente"
+        description="Detalle completo del registro académico confirmado."
+      >
+        {profile && <AcademicProfileDetails item={profile} />}
+      </Modal>
 
       {catalogs && (
-        <Panel
-          title="Solicitar cambio"
+        <Modal
+          open={requestOpen}
+          onClose={() => {
+            if (!saving) setRequestOpen(false);
+          }}
+          title="Pedir cambio"
           description="Los catálogos se filtran por la institución y unidad seleccionadas."
+          size="wide"
         >
+          <ErrorBanner message={requestError} />
           <form
             onSubmit={submitProfile}
-            className="grid gap-4 md:grid-cols-2 xl:grid-cols-3"
+            className="mt-1 grid gap-4 md:grid-cols-2 xl:grid-cols-3"
           >
             <SelectField
               label="Institución"
@@ -288,115 +404,221 @@ export function AcademicPage() {
             </Field>
             <button
               disabled={saving}
-              className="focus-ring min-h-11 rounded-xl bg-[#12221b] px-5 text-sm font-black text-white disabled:opacity-50 md:col-span-2 xl:col-span-3"
+              className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#f97316] px-5 text-sm font-black text-[#17174a] transition hover:bg-[#ea580c] hover:text-white disabled:opacity-50 md:col-span-2 xl:col-span-3"
             >
+              <Send size={17} aria-hidden="true" />
               {saving ? "Enviando…" : "Enviar solicitud"}
             </button>
           </form>
-        </Panel>
+        </Modal>
       )}
 
-      {admin && pending && (
-        <Panel
-          title={`Solicitudes pendientes (${pending.total})`}
-          description="Aprobar y rechazar son acciones separadas; el rechazo requiere un motivo."
-        >
-          {pending.items.length ? (
-            <div className="space-y-3">
-              {pending.items.map((item) => (
-                <article
-                  key={item.id}
-                  className="flex flex-col gap-4 rounded-2xl border border-[var(--ares-border)] p-4 lg:flex-row lg:items-center lg:justify-between"
-                >
-                  <div>
-                    <p className="font-black">
-                      Usuario #{item.usuarioId} ·{" "}
-                      {label(item.programaAcademico)}
-                    </p>
-                    <p className="mt-1 text-sm text-[var(--ares-muted)]">
-                      Inicio {item.inicio.slice(0, 10)} ·{" "}
-                      {label(item.institucion)}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      disabled={saving}
-                      onClick={() => void resolve(item.id, true)}
-                      className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-xl bg-emerald-700 px-4 text-sm font-black text-white"
-                    >
-                      <Check size={16} /> Aprobar
-                    </button>
-                    <button
-                      disabled={saving}
-                      onClick={() => void resolve(item.id, false)}
-                      className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-xl bg-red-700 px-4 text-sm font-black text-white"
-                    >
-                      <X size={16} /> Rechazar
-                    </button>
-                  </div>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <EmptyState
-              title="Cola al día"
-              description="No hay solicitudes académicas pendientes."
-            />
-          )}
-        </Panel>
-      )}
+      <Modal
+        open={pendingOpen}
+        onClose={() => setPendingOpen(false)}
+        title={`Solicitudes pendientes (${pending?.total ?? 0})`}
+        description="Aprobar y rechazar son acciones separadas; el rechazo requiere un motivo."
+        size="wide"
+      >
+        {pending?.items.length ? (
+          <div className="space-y-3">
+            {pending.items.map((item) => (
+              <PendingRequestItem
+                key={item.id}
+                item={item}
+                saving={saving}
+                onResolve={resolve}
+              />
+            ))}
+          </div>
+        ) : (
+          <CompactEmpty
+            title="Cola al día"
+            description="No hay solicitudes académicas pendientes."
+          />
+        )}
+      </Modal>
 
-      <Panel
-        title="Historial"
-        description="Se consulta con tu ID autenticado; cada estado conserva sus fechas."
+      <Modal
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        title={`Historial académico (${history?.total ?? 0})`}
+        description="Lista de movimientos y estados registrados para tu perfil."
+        size="wide"
       >
         {history?.items.length ? (
           <div className="space-y-3">
             {history.items.map((item) => (
-              <article
-                key={item.id}
-                className="rounded-2xl border border-[var(--ares-border)] p-4"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <p className="inline-flex items-center gap-2 font-black">
-                    <History size={17} /> {label(item.programaAcademico)}
-                  </p>
-                  <StatusBadge
-                    label={item.estado.replaceAll("_", " ")}
-                    tone={
-                      item.estado === "CONFIRMADA"
-                        ? "success"
-                        : item.estado.includes("RECHAZ")
-                          ? "danger"
-                          : "warning"
-                    }
-                  />
-                </div>
-                <p className="mt-2 text-sm text-[var(--ares-muted)]">
-                  {label(item.institucion)} · {item.inicio.slice(0, 10)}
-                  {item.fin ? ` a ${item.fin.slice(0, 10)}` : " · vigente"}
-                </p>
-              </article>
+              <AcademicHistoryItem key={item.id} item={item} />
             ))}
           </div>
         ) : (
-          <EmptyState
+          <CompactEmpty
             title="Sin historial"
             description="Todavía no existen movimientos académicos."
           />
         )}
-      </Panel>
+      </Modal>
+    </div>
+  );
+}
 
-      {admin && catalogs && (
-        <CatalogManager catalogs={catalogs} onSaved={load} />
-      )}
+function ExpandButton({
+  label: buttonLabel,
+  onClick,
+}: {
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#dde1ea] px-3 text-xs font-black text-[#17174a] transition hover:border-[#f97316] hover:bg-[#fff1e8]"
+    >
+      <Maximize2 size={15} aria-hidden="true" /> {buttonLabel}
+    </button>
+  );
+}
+
+function AcademicProfilePreview({ item }: { item: AcademicProfile }) {
+  return (
+    <article className="rounded-2xl border border-[var(--ares-border)] p-4">
+      <GraduationCap size={22} className="text-[#ea580c]" aria-hidden="true" />
+      <h3 className="mt-3 font-black">{label(item.programaAcademico)}</h3>
+      <p className="mt-1 text-sm text-[var(--ares-muted)]">
+        {label(item.institucion)}
+      </p>
+      <p className="mt-3 text-xs font-bold text-[var(--ares-muted)]">
+        Desde {item.inicio.slice(0, 10)}
+      </p>
+    </article>
+  );
+}
+
+function AcademicProfileDetails({ item }: { item: AcademicProfile }) {
+  return (
+    <div className="space-y-5">
+      <dl className="grid gap-4 sm:grid-cols-2">
+        <Info label="Institución" value={label(item.institucion)} />
+        <Info label="Unidad" value={label(item.unidadAcademica)} />
+        <Info label="Programa" value={label(item.programaAcademico)} />
+        <Info label="Cohorte" value={label(item.cohorte)} />
+      </dl>
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--ares-border)] p-4">
+        <p className="text-sm font-bold text-[var(--ares-muted)]">
+          {item.inicio.slice(0, 10)}
+          {item.fin ? ` a ${item.fin.slice(0, 10)}` : " · vigente"}
+        </p>
+        <StatusBadge
+          label={item.estado.replaceAll("_", " ")}
+          tone={academicStatusTone(item.estado)}
+        />
+      </div>
+    </div>
+  );
+}
+
+function PendingRequestPreview({ item }: { item: AcademicProfile }) {
+  return (
+    <article className="rounded-2xl border border-[var(--ares-border)] p-4">
+      <p className="font-black">{label(item.programaAcademico)}</p>
+      <p className="mt-1 text-sm text-[var(--ares-muted)]">
+        Usuario #{item.usuarioId} · {label(item.institucion)}
+      </p>
+      <div className="mt-3">
+        <StatusBadge label={item.estado.replaceAll("_", " ")} tone="warning" />
+      </div>
+    </article>
+  );
+}
+
+function PendingRequestItem({
+  item,
+  saving,
+  onResolve,
+}: {
+  item: AcademicProfile;
+  saving: boolean;
+  onResolve: (id: number, accept: boolean) => Promise<void>;
+}) {
+  return (
+    <article className="flex flex-col gap-4 rounded-2xl border border-[var(--ares-border)] p-4 lg:flex-row lg:items-center lg:justify-between">
+      <div>
+        <p className="font-black">
+          Usuario #{item.usuarioId} · {label(item.programaAcademico)}
+        </p>
+        <p className="mt-1 text-sm text-[var(--ares-muted)]">
+          Inicio {item.inicio.slice(0, 10)} · {label(item.institucion)}
+        </p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          disabled={saving}
+          onClick={() => void onResolve(item.id, true)}
+          className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-xl bg-emerald-700 px-4 text-sm font-black text-white disabled:opacity-50"
+        >
+          <Check size={16} aria-hidden="true" /> Aprobar
+        </button>
+        <button
+          type="button"
+          disabled={saving}
+          onClick={() => void onResolve(item.id, false)}
+          className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-xl bg-red-700 px-4 text-sm font-black text-white disabled:opacity-50"
+        >
+          <X size={16} aria-hidden="true" /> Rechazar
+        </button>
+      </div>
+    </article>
+  );
+}
+
+function AcademicHistoryItem({ item }: { item: AcademicProfile }) {
+  return (
+    <article className="rounded-2xl border border-[var(--ares-border)] p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="inline-flex items-center gap-2 font-black">
+          <History size={17} aria-hidden="true" />
+          {label(item.programaAcademico)}
+        </p>
+        <StatusBadge
+          label={item.estado.replaceAll("_", " ")}
+          tone={academicStatusTone(item.estado)}
+        />
+      </div>
+      <p className="mt-2 text-sm text-[var(--ares-muted)]">
+        {label(item.institucion)} · {item.inicio.slice(0, 10)}
+        {item.fin ? ` a ${item.fin.slice(0, 10)}` : " · vigente"}
+      </p>
+    </article>
+  );
+}
+
+function academicStatusTone(estado: string) {
+  if (estado === "CONFIRMADA") return "success" as const;
+  if (estado.includes("RECHAZ")) return "danger" as const;
+  return "warning" as const;
+}
+
+function CompactEmpty({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-dashed border-[#dde1ea] bg-[#f6f7fb] p-5 text-center">
+      <p className="font-black">{title}</p>
+      <p className="mt-1 text-sm leading-6 text-[#667085]">{description}</p>
     </div>
   );
 }
 
 function Info({ label: title, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl bg-[#f4f0e7] p-4">
+    <div className="rounded-xl bg-[#f6f7fb] p-4">
       <dt className="text-xs font-black uppercase tracking-wide text-[var(--ares-muted)]">
         {title}
       </dt>
@@ -517,7 +739,7 @@ function CatalogManager({
         )}
         <button
           disabled={busy}
-          className="focus-ring min-h-11 rounded-xl bg-[#12221b] px-5 text-sm font-black text-white md:col-span-3"
+          className="focus-ring min-h-11 rounded-xl bg-[#17174a] px-5 text-sm font-black text-white md:col-span-3"
         >
           {busy ? "Guardando…" : "Crear elemento"}
         </button>

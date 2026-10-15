@@ -443,7 +443,7 @@ export function PublicContentAdminPage() {
           </div>
           <button
             disabled={busy || version.bloques.length === 0}
-            className="focus-ring min-h-11 w-full rounded-xl bg-[#12221b] px-4 text-sm font-black text-white disabled:opacity-50"
+            className="focus-ring min-h-11 w-full rounded-xl bg-[#17174a] px-4 text-sm font-black text-white disabled:opacity-50"
           >
             {busy ? "Guardando…" : "Guardar borrador"}
           </button>
@@ -482,7 +482,7 @@ export function PublicContentAdminPage() {
                         "Versión publicada.",
                       )
                     }
-                    className="focus-ring mt-3 inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#769a27] px-4 text-sm font-black text-[#12221b]"
+                    className="focus-ring mt-3 inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#ea580c] px-4 text-sm font-black text-[#17174a]"
                   >
                     <Send size={16} /> Publicar
                   </button>
@@ -496,7 +496,7 @@ export function PublicContentAdminPage() {
                 setSelected(null);
                 setVersion(initialVersion);
               }}
-              className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#12221b] px-4 text-sm font-black text-white"
+              className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#17174a] px-4 text-sm font-black text-white"
             >
               <Plus size={16} /> Nueva versión
             </button>

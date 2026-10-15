@@ -5,11 +5,18 @@ import { UsersController } from "./users.controller";
 import { UsersPolicy } from "./users.policy";
 import { UsersRepository } from "./users.repository";
 import { UsersService } from "./users.service";
+import { AuthModule } from "../auth/auth.module";
+import { AdministrativeRecoveryService } from "./administrative-recovery.service";
 
 @Module({
-  imports: [OrganizationModule],
+  imports: [OrganizationModule, AuthModule],
   controllers: [UsersController],
-  providers: [UsersRepository, UsersService, UsersPolicy],
+  providers: [
+    UsersRepository,
+    UsersService,
+    UsersPolicy,
+    AdministrativeRecoveryService,
+  ],
   exports: [UsersPolicy],
 })
 export class UsersModule {}

@@ -123,6 +123,7 @@ function make(overrides: any = {}) {
     },
     usuario: { findMany: vi.fn().mockResolvedValue([{ id: 7 }, { id: 8 }]) },
     notification: { createMany: vi.fn().mockResolvedValue({ count: 2 }) },
+    outboxEvent: { createMany: vi.fn().mockResolvedValue({ count: 2 }) },
     acuseBiblioteca: {
       findUnique: vi.fn().mockResolvedValue(null),
       create: vi.fn().mockResolvedValue({

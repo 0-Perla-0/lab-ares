@@ -6,6 +6,7 @@ import helmet from "helmet";
 import { AppModule } from "./app.module";
 import { PrismaSessionStore } from "./auth/prisma-session.store";
 import type { Environment } from "./config/environment";
+import { inNetworks, normalizeIp } from "./attendance/attendance-signals";
 
 const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 
@@ -17,9 +18,15 @@ async function bootstrap(): Promise<void> {
   app.setGlobalPrefix("api");
   app.use(helmet());
 
-  if (isProduction) {
-    app.getHttpAdapter().getInstance().set("trust proxy", 1);
-  }
+  const trusted = config
+    .get("TRUSTED_PROXY_CIDRS", { infer: true })
+    .split(",")
+    .map((v) => v.trim())
+    .filter(Boolean);
+  app
+    .getHttpAdapter()
+    .getInstance()
+    .set("trust proxy", (ip: string) => inNetworks(normalizeIp(ip), trusted));
 
   app.use(
     session({

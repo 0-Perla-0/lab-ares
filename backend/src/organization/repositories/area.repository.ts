@@ -6,6 +6,7 @@ import type {
 
 import { PrismaService } from "../../database/prisma.service";
 import { translateUniqueViolation } from "./prisma-errors";
+import { recordOperationalHistory } from "../../common/domain/operational-history";
 
 type CreateData = Pick<AreaCreateInput, "nombre"> & { sedeId: number };
 type UpdateData = Pick<AreaUpdateInput, "nombre"> & { sedeId?: number };
@@ -36,31 +37,60 @@ export class AreaRepository {
   }
 
   create(data: CreateData) {
-    return translateUniqueViolation(() => this.prisma.area.create({ data }));
+    return translateUniqueViolation(() =>
+      this.prisma.$transaction(async (tx) => {
+        const row = await tx.area.create({ data });
+        await recordOperationalHistory(tx, "AREA", row.id);
+        return row;
+      }),
+    );
   }
 
   update(id: number, data: UpdateData) {
     return translateUniqueViolation(() =>
-      this.prisma.area.update({ where: { id }, data }),
+      this.prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT id FROM Area WHERE id = ${id} FOR UPDATE`;
+        const row = await tx.area.update({ where: { id }, data });
+        if (data.sedeId !== undefined)
+          await recordOperationalHistory(tx, "AREA", id);
+        return row;
+      }),
     );
   }
 
   reactivate(id: number, data: CreateData) {
     return translateUniqueViolation(() =>
-      this.prisma.area.update({
-        where: { id },
-        data: { ...data, activa: true },
+      this.prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT id FROM Area WHERE id = ${id} FOR UPDATE`;
+        const row = await tx.area.update({
+          where: { id },
+          data: { ...data, activa: true },
+        });
+        await recordOperationalHistory(tx, "AREA", id);
+        return row;
       }),
     );
   }
 
   deactivateCascade(id: number) {
     return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM Area WHERE id = ${id} FOR UPDATE`;
+      const shifts = await tx.turno.findMany({
+        where: { areaId: id },
+        orderBy: { id: "asc" },
+      });
       await tx.turno.updateMany({
         where: { areaId: id },
         data: { activo: false },
       });
-      return tx.area.update({ where: { id }, data: { activa: false } });
+      const row = await tx.area.update({
+        where: { id },
+        data: { activa: false },
+      });
+      for (const shift of shifts)
+        await recordOperationalHistory(tx, "SHIFT", shift.id);
+      await recordOperationalHistory(tx, "AREA", id);
+      return row;
     });
   }
 }

@@ -15,6 +15,13 @@ export type Attendance = {
   closeReason: string | null;
   closedById: number | null;
   abnormal: boolean;
+  version?: number;
+  requiresReview?: boolean;
+  risk?: {
+    color: "VERDE" | "AMARILLO" | "ROJO";
+    reasons: string[];
+    policyVersion: number;
+  };
 };
 
 export type AttendancePage = {
@@ -53,6 +60,7 @@ export function idempotencyKey(
   operation: string,
   target = "",
   payload = "",
+  strict = false,
 ) {
   const storageKey = `ares:attendance:key:${userId}:${operation}:${target}`;
   let existing = pendingKeys.get(storageKey);
@@ -75,6 +83,8 @@ export function idempotencyKey(
   } catch {
     /* Memory retains retry identity when storage is unavailable. */
   }
+  if (strict && existing && existing.payload !== payload)
+    throw new Error("RESULTADO_DESCONOCIDO");
   const current =
     existing?.payload === payload
       ? existing
@@ -107,4 +117,30 @@ export function clearIdempotencyKey(
   } catch {
     /* unavailable */
   }
+}
+
+export function pendingIdempotencyKey(
+  userId: number,
+  operation: string,
+  target = "",
+) {
+  const storageKey = `ares:attendance:key:${userId}:${operation}:${target}`;
+  try {
+    const stored =
+      typeof window !== "undefined" ? sessionStorage.getItem(storageKey) : null;
+    if (stored) {
+      const entry: unknown = JSON.parse(stored);
+      if (
+        entry &&
+        typeof entry === "object" &&
+        "key" in entry &&
+        typeof entry.key === "string" &&
+        /^[A-Za-z0-9._:-]{16,128}$/.test(entry.key)
+      )
+        return entry.key;
+    }
+  } catch {
+    /* Memory retains retry identity when storage is unavailable. */
+  }
+  return pendingKeys.get(storageKey)?.key;
 }

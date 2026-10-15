@@ -22,6 +22,7 @@ WORKDIR /app
 
 COPY --from=build /app/frontend/.next/standalone ./
 COPY --from=build /app/frontend/.next/static frontend/.next/static
+COPY --from=build /app/frontend/public frontend/public
 
 USER node
 EXPOSE 4321

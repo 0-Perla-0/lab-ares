@@ -69,6 +69,7 @@ const turno = {
 };
 
 const auth = {
+  completedAuthentication: vi.fn(),
   authenticate: vi.fn(async (email: string) => {
     if (email === regular.email) return regular;
     if (email === sedeManager.email) return sedeManager;
@@ -351,26 +352,21 @@ describe("Nest API", () => {
         areaId: 2,
         turnoId: 3,
       })
-      .expect(201);
-    expect(managedUsers.crear).toHaveBeenLastCalledWith({
-      codigo: "POSTMAN20",
-      email: "postman20@ares.local",
-      password: "A-secure-password-123!",
-      rol: RolUsuario.PRESTADOR,
-      estado: EstadoUsuario.ACTIVA,
-      sedeId: 1,
-      areaId: 2,
-      turnoId: 3,
-    });
+      .expect(410);
+    expect(managedUsers.crear).not.toHaveBeenCalled();
 
     await agent.get("/api/users/20").expect(200);
     await agent
       .put("/api/users/20")
       .send({ email: " UPDATED@ARES.LOCAL " })
       .expect(200);
-    expect(managedUsers.actualizar).toHaveBeenLastCalledWith(20, {
-      email: "updated@ares.local",
-    });
+    expect(managedUsers.actualizar).toHaveBeenLastCalledWith(
+      20,
+      {
+        email: "updated@ares.local",
+      },
+      admin.id,
+    );
 
     const deleted = await agent.delete("/api/users/20").expect(200);
     expect(deleted.body.data.estado).toBe(EstadoUsuario.DESACTIVADA);

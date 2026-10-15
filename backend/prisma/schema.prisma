@@ -42,6 +42,7 @@ enum EstadoAdscripcionAcademica {
 }
 
 model Sede {
+  politicasAsistencia PoliticaAsistencia[]
   id        Int     @id @default(autoincrement())
   nombre    String  @unique @db.VarChar(150)
   direccion String? @db.VarChar(255)
@@ -51,6 +52,9 @@ model Sede {
   areas    Area[]
   usuarios Usuario[]
   bibliotecaDocumentos DocumentoBiblioteca[]
+  excepcionesCalendario ExcepcionCalendario[]
+  visitas InvitacionVisita[]
+  ubicacionesInventario UbicacionInventario[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -68,6 +72,9 @@ model Area {
   turnos   Turno[]
   usuarios Usuario[]
   bibliotecaDocumentos DocumentoBiblioteca[]
+  excepcionesCalendario ExcepcionCalendario[]
+  visitas InvitacionVisita[]
+  ubicacionesInventario UbicacionInventario[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -108,6 +115,8 @@ model TurnoDia {
 }
 
 model Usuario {
+  validacionesAsistencia AsistenciaValidacion[]
+  politicasAsistencia PoliticaAsistencia[]
   id Int @id @default(autoincrement())
 
   codigo String @unique @db.VarChar(50)
@@ -127,6 +136,13 @@ model Usuario {
   turno Turno? @relation(fields: [turnoId], references: [id], onDelete: SetNull)
 
   asistencias Asistencia[]
+  visitas InvitacionVisita[] @relation("VisitHost")
+  entradasVisita InvitacionVisita[] @relation("VisitEntry")
+  salidasVisita InvitacionVisita[] @relation("VisitExit")
+  movimientosInventario MovimientoInventario[]
+  prestamosSolicitados PrestamoInventario[] @relation("LoanBorrower")
+  prestamosEntregados PrestamoInventario[] @relation("LoanResponsible")
+  devolucionesRecibidas PrestamoInventario[] @relation("LoanReturn")
   sessions Session[]
   invitationsCreated Invitation[] @relation("InvitationCreator")
   invitationsTarget Invitation[] @relation("InvitationTarget")
@@ -139,6 +155,10 @@ model Usuario {
   solicitudesAcademicas AdscripcionAcademica[] @relation("AcademicRequester")
   confirmacionesAcademicas AdscripcionAcademica[] @relation("AcademicConfirmer")
   requisitosDocumentales RequisitoDocumento[]
+  formalizacionesExpediente FormalizacionExpediente[] @relation("ExpedientSubject")
+  periodosServicio PeriodoServicio[] @relation("ServicePeriodSubject")
+  eventosPeriodoServicio EventoPeriodoServicio[] @relation("ServicePeriodActor")
+  expedientesFormalizados FormalizacionExpediente[] @relation("ExpedientAuthority")
   documentosCargados DocumentoVersion[] @relation("DocumentoUploader")
   documentosRevisados DocumentoVersion[] @relation("DocumentoReviewer")
   kairosProjectsCreated ProyectoKairos[] @relation("KairosProjectCreator")
@@ -185,6 +205,12 @@ model Usuario {
   lotesSupresionAutorizados LoteSupresion[] @relation("SuppressionBatchAuthorizer")
   registrosSupresionEjecutados RegistroSupresion[] @relation("SuppressionExecutor")
   operacionesRetencion OperacionRetencion[] @relation("RetentionOperationActor")
+  ausencias Ausencia[] @relation("AbsenceSubject")
+  ausenciasResueltas Ausencia[] @relation("AbsenceResolver")
+  apelacionesResueltas ApelacionAusencia[] @relation("AppealResolver")
+  justificacionesAusencia JustificacionAusencia[]
+  excepcionesCalendario ExcepcionCalendario[] @relation("CalendarSubject")
+  excepcionesCreadas ExcepcionCalendario[] @relation("CalendarCreator")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -254,6 +280,7 @@ model CohorteAcademica {
 }
 
 model AdscripcionAcademica {
+  formalizacionesExpediente FormalizacionExpediente[]
   id Int @id @default(autoincrement())
   usuarioId Int
   institucionId Int
@@ -287,7 +314,7 @@ model Session {
   userId Int?
   user Usuario? @relation(fields: [userId], references: [id], onDelete: Cascade)
   lastActivityAt DateTime @default(now())
-  absoluteExpiresAt DateTime
+  absoluteExpiresAt DateTime @default(now())
   revokedAt DateTime?
   ipHash String? @db.Char(64)
   userAgentSummary String? @db.VarChar(255)
@@ -392,11 +419,12 @@ model OutboxEvent {
   failedAt DateTime?
   emailDeliveries EmailDelivery[]
   @@index([processedAt, occurredAt])
+  @@index([state, nextAttemptAt])
 }
 
 model EmailDelivery {
   id String @id @default(cuid()) @db.VarChar(30)
-  outboxEventId String @unique
+  outboxEventId String @unique @db.VarChar(30)
   event OutboxEvent @relation(fields: [outboxEventId], references: [id], onDelete: Cascade)
   status String @db.VarChar(20)
   attempts Int @default(0)
@@ -407,6 +435,7 @@ model EmailDelivery {
   leaseOwner String? @db.VarChar(80)
   createdAt DateTime @default(now())
   @@index([status, leaseUntil])
+  @@index([outboxEventId, createdAt])
 }
 
 model AuditEvent {
@@ -596,6 +625,7 @@ model OperationalIncidentEvent {
 }
 
 enum RecoveryScope {
+  CRITICO
   IMPORTANTE
   SECUNDARIO
 }
@@ -774,7 +804,7 @@ model RecoveryReconciliationRun {
 
 model RecoveryOperation {
   id String @id @default(cuid()) @db.VarChar(30)
-  runId String?
+  runId String? @db.VarChar(30)
   run RecoveryRun? @relation(fields:[runId], references:[id], onDelete:Restrict)
   actorId Int
   key String @db.VarChar(128)
@@ -820,6 +850,7 @@ model RecoveryImportedSuppression {
 
 enum TipoReporteExportacion {
   ATTENDANCE
+  ABSENCES
   DOCUMENTS
   KAIROS
 }
@@ -862,6 +893,7 @@ enum EstadoArchivo {
   RECHAZADO
   ERROR_ANALISIS
   ELIMINADO
+  ELIMINACION_PENDIENTE
 }
 
 enum ResultadoAnalisisArchivo {
@@ -897,10 +929,38 @@ model Archivo {
   bibliotecaVersion VersionBiblioteca?
   activoPublico ActivoPublico?
   trabajosImpresion3D TrabajoImpresion3D[]
+  justificacionesAusencia JustificacionAusencia[]
+  apelacionesAusencia ApelacionAusencia[]
+  deletionJob ObjectDeletionJob?
 
   @@index([status, nextAttemptAt])
   @@index([leaseUntil])
   @@index([propietarioId])
+}
+
+model ObjectDeletionJob {
+  id String @id @default(cuid()) @db.VarChar(30)
+  fileId String @unique @db.VarChar(30)
+  file Archivo @relation(fields: [fileId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  purpose String @db.VarChar(30)
+  resourceId String? @db.VarChar(191)
+  originalStatus EstadoArchivo
+  manifest Json
+  manifestHash String @unique @db.Char(64)
+  manifestRef String @unique @db.VarChar(191)
+  state String @default("PREPARED") @db.VarChar(20)
+  attempts Int @default(0)
+  leaseOwner String? @db.VarChar(80)
+  leaseUntil DateTime? @db.DateTime(3)
+  barrierVersion Int?
+  lastErrorCode String? @db.VarChar(100)
+  manifestPublishedAt DateTime? @db.DateTime(3)
+  irreversibleAt DateTime? @db.DateTime(3)
+  verifiedAt DateTime? @db.DateTime(3)
+  completedAt DateTime? @db.DateTime(3)
+  createdAt DateTime @default(now()) @db.DateTime(3)
+  updatedAt DateTime @updatedAt @db.DateTime(3)
+  @@index([state,leaseUntil])
 }
 
 enum EstadoDocumento {
@@ -911,6 +971,25 @@ enum EstadoDocumento {
   REQUIERE_CORRECCION
   VENCIDO
   CANCELADO
+}
+
+model FormalizacionExpediente {
+  id String @id @default(cuid())
+  usuarioId Int
+  inicio DateTime @db.Date
+  adscripcionId Int
+  sedeId Int?
+  areaId Int?
+  formalizadoPorId Int
+  academicSnapshot Json
+  documentSnapshot Json
+  periodos PeriodoServicio[]
+  createdAt DateTime @default(now())
+  usuario Usuario @relation("ExpedientSubject", fields: [usuarioId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  formalizadoPor Usuario @relation("ExpedientAuthority", fields: [formalizadoPorId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  adscripcion AdscripcionAcademica @relation(fields: [adscripcionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  @@unique([usuarioId, inicio])
+  @@index([sedeId, areaId, inicio])
 }
 
 model RequisitoDocumento {
@@ -932,12 +1011,15 @@ model DocumentoVersion {
   id String @id @default(cuid()) @db.VarChar(30)
   requisitoId Int
   requisito RequisitoDocumento @relation(fields: [requisitoId], references: [id], onDelete: Restrict)
-  archivoId String
+  archivoId String @db.VarChar(30)
   archivo Archivo @relation(fields: [archivoId], references: [id], onDelete: Restrict)
   version Int
   estado EstadoDocumento @default(PENDIENTE_CARGA)
   comentario String? @db.VarChar(1000)
   cargadoPorId Int
+  reportSedeId Int?
+  reportAreaId Int?
+  reportSnapshotAt DateTime? @db.DateTime(3)
   cargadoPor Usuario @relation("DocumentoUploader", fields: [cargadoPorId], references: [id], onDelete: Restrict)
   revisadoPorId Int?
   revisadoPor Usuario? @relation("DocumentoReviewer", fields: [revisadoPorId], references: [id], onDelete: Restrict)
@@ -945,11 +1027,12 @@ model DocumentoVersion {
   updatedAt DateTime @updatedAt
   @@unique([requisitoId, version])
   @@index([requisitoId, estado, createdAt])
+  @@index([reportSedeId, reportAreaId, createdAt])
 }
 
 model AnalisisArchivo {
   id        String                    @id @default(cuid()) @db.VarChar(30)
-  archivoId String
+  archivoId String @db.VarChar(30)
   archivo   Archivo                   @relation(fields: [archivoId], references: [id], onDelete: Cascade)
   scanner   String                    @db.VarChar(50)
   resultado ResultadoAnalisisArchivo
@@ -1064,6 +1147,9 @@ model ActividadKairos {
   id String @id @default(cuid()) @db.VarChar(30)
   proyectoId String @db.VarChar(30)
   responsableId Int
+  reportSedeId Int?
+  reportAreaId Int?
+  reportSnapshotAt DateTime? @db.DateTime(3)
   title String @db.VarChar(191)
   description String? @db.VarChar(3000)
   startAt DateTime?
@@ -1083,6 +1169,44 @@ model ActividadKairos {
   updatedAt DateTime @updatedAt
   @@index([proyectoId,state,dueAt])
   @@index([responsableId,state])
+  @@index([reportSedeId,reportAreaId,createdAt])
+}
+
+enum EstadoPeriodoServicio {
+  REGISTRADO
+  INICIADO
+  CERRADO
+  CANCELADO
+}
+
+model PeriodoServicio {
+  id String @id @default(cuid()) @db.VarChar(30)
+  usuarioId Int
+  formalizacionId String @db.VarChar(191)
+  inicio DateTime @db.Date
+  fin DateTime @db.Date
+  estado EstadoPeriodoServicio @default(REGISTRADO)
+  version Int @default(1)
+  createdAt DateTime @default(now()) @db.DateTime(3)
+  updatedAt DateTime @updatedAt @db.DateTime(3)
+  usuario Usuario @relation("ServicePeriodSubject", fields: [usuarioId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  formalizacion FormalizacionExpediente @relation(fields: [formalizacionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  eventos EventoPeriodoServicio[]
+  @@unique([formalizacionId])
+  @@index([usuarioId,createdAt])
+}
+
+model EventoPeriodoServicio {
+  id String @id @default(cuid()) @db.VarChar(30)
+  periodoId String @db.VarChar(30)
+  actorId Int
+  estado EstadoPeriodoServicio
+  version Int
+  motivo String @db.VarChar(500)
+  occurredAt DateTime @default(now()) @db.DateTime(3)
+  periodo PeriodoServicio @relation(fields: [periodoId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  actor Usuario @relation("ServicePeriodActor", fields: [actorId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  @@unique([periodoId,version])
 }
 model ParticipanteActividadKairos {
   actividadId String @db.VarChar(30)
@@ -1171,11 +1295,11 @@ model DocumentoBiblioteca {
   estado EstadoBiblioteca @default(BORRADOR)
   requiereAcuse Boolean @default(false)
   sedeId Int?
-  sede Sede? @relation(fields:[sedeId], references:[id], onDelete:Restrict)
+  sede Sede? @relation(fields:[sedeId], references:[id], onDelete:Restrict, onUpdate:Restrict)
   areaId Int?
-  area Area? @relation(fields:[areaId], references:[id], onDelete:Restrict)
+  area Area? @relation(fields:[areaId], references:[id], onDelete:Restrict, onUpdate:Restrict)
   proyectoId String? @db.VarChar(30)
-  proyecto ProyectoKairos? @relation(fields:[proyectoId], references:[id], onDelete:Restrict)
+  proyecto ProyectoKairos? @relation(fields:[proyectoId], references:[id], onDelete:Restrict, onUpdate:Restrict)
   creadoPorId Int
   creadoPor Usuario @relation("LibraryDocumentCreator", fields:[creadoPorId], references:[id], onDelete:Restrict)
   archivadoPorId Int?
@@ -1299,7 +1423,7 @@ model BloqueContenidoPublico {
   tipo TipoBloqueContenidoPublico
   contenido Json
   activoPublicoId String? @db.VarChar(30)
-  activoPublico ActivoPublico? @relation(fields:[activoPublicoId], references:[id], onDelete:Restrict)
+  activoPublico ActivoPublico? @relation(fields:[activoPublicoId], references:[id], onDelete:Restrict, onUpdate:Restrict)
   createdAt DateTime @default(now())
   @@unique([versionId,orden])
   @@index([activoPublicoId])
@@ -1381,7 +1505,7 @@ model EventoGamificacion {
   reglaId String? @db.VarChar(30)
   regla ReglaGamificacion? @relation(fields:[reglaId], references:[id], onDelete:Restrict)
   reversaDeId String? @unique @db.VarChar(30)
-  reversaDe EventoGamificacion? @relation("GamificationReversal", fields:[reversaDeId], references:[id], onDelete:Restrict)
+  reversaDe EventoGamificacion? @relation("GamificationReversal", fields:[reversaDeId], references:[id], onDelete:Restrict, onUpdate:Restrict)
   reverso EventoGamificacion? @relation("GamificationReversal")
   createdAt DateTime @default(now())
   @@index([usuarioId,createdAt])
@@ -1429,14 +1553,14 @@ model TrabajoImpresion3D {
   sedeId Int?
   areaId Int?
   operadorAsignadoId Int?
-  operadorAsignado Usuario? @relation("Printing3DOperator", fields:[operadorAsignadoId], references:[id], onDelete:Restrict)
+  operadorAsignado Usuario? @relation("Printing3DOperator", fields:[operadorAsignadoId], references:[id], onDelete:Restrict, onUpdate:Restrict)
   revisadoPorId Int?
-  revisadoPor Usuario? @relation("Printing3DReviewer", fields:[revisadoPorId], references:[id], onDelete:Restrict)
+  revisadoPor Usuario? @relation("Printing3DReviewer", fields:[revisadoPorId], references:[id], onDelete:Restrict, onUpdate:Restrict)
   motivoRevision String? @db.VarChar(1000)
   reviewedAt DateTime?
   assignedAt DateTime?
   canceladoPorId Int?
-  canceladoPor Usuario? @relation("Printing3DCanceller", fields:[canceladoPorId], references:[id], onDelete:Restrict)
+  canceladoPor Usuario? @relation("Printing3DCanceller", fields:[canceladoPorId], references:[id], onDelete:Restrict, onUpdate:Restrict)
   motivoCancelacion String? @db.VarChar(1000)
   cancelledAt DateTime?
   ejecuciones EjecucionImpresion3D[]
@@ -1500,6 +1624,7 @@ enum CategoriaRetencion {
   LOGS
   EXPORTACIONES
   ARCHIVOS_RECHAZADOS
+  VISITAS
 }
 
 enum AccionFinalRetencion {
@@ -1585,7 +1710,7 @@ model ReglaRetencion {
   creadoPorId Int?
   creadoPor Usuario? @relation("RetentionRuleCreator", fields:[creadoPorId], references:[id], onDelete:Restrict)
   aprobadoPorId Int?
-  aprobadoPor Usuario? @relation("RetentionRuleApprover", fields:[aprobadoPorId], references:[id], onDelete:Restrict)
+  aprobadoPor Usuario? @relation("RetentionRuleApprover", fields:[aprobadoPorId], references:[id], onDelete:Restrict, onUpdate:Restrict)
   registros RegistroRetencion[]
   createdAt DateTime @default(now())
   @@unique([categoria,version])
@@ -1631,7 +1756,7 @@ model RetencionLegal {
   creadoPorId Int
   creadoPor Usuario @relation("LegalHoldCreator", fields:[creadoPorId], references:[id], onDelete:Restrict)
   liberadoPorId Int?
-  liberadoPor Usuario? @relation("LegalHoldReleaser", fields:[liberadoPorId], references:[id], onDelete:Restrict)
+  liberadoPor Usuario? @relation("LegalHoldReleaser", fields:[liberadoPorId], references:[id], onDelete:Restrict, onUpdate:Restrict)
   motivoLiberacion String? @db.VarChar(2000)
   releasedAt DateTime?
   createdAt DateTime @default(now())
@@ -1647,7 +1772,7 @@ model SolicitudSupresion {
   clasificacion Json?
   resolucion String? @db.VarChar(2000)
   resueltoPorId Int?
-  resueltoPor Usuario? @relation("SuppressionResolver", fields:[resueltoPorId], references:[id], onDelete:Restrict)
+  resueltoPor Usuario? @relation("SuppressionResolver", fields:[resueltoPorId], references:[id], onDelete:Restrict, onUpdate:Restrict)
   resolvedAt DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1667,7 +1792,7 @@ model LoteSupresion {
   creadoPorId Int
   creadoPor Usuario @relation("SuppressionBatchCreator", fields:[creadoPorId], references:[id], onDelete:Restrict)
   autorizadoPorId Int?
-  autorizadoPor Usuario? @relation("SuppressionBatchAuthorizer", fields:[autorizadoPorId], references:[id], onDelete:Restrict)
+  autorizadoPor Usuario? @relation("SuppressionBatchAuthorizer", fields:[autorizadoPorId], references:[id], onDelete:Restrict, onUpdate:Restrict)
   authorizedAt DateTime?
   pausedAt DateTime?
   motivoPausa String? @db.VarChar(1000)
@@ -1782,6 +1907,22 @@ model Asistencia {
   status EstadoAsistencia @default(ABIERTA)
   closeReason String? @db.VarChar(500)
   closedById Int?
+  version Int @default(1)
+  requiresReview Boolean @default(false)
+  riskSnapshot Json?
+  shiftSnapshot Json?
+  policySnapshot Json?
+  clientIp String? @db.VarChar(45)
+  geoLatitude Decimal? @db.Decimal(10, 8)
+  geoLongitude Decimal? @db.Decimal(11, 8)
+  geoAccuracyMeters Float?
+  locationRiskCode String? @db.VarChar(50)
+  checkoutSignal Json?
+  evidenceSuppressedAt DateTime? @db.DateTime(3)
+  isContingency Boolean @default(false)
+  contingencyTicket String? @db.VarChar(150)
+  contingencyJustification String? @db.VarChar(1000)
+  validations AsistenciaValidacion[]
   events AsistenciaEvento[]
 
   @@index([userId, id])
@@ -1793,10 +1934,11 @@ model AsistenciaEvento {
   id Int @id @default(autoincrement())
   attendanceId Int
   attendance Asistencia @relation(fields: [attendanceId], references: [id], onDelete: Restrict)
-  actorId Int
+  actorId Int?
   action String @db.VarChar(30)
   occurredAt DateTime @db.DateTime(3)
   reason String? @db.VarChar(500)
+  metadata Json?
 
   @@index([attendanceId, id])
 }
@@ -1809,4 +1951,370 @@ model AsistenciaSolicitud {
   createdAt DateTime @default(now())
 
   @@id([actorId, key])
+}
+
+model AsistenciaValidacion {
+  id Int @id @default(autoincrement())
+  attendanceId Int
+  attendance Asistencia @relation(fields: [attendanceId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  actorId Int
+  actor Usuario @relation(fields: [actorId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  decision EstadoAsistencia
+  reason String @db.VarChar(500)
+  previousVersion Int
+  riskSnapshot Json
+  occurredAt DateTime @default(now()) @db.DateTime(3)
+  @@unique([attendanceId, previousVersion])
+}
+
+model PoliticaAsistencia {
+  id Int @id @default(autoincrement())
+  sedeId Int
+  sede Sede @relation(fields: [sedeId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  version Int
+  rules Json
+  locationRules Json?
+  actorId Int
+  actor Usuario @relation(fields: [actorId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  reason String @db.VarChar(500)
+  createdAt DateTime @default(now())
+  @@unique([sedeId, version])
+}
+
+enum EstadoAusencia {
+  PENDIENTE_JUSTIFICACION
+  JUSTIFICACION_ENVIADA
+  EN_ACLARACION
+  JUSTIFICADA
+  NO_JUSTIFICADA
+  EN_APELACION
+  CANCELADA
+}
+
+enum TipoAusencia {
+  INASISTENCIA_COMPLETA
+  RETARDO_MAYOR
+  ABANDONO_TURNO
+}
+
+model Ausencia {
+  id String @id @default(cuid()) @db.VarChar(30)
+  userId Int
+  user Usuario @relation("AbsenceSubject", fields: [userId], references: [id], onDelete: Restrict)
+  sedeId Int
+  areaId Int
+  turnoId Int
+  fecha DateTime @db.Date
+  tipo TipoAusencia @default(INASISTENCIA_COMPLETA)
+  estado EstadoAusencia @default(PENDIENTE_JUSTIFICACION)
+  version Int @default(1)
+  plazoLimiteAt DateTime @db.DateTime(3)
+  aclaracionLimiteAt DateTime? @db.DateTime(3)
+  apelacionLimiteAt DateTime? @db.DateTime(3)
+  motivoResolucion String? @db.VarChar(1000)
+  evidenceSuppressedAt DateTime? @db.DateTime(3)
+  resueltoPorId Int?
+  resueltoPor Usuario? @relation("AbsenceResolver", fields: [resueltoPorId], references: [id], onDelete: Restrict)
+  justificaciones JustificacionAusencia[]
+  apelacion ApelacionAusencia?
+  createdAt DateTime @default(now()) @db.DateTime(3)
+  updatedAt DateTime @updatedAt @db.DateTime(3)
+  @@unique([userId, fecha])
+  @@index([estado, plazoLimiteAt])
+  @@index([estado, aclaracionLimiteAt])
+  @@index([sedeId, areaId, fecha])
+}
+
+model JustificacionAusencia {
+  id String @id @default(cuid()) @db.VarChar(30)
+  ausenciaId String @db.VarChar(30)
+  ausencia Ausencia @relation(fields: [ausenciaId], references: [id], onDelete: Restrict)
+  motivo String @db.VarChar(2000)
+  archivoId String? @db.VarChar(30)
+  archivo Archivo? @relation(fields: [archivoId], references: [id], onDelete: Restrict)
+  solicitadoPor Int
+  solicitante Usuario @relation(fields: [solicitadoPor], references: [id], onDelete: Restrict)
+  createdAt DateTime @default(now()) @db.DateTime(3)
+  @@index([ausenciaId, createdAt])
+}
+
+model ApelacionAusencia {
+  id String @id @default(cuid()) @db.VarChar(30)
+  ausenciaId String @unique @db.VarChar(30)
+  ausencia Ausencia @relation(fields: [ausenciaId], references: [id], onDelete: Restrict)
+  argumento String @db.VarChar(2000)
+  archivoId String? @db.VarChar(30)
+  archivo Archivo? @relation(fields: [archivoId], references: [id], onDelete: Restrict)
+  resueltoPorId Int?
+  resueltoPor Usuario? @relation("AppealResolver", fields: [resueltoPorId], references: [id], onDelete: Restrict)
+  resolucion String? @db.VarChar(1000)
+  createdAt DateTime @default(now()) @db.DateTime(3)
+  resolvedAt DateTime? @db.DateTime(3)
+}
+
+enum TipoExcepcionCalendario {
+  FESTIVO_OFICIAL
+  VACACIONES_INSTITUCIONALES
+  SUSPENSION_OPERATIVA
+  PERMISO_INDIVIDUAL
+  HORARIO_ESPECIAL
+  ASISTENCIA_EXTRAORDINARIA
+}
+
+enum AlcanceExcepcionCalendario {
+  GLOBAL
+  SEDE
+  AREA
+  USUARIO
+}
+
+enum EfectoExcepcionCalendario {
+  SUSPENSION_ACTIVIDADES
+  HORARIO_ESPECIAL
+  ASISTENCIA_EXTRAORDINARIA
+  PERMISO_PROGRAMADO
+}
+
+model ExcepcionCalendario {
+  id String @id @default(cuid()) @db.VarChar(30)
+  titulo String @db.VarChar(150)
+  motivo String @db.VarChar(500)
+  tipo TipoExcepcionCalendario
+  efecto EfectoExcepcionCalendario
+  alcance AlcanceExcepcionCalendario
+  sedeId Int?
+  sede Sede? @relation(fields: [sedeId], references: [id], onDelete: Restrict)
+  areaId Int?
+  area Area? @relation(fields: [areaId], references: [id], onDelete: Restrict)
+  usuarioId Int?
+  usuario Usuario? @relation("CalendarSubject", fields: [usuarioId], references: [id], onDelete: Restrict)
+  fechaInicio DateTime @db.Date
+  fechaFin DateTime @db.Date
+  horaInicio String? @db.Char(8)
+  horaFin String? @db.Char(8)
+  aplicaAsistencia Boolean @default(false)
+  horasEquivalentes Int @default(0)
+  creadoPorId Int
+  creadoPor Usuario @relation("CalendarCreator", fields: [creadoPorId], references: [id], onDelete: Restrict)
+  revokedAt DateTime? @db.DateTime(3)
+  createdAt DateTime @default(now()) @db.DateTime(3)
+  updatedAt DateTime @updatedAt @db.DateTime(3)
+  @@index([alcance, fechaInicio, fechaFin])
+  @@index([sedeId, fechaInicio])
+  @@index([usuarioId, fechaInicio])
+}
+
+model CalendarRevision {
+  id String @id @db.VarChar(20)
+  version Int @default(0)
+}
+
+model DomainOperation {
+  actorId Int
+  key String @db.VarChar(100)
+  fingerprint String @db.Char(64)
+  response Json
+  createdAt DateTime @default(now()) @db.DateTime(3)
+  @@id([actorId, key])
+}
+
+model OperationalHistory {
+  id BigInt @id @default(autoincrement())
+  resourceType String @db.VarChar(16)
+  resourceId Int
+  snapshot Json
+  recordedAt DateTime @default(now()) @db.DateTime(3)
+  @@index([resourceType, resourceId, recordedAt])
+}
+
+model AbsenceEvaluationIssue {
+  userId Int
+  fecha DateTime @db.Date
+  reason String @db.VarChar(80)
+  createdAt DateTime @default(now()) @db.DateTime(3)
+  @@id([userId, fecha])
+}
+
+model WorkerHeartbeat {
+  name String @id @db.VarChar(80)
+  lastStartedAt DateTime? @db.DateTime(3)
+  lastSucceededAt DateTime? @db.DateTime(3)
+  lastFailedAt DateTime? @db.DateTime(3)
+  errorCode String? @db.VarChar(100)
+  processed Int @default(0)
+  updatedAt DateTime @updatedAt @db.DateTime(3)
+}
+
+enum EstadoVisita {
+  EMITIDA
+  REGISTRADA_ENTRADA
+  REGISTRADA_SALIDA
+  VENCIDA
+  CANCELADA
+}
+model InvitacionVisita {
+  id String @id @db.VarChar(30)
+  // SHA-256 of the opaque code; never a bearer permission to enter.
+  codigoAcceso String @unique @db.Char(64)
+  tokenKeyVersion String @default("legacy") @db.VarChar(32)
+  evidenceSuppressedAt DateTime? @db.DateTime(3)
+  anfitrionId Int
+  anfitrion Usuario @relation("VisitHost", fields: [anfitrionId], references: [id], onDelete: Restrict)
+  sedeId Int
+  sede Sede @relation(fields: [sedeId], references: [id], onDelete: Restrict)
+  areaId Int?
+  area Area? @relation(fields: [areaId], references: [id], onDelete: Restrict)
+  nombreVisitante String @db.VarChar(150)
+  institucionProcedencia String? @db.VarChar(150)
+  motivo String @db.VarChar(500)
+  fechaProgramada DateTime @db.Date
+  validaDesde DateTime @db.DateTime(3)
+  validaHasta DateTime @db.DateTime(3)
+  estado EstadoVisita @default(EMITIDA)
+  version Int @default(1)
+  entradaAt DateTime? @db.DateTime(3)
+  salidaAt DateTime? @db.DateTime(3)
+  registradoEntradaPorId Int?
+  registradoSalidaPorId Int?
+  registradoEntradaPor Usuario? @relation("VisitEntry", fields: [registradoEntradaPorId], references: [id], onDelete: Restrict)
+  registradoSalidaPor Usuario? @relation("VisitExit", fields: [registradoSalidaPorId], references: [id], onDelete: Restrict)
+  observaciones String? @db.VarChar(1000)
+  createdAt DateTime @default(now()) @db.DateTime(3)
+  updatedAt DateTime @updatedAt @db.DateTime(3)
+  @@index([sedeId, fechaProgramada, estado])
+  @@index([anfitrionId, createdAt])
+}
+
+enum TipoArticuloInventario {
+  CONSUMIBLE
+  ACTIVO
+}
+enum EstadoActivoInventario {
+  DISPONIBLE
+  EN_PRESTAMO
+  EN_MANTENIMIENTO
+  DANIADO
+  BAJA
+}
+enum TipoMovimientoInventario {
+  ENTRADA
+  SALIDA
+  AJUSTE
+  PRESTAMO
+  DEVOLUCION
+}
+model UbicacionInventario {
+  id Int @id @default(autoincrement())
+  sedeId Int
+  sede Sede @relation(fields: [sedeId], references: [id], onDelete: Restrict)
+  areaId Int?
+  area Area? @relation(fields: [areaId], references: [id], onDelete: Restrict)
+  nombre String @db.VarChar(100)
+  codigo String @db.VarChar(50)
+  activa Boolean @default(true)
+  articulos ArticuloInventario[]
+  createdAt DateTime @default(now()) @db.DateTime(3)
+  @@unique([sedeId, codigo])
+}
+model ArticuloInventario {
+  id String @id @default(cuid()) @db.VarChar(30)
+  codigo String @unique @db.VarChar(60)
+  nombre String @db.VarChar(150)
+  descripcion String? @db.VarChar(1000)
+  tipo TipoArticuloInventario
+  unidadMedida String? @db.VarChar(30)
+  // Materialized ledger balance, only changed in the same transaction as a movement.
+  cantidadStock Decimal @default(0) @db.Decimal(10, 2)
+  umbralMinimo Decimal? @db.Decimal(10, 2)
+  estadoActivo EstadoActivoInventario?
+  version Int @default(1)
+  ubicacionId Int
+  ubicacion UbicacionInventario @relation(fields: [ubicacionId], references: [id], onDelete: Restrict)
+  movimientos MovimientoInventario[]
+  prestamos PrestamoInventario[]
+  createdAt DateTime @default(now()) @db.DateTime(3)
+  updatedAt DateTime @updatedAt @db.DateTime(3)
+  @@index([tipo, estadoActivo])
+  @@index([ubicacionId])
+}
+model MovimientoInventario {
+  id String @id @default(cuid()) @db.VarChar(30)
+  articuloId String @db.VarChar(30)
+  articulo ArticuloInventario @relation(fields: [articuloId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "MovimientoInventario_articuloId_immutable_fkey")
+  tipo TipoMovimientoInventario
+  // Signed delta; append-only application API.
+  cantidad Decimal @db.Decimal(10, 2)
+  motivo String @db.VarChar(500)
+  actorId Int
+  actor Usuario @relation(fields: [actorId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "MovimientoInventario_actorId_immutable_fkey")
+  prestamoId String? @db.VarChar(30)
+  prestamo PrestamoInventario? @relation(fields: [prestamoId], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "MovimientoInventario_prestamoId_immutable_fkey")
+  createdAt DateTime @default(now()) @db.DateTime(3)
+  @@index([articuloId, createdAt])
+}
+model PrestamoInventario {
+  id String @id @default(cuid()) @db.VarChar(30)
+  articuloId String @db.VarChar(30)
+  articulo ArticuloInventario @relation(fields: [articuloId], references: [id], onDelete: Restrict)
+  solicitanteId Int
+  solicitante Usuario @relation("LoanBorrower", fields: [solicitanteId], references: [id], onDelete: Restrict)
+  responsableId Int
+  responsable Usuario @relation("LoanResponsible", fields: [responsableId], references: [id], onDelete: Restrict)
+  devueltoAId Int?
+  devueltoA Usuario? @relation("LoanReturn", fields: [devueltoAId], references: [id], onDelete: Restrict)
+  fechaEntrega DateTime @default(now()) @db.DateTime(3)
+  fechaLimite DateTime @db.DateTime(3)
+  fechaDevolucion DateTime? @db.DateTime(3)
+  estado String @default("ACTIVO") @db.VarChar(20)
+  observaciones String? @db.VarChar(1000)
+  movimientos MovimientoInventario[]
+  createdAt DateTime @default(now()) @db.DateTime(3)
+  @@index([estado, fechaLimite])
+}
+
+model CalendarPreview {
+  id String @id @default(cuid()) @db.VarChar(30)
+  actorId Int
+  fingerprint String @db.Char(64)
+  impactHash String @db.Char(64)
+  expiresAt DateTime @db.DateTime(3)
+  createdAt DateTime @default(now()) @db.DateTime(3)
+  @@index([expiresAt])
+}
+
+model AbsenceOperation {
+  actorId Int
+  key String @db.VarChar(100)
+  fingerprint String @db.Char(64)
+  response Json
+  createdAt DateTime @default(now()) @db.DateTime(3)
+  @@id([actorId, key])
+}
+
+model AbsenceEvaluationProgress {
+  id String @id @db.VarChar(20)
+  fecha DateTime @db.Date
+  afterUserId Int @default(0)
+  completed Boolean @default(false)
+  updatedAt DateTime @updatedAt @db.DateTime(3)
+}
+
+model AuthThrottle {
+  key String @id @db.Char(64)
+  count Int @default(0)
+  resetAt DateTime @db.DateTime(3)
+  blockedUntil DateTime? @db.DateTime(3)
+  @@index([resetAt])
+}
+
+model FeaturePolicy {
+  module String @id @db.VarChar(40)
+  version Int @default(1)
+  enabled Boolean
+  sedeIds Json
+  areaIds Json
+  userIds Json
+  reason String @db.VarChar(500)
+  changedById Int
+  updatedAt DateTime @updatedAt @db.DateTime(3)
 }

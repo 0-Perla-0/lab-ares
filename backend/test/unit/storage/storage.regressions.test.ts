@@ -303,7 +303,7 @@ describe("Storage regressions", () => {
     ).resolves.toBeTruthy();
     expect(storage.copy).toHaveBeenCalled();
   });
-  it("compensates when promotion update loses lease", async () => {
+  it("retains a private promotion when ownership is lost instead of deleting another owner's object", async () => {
     const updateMany = vi.fn().mockResolvedValue({ count: 0 });
     const p = {
       archivo: { findUnique: vi.fn().mockResolvedValue(f()), updateMany },
@@ -320,7 +320,7 @@ describe("Storage regressions", () => {
       { scan: vi.fn().mockResolvedValue({ clean: true }) } as never,
       cfg(),
     ).analyze("f", "owner");
-    expect(storage.delete).toHaveBeenCalledWith("available", "k");
+    expect(storage.delete).not.toHaveBeenCalled();
   });
   it("rejects a capability for another resource", async () => {
     const s = new StorageService(

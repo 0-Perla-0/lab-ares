@@ -1,9 +1,5 @@
-import type { Metadata } from "next";
-
-import { UserEditorPage } from "@/components/portal/user-editor-page";
-
-export const metadata: Metadata = { title: "Registrar usuario" };
+import { redirect } from "next/navigation";
 
 export default function Page() {
-  return <UserEditorPage mode="create" />;
+  redirect("/portal/usuarios");
 }

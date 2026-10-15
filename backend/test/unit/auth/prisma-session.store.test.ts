@@ -23,11 +23,25 @@ describe("PrismaSessionStore", () => {
 
     await setSession("sid", value);
 
-    expect(sessions.upsert).toHaveBeenCalledWith(expect.objectContaining({
-      where: { id: "sid" },
-      create: expect.objectContaining({ id: "sid", data: expect.objectContaining({ userId: 7 }), expiresAt: new Date("2026-01-01T08:00:00.000Z"), absoluteExpiresAt: expect.any(Date), lastActivityAt: expect.any(Date), userId: 7 }),
-      update: expect.objectContaining({ data: expect.objectContaining({ userId: 7 }), expiresAt: new Date("2026-01-01T08:00:00.000Z"), lastActivityAt: expect.any(Date), userId: 7 }),
-    }));
+    expect(sessions.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "sid" },
+        create: expect.objectContaining({
+          id: "sid",
+          data: expect.objectContaining({ userId: 7 }),
+          expiresAt: new Date("2026-01-01T08:00:00.000Z"),
+          absoluteExpiresAt: expect.any(Date),
+          lastActivityAt: expect.any(Date),
+          userId: 7,
+        }),
+        update: expect.objectContaining({
+          data: expect.objectContaining({ userId: 7 }),
+          expiresAt: new Date("2026-01-01T08:00:00.000Z"),
+          lastActivityAt: expect.any(Date),
+          userId: 7,
+        }),
+      }),
+    );
   });
 
   it("returns a stored active session", async () => {

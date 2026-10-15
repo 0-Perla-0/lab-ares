@@ -1,9 +1,15 @@
 import { z } from "zod";
 
 export const idempotencyKeySchema = z.string().regex(/^[A-Za-z0-9_-]{16,100}$/);
-export const checkInSchema = z.object({}).strict();
+// Malformed location evidence is advisory, not a reason to reject attendance.
+export const checkInSchema = z
+  .object({ coords: z.unknown().optional() })
+  .strict();
 export const checkOutSchema = z
-  .object({ attendanceId: z.number().int().positive() })
+  .object({
+    attendanceId: z.number().int().positive(),
+    coords: z.unknown().optional(),
+  })
   .strict();
 export const manualCloseSchema = z
   .object({ reason: z.string().trim().min(5).max(500) })

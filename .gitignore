@@ -7,6 +7,8 @@ dist/
 # Playwright output (specs under frontend/e2e remain tracked)
 /frontend/test-results/
 /frontend/playwright-report/
+/frontend/fullstack-results/
+/frontend/playwright-fullstack-report/
 # generated types
 *.tsbuildinfo
 

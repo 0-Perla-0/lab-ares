@@ -13,6 +13,9 @@ import {
 import { useAuth } from "@/components/auth/auth-provider";
 import { LoadError, LoadingTable } from "@/components/ui/primitives";
 import { ApiError, apiRequest, getApiErrorMessage } from "@/lib/api";
+import { hasPermission, permissions } from "@/lib/permissions";
+import { advisoryCoordinates } from "@/lib/geolocation";
+import { socialMutation } from "@/lib/service-social";
 import {
   formatDate,
   formatDuration,
@@ -24,10 +27,11 @@ import {
 } from "@/lib/attendance";
 
 type Envelope = { data: AttendanceResponse };
-const canReview = (role: string) => role !== "PRESTADOR";
 
 export function AttendancePage() {
   const { user } = useAuth();
+  const pendingSignal = useRef<{ target: string; body: object } | null>(null);
+  const canReview = hasPermission(user, permissions.ATTENDANCE_MANAGE);
   const [mine, setMine] = useState<AttendanceResponse | null>(null);
   const [review, setReview] = useState<AttendanceResponse | null>(null);
   const [cursor, setCursor] = useState<number | null>(null);
@@ -62,7 +66,7 @@ export function AttendancePage() {
           server: new Date(own.data.serverTime).getTime(),
           mono: performance.now(),
         });
-        if (canReview(user.rol)) {
+        if (canReview) {
           try {
             const queue = await apiRequest<Envelope>(
               `/api/attendance/open?limit=20${nextReviewCursor ? `&cursor=${nextReviewCursor}` : ""}`,
@@ -83,7 +87,7 @@ export function AttendancePage() {
         if (sequence === loadSequence.current) setLoading(false);
       }
     },
-    [user.id, user.rol],
+    [user.id, canReview],
   );
 
   useEffect(() => {
@@ -105,20 +109,28 @@ export function AttendancePage() {
     busyRef.current = true;
     setBusy(operation);
     try {
-      const payload = JSON.stringify(
-        operation === "check-out" ? { attendanceId: Number(target) } : {},
+      const identity = `${operation}:${target}`;
+      if (pendingSignal.current?.target !== identity) {
+        const coords = await advisoryCoordinates();
+        pendingSignal.current = {
+          target: identity,
+          body: {
+            ...(operation === "check-out"
+              ? { attendanceId: Number(target) }
+              : {}),
+            ...(coords ? { coords } : {}),
+          },
+        };
+      }
+      await socialMutation(
+        user.id,
+        `/api/attendance/${operation}`,
+        pendingSignal.current.body,
       );
-      const key = idempotencyKey(user.id, operation, target, payload);
-      await apiRequest(`/api/attendance/${operation}`, {
-        method: "POST",
-        headers: { "Idempotency-Key": key },
-        body: payload,
-      });
-      clearIdempotencyKey(user.id, operation, target);
+      pendingSignal.current = null;
       await load(null, reviewCursor);
     } catch (e) {
-      if (isDefinitiveFailure(e))
-        clearIdempotencyKey(user.id, operation, target);
+      if (isDefinitiveFailure(e)) pendingSignal.current = null;
       setError(getApiErrorMessage(e, "save"));
     } finally {
       busyRef.current = false;
@@ -177,13 +189,13 @@ export function AttendancePage() {
     <div className="animate-fade-up">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-[11px] font-black uppercase tracking-[.19em] text-[#769a27]">
+          <p className="text-[11px] font-black uppercase tracking-[.19em] text-[var(--ares-accent-text)]">
             Control de jornada
           </p>
           <h1 className="mt-2 text-3xl font-black tracking-[-.045em] sm:text-4xl">
             Asistencia
           </h1>
-          <p className="mt-2 text-sm text-[#66736d]">
+          <p className="mt-2 text-sm text-[#667085]">
             Registra tus entradas y salidas con la hora oficial del servidor.
           </p>
         </div>
@@ -191,7 +203,7 @@ export function AttendancePage() {
           type="button"
           disabled={busy !== "" || loading}
           onClick={() => void load(cursor, reviewCursor)}
-          className="focus-ring inline-flex w-fit items-center gap-2 rounded-xl border border-[#12221b]/10 bg-white px-4 py-2 text-sm font-extrabold"
+          className="focus-ring inline-flex w-fit items-center gap-2 rounded-xl border border-[#dde1ea] bg-white px-4 py-2 text-sm font-extrabold"
         >
           <RefreshCw size={16} /> Actualizar
         </button>
@@ -205,13 +217,13 @@ export function AttendancePage() {
         </div>
       )}
       <section className="mt-8 grid gap-4 lg:grid-cols-[1.2fr_.8fr]">
-        <div className="rounded-[1.6rem] bg-[#12221b] p-6 text-white sm:p-8">
+        <div className="rounded-[1.6rem] bg-[#17174a] p-6 text-white sm:p-8">
           <div className="flex items-center gap-3">
-            <span className="grid h-11 w-11 place-items-center rounded-xl bg-[#c8f169] text-[#12221b]">
+            <span className="grid h-11 w-11 place-items-center rounded-xl bg-[#f97316] text-[#17174a]">
               <Clock3 size={21} />
             </span>
             <div>
-              <p className="text-xs font-bold text-white/45">Estado actual</p>
+              <p className="text-xs font-bold text-white/65">Estado actual</p>
               <h2 className="text-xl font-black">
                 {open ? "Sesión abierta" : "Sin sesión abierta"}
               </h2>
@@ -239,7 +251,7 @@ export function AttendancePage() {
                 type="button"
                 disabled={busy !== "" || loading}
                 onClick={() => void mutate("check-out", String(open.id))}
-                className="focus-ring mt-7 inline-flex items-center gap-2 rounded-xl bg-[#f4834f] px-5 py-3 text-sm font-black text-[#12221b] disabled:opacity-50"
+                className="focus-ring mt-7 inline-flex items-center gap-2 rounded-xl bg-[#fb923c] px-5 py-3 text-sm font-black text-[#17174a] disabled:opacity-50"
               >
                 <LogOut size={17} />{" "}
                 {busy === "check-out" ? "Registrando…" : "Registrar salida"}
@@ -250,15 +262,15 @@ export function AttendancePage() {
               type="button"
               disabled={busy !== "" || loading}
               onClick={() => void mutate("check-in")}
-              className="focus-ring mt-8 inline-flex items-center gap-2 rounded-xl bg-[#c8f169] px-5 py-3 text-sm font-black text-[#12221b] disabled:opacity-50"
+              className="focus-ring mt-8 inline-flex items-center gap-2 rounded-xl bg-[#f97316] px-5 py-3 text-sm font-black text-[#17174a] disabled:opacity-50"
             >
               <LogIn size={17} />{" "}
               {busy === "check-in" ? "Registrando…" : "Registrar entrada"}
             </button>
           )}
         </div>
-        <div className="rounded-[1.6rem] border border-[#12221b]/10 bg-white p-6 sm:p-8">
-          <p className="text-[10px] font-black uppercase tracking-[.17em] text-[#769a27]">
+        <div className="rounded-[1.6rem] border border-[#dde1ea] bg-white p-6 sm:p-8">
+          <p className="text-[10px] font-black uppercase tracking-[.17em] text-[var(--ares-accent-text)]">
             Bolsa de horas
           </p>
           <div className="mt-6 grid gap-4 sm:grid-cols-3 lg:grid-cols-1">
@@ -275,7 +287,7 @@ export function AttendancePage() {
             disabled={busy !== "" || loading}
             type="button"
             onClick={() => void load(mine.nextCursor, reviewCursor)}
-            className="focus-ring rounded-xl border border-[#12221b]/10 bg-white px-4 py-2 text-sm font-extrabold disabled:opacity-50"
+            className="focus-ring rounded-xl border border-[#dde1ea] bg-white px-4 py-2 text-sm font-extrabold disabled:opacity-50"
           >
             Página siguiente del historial
           </button>
@@ -285,13 +297,13 @@ export function AttendancePage() {
             disabled={busy !== "" || loading}
             type="button"
             onClick={() => void load(null, reviewCursor)}
-            className="focus-ring rounded-xl border border-[#12221b]/10 bg-white px-4 py-2 text-sm font-extrabold disabled:opacity-50"
+            className="focus-ring rounded-xl border border-[#dde1ea] bg-white px-4 py-2 text-sm font-extrabold disabled:opacity-50"
           >
             Historial reciente
           </button>
         )}
       </div>
-      {canReview(user.rol) && (
+      {canReview && (
         <Review
           items={review?.items ?? []}
           error={reviewError}
@@ -317,7 +329,7 @@ export function AttendancePage() {
 function Stat({ label, value }: { label: string; value: number }) {
   return (
     <div>
-      <p className="text-xs font-bold text-[#66736d]">{label}</p>
+      <p className="text-xs font-bold text-[#667085]">{label}</p>
       <p className="mt-1 text-xl font-black">{formatDuration(value)}</p>
     </div>
   );
@@ -342,27 +354,38 @@ function History({
   return (
     <section className="mt-8">
       <h2 className="text-xl font-black">Tu historial</h2>
-      <div className="mt-4 overflow-hidden rounded-2xl border border-[#12221b]/10 bg-white">
+      <div className="mt-4 overflow-hidden rounded-2xl border border-[#dde1ea] bg-white">
         {items.length === 0 ? (
-          <p className="p-6 text-sm text-[#66736d]">
+          <p className="p-6 text-sm text-[#667085]">
             Aún no hay registros de asistencia.
           </p>
         ) : (
           items.map((item) => (
             <div
               key={item.id}
-              className="flex flex-col gap-2 border-b border-[#12221b]/8 p-4 last:border-0 sm:flex-row sm:items-center sm:justify-between"
+              className="flex flex-col gap-2 border-b border-[#dde1ea] p-4 last:border-0 sm:flex-row sm:items-center sm:justify-between"
             >
               <div>
                 <p className="text-sm font-black">
                   {formatDate(item.checkInAt, timeZone)} · {item.status}
                 </p>
-                <p className="text-xs text-[#66736d]">
+                <p className="text-xs text-[#667085]">
                   {item.checkOutAt
                     ? `Salida ${formatDate(item.checkOutAt, timeZone)}`
                     : "Sesión abierta"}
                   {item.closeReason ? ` · ${item.closeReason}` : ""}
                 </p>
+                {item.risk && (
+                  <p className="text-xs font-semibold">
+                    Riesgo {item.risk.color} · reglas v{item.risk.policyVersion}
+                    {item.risk.reasons.length
+                      ? ` · ${item.risk.reasons.join(", ")}`
+                      : " · Sin incidencias"}
+                    {item.requiresReview
+                      ? " · REQUIERE_REVISION: estas horas no suman en la bolsa"
+                      : ""}
+                  </p>
+                )}
               </div>
               <span className="text-sm font-black">
                 {item.durationSeconds === null
@@ -420,16 +443,16 @@ function Review({
           {error}
         </p>
       ) : (
-        <div className="mt-4 overflow-hidden rounded-2xl border border-[#12221b]/10 bg-white">
+        <div className="mt-4 overflow-hidden rounded-2xl border border-[#dde1ea] bg-white">
           {items.length === 0 ? (
-            <p className="p-6 text-sm text-[#66736d]">
+            <p className="p-6 text-sm text-[#667085]">
               No hay sesiones pendientes de cierre.
             </p>
           ) : (
             items.map((item) => (
               <div
                 key={item.id}
-                className="border-b border-[#12221b]/8 p-4 last:border-0"
+                className="border-b border-[#dde1ea] p-4 last:border-0"
               >
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
@@ -437,7 +460,7 @@ function Review({
                       {item.user.codigo} ·{" "}
                       {formatDate(item.checkInAt, timeZone)}
                     </p>
-                    <p className="text-xs text-[#66736d]">
+                    <p className="text-xs text-[#667085]">
                       {item.abnormal && (
                         <span className="mr-2 inline-flex items-center gap-1 font-black text-amber-700">
                           <AlertTriangle size={13} /> Tiempo fuera de rango
@@ -453,14 +476,14 @@ function Review({
                       setReasonFor(reasonFor === item.id ? null : item.id);
                       setReason("");
                     }}
-                    className="focus-ring inline-flex items-center gap-2 rounded-xl border border-[#12221b]/10 px-3 py-2 text-xs font-black disabled:opacity-50"
+                    className="focus-ring inline-flex items-center gap-2 rounded-xl border border-[#dde1ea] px-3 py-2 text-xs font-black disabled:opacity-50"
                   >
                     <X size={14} /> Cerrar sesión
                   </button>
                 </div>
                 {reasonFor === item.id && (
                   <form
-                    className="mt-4 rounded-xl bg-[#f7f7f3] p-4"
+                    className="mt-4 rounded-xl bg-[#f6f7fb] p-4"
                     onSubmit={(event) => {
                       event.preventDefault();
                       void onClose(item);
@@ -480,7 +503,7 @@ function Review({
                       maxLength={500}
                       value={reason}
                       onChange={(event) => setReason(event.target.value)}
-                      className="focus-ring mt-2 min-h-20 w-full rounded-xl border border-[#12221b]/10 bg-white p-3 text-sm"
+                      className="focus-ring mt-2 min-h-20 w-full rounded-xl border border-[#dde1ea] bg-white p-3 text-sm"
                       placeholder="Describe por qué se cierra esta sesión"
                     />
                     <div className="mt-3 flex items-center justify-end gap-2">
@@ -495,7 +518,7 @@ function Review({
                       <button
                         type="submit"
                         disabled={reason.trim().length < 5 || busy !== ""}
-                        className="focus-ring inline-flex items-center gap-2 rounded-xl bg-[#12221b] px-4 py-2 text-xs font-black text-white disabled:opacity-50"
+                        className="focus-ring inline-flex items-center gap-2 rounded-xl bg-[#17174a] px-4 py-2 text-xs font-black text-white disabled:opacity-50"
                       >
                         <Check size={14} /> Confirmar cierre
                       </button>
@@ -512,7 +535,7 @@ function Review({
           disabled={busy !== ""}
           type="button"
           onClick={onNext}
-          className="focus-ring mt-4 rounded-xl border border-[#12221b]/10 bg-white px-4 py-2 text-sm font-extrabold disabled:opacity-50"
+          className="focus-ring mt-4 rounded-xl border border-[#dde1ea] bg-white px-4 py-2 text-sm font-extrabold disabled:opacity-50"
         >
           Página siguiente de sesiones
         </button>
@@ -522,7 +545,7 @@ function Review({
           type="button"
           disabled={busy !== ""}
           onClick={onFirst}
-          className="focus-ring ml-3 mt-4 rounded-xl border border-[#12221b]/10 bg-white px-4 py-2 text-sm font-extrabold disabled:opacity-50"
+          className="focus-ring ml-3 mt-4 rounded-xl border border-[#dde1ea] bg-white px-4 py-2 text-sm font-extrabold disabled:opacity-50"
         >
           Primeras sesiones
         </button>

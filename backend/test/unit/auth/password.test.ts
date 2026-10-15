@@ -4,7 +4,7 @@ import { hashPassword, verifyPassword } from "../../../src/auth/password";
 
 describe("password helpers", () => {
   it("hashes and verifies a password without returning plaintext", async () => {
-    const password = "Admin123!secure";
+    const password = "Admin123!secure-long";
     const passwordHash = await hashPassword(password);
 
     expect(passwordHash).not.toBe(password);
@@ -15,7 +15,7 @@ describe("password helpers", () => {
   });
 
   it("accepts long Unicode passwords under the Argon2 policy", async () => {
-    const longPassword = "a".repeat(73);
+    const longPassword = "Una frase Unicode 🛡️ ".repeat(3);
 
     const hash = await hashPassword(longPassword);
     await expect(verifyPassword(longPassword, hash)).resolves.toBe(true);

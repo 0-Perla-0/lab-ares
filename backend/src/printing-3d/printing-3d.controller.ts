@@ -25,6 +25,7 @@ import {
   printing3dReviewSchema,
 } from "./printing-3d.schemas";
 import { Printing3dService } from "./printing-3d.service";
+import { RequireFeature } from "../common/domain/feature-policy.guard";
 
 @Controller("printing-3d")
 export class Printing3dController {
@@ -38,6 +39,7 @@ export class Printing3dController {
   }
 
   @Post("jobs")
+  @RequireFeature("PRINTING_3D.REQUEST")
   @RequirePermissions(Permission.PRINTING_3D_REQUEST)
   create(
     @Req() req: Request,

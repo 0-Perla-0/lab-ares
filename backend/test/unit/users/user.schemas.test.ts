@@ -31,7 +31,10 @@ describe("user schemas", () => {
     expect(
       crearUsuarioSchema.safeParse({ ...base, password: "short" }).success,
     ).toBe(false);
-    expect(crearUsuarioSchema.safeParse({ ...base, password: "á".repeat(37) }).success).toBe(true);
+    expect(
+      crearUsuarioSchema.safeParse({ ...base, password: "á".repeat(37) })
+        .success,
+    ).toBe(true);
   });
 
   it("does not create users already in BAJA", () => {

@@ -1,24 +1,88 @@
-import { Injectable, type OnApplicationBootstrap, type OnModuleDestroy } from "@nestjs/common";
+import {
+  Injectable,
+  type OnApplicationBootstrap,
+  type OnModuleDestroy,
+} from "@nestjs/common";
 import { PrismaService } from "../database/prisma.service";
 
 @Injectable()
-export class IdentityCleanupService implements OnApplicationBootstrap, OnModuleDestroy {
+export class IdentityCleanupService
+  implements OnApplicationBootstrap, OnModuleDestroy
+{
   private timer?: ReturnType<typeof setInterval>;
   private running = false;
   constructor(private readonly prisma: PrismaService) {}
-  onApplicationBootstrap() { this.timer = setInterval(() => void this.run(), 15 * 60_000); this.timer.unref(); void this.run(); }
-  onModuleDestroy() { if (this.timer) clearInterval(this.timer); }
-  async run(now = new Date(), retentionDays = Number(process.env.IDENTITY_INVITATION_RETENTION_DAYS ?? 30)) {
+  onApplicationBootstrap() {
+    this.timer = setInterval(() => void this.run(), 15 * 60_000);
+    this.timer.unref();
+    void this.run();
+  }
+  onModuleDestroy() {
+    if (this.timer) clearInterval(this.timer);
+  }
+  async run(
+    now = new Date(),
+    retentionDays = Number(
+      process.env.IDENTITY_INVITATION_RETENTION_DAYS ?? 30,
+    ),
+  ) {
     if (this.running) return;
     this.running = true;
     try {
-      const cutoff = new Date(now.getTime() - Math.max(0, retentionDays) * 24 * 60 * 60_000);
+      const cutoff = new Date(
+        now.getTime() - Math.max(0, retentionDays) * 24 * 60 * 60_000,
+      );
       await this.prisma.$transaction([
-        this.prisma.recoveryToken.deleteMany({ where: { OR: [{ expiresAt: { lt: now } }, { usedAt: { not: null } }] } }),
-        this.prisma.session.deleteMany({ where: { OR: [{ expiresAt: { lt: now } }, { absoluteExpiresAt: { lt: now } }, { revokedAt: { not: null } }] } }),
-        ...(this.prisma.mfaChallenge ? [this.prisma.mfaChallenge.deleteMany({ where: { OR: [{ expiresAt: { lt: now } }, { consumedAt: { not: null } }] } })] : []),
-        ...(this.prisma.mfaRecoveryCode ? [this.prisma.mfaRecoveryCode.deleteMany({ where: { usedAt: { not: null, lt: cutoff } } })] : []),
-        ...(this.prisma.outboxEvent ? [this.prisma.outboxEvent.deleteMany({ where: { processedAt: { not: null, lt: cutoff } } })] : []),
+        ...(this.prisma.authThrottle
+          ? [
+              this.prisma.authThrottle.deleteMany({
+                where: {
+                  resetAt: { lt: now },
+                  OR: [{ blockedUntil: null }, { blockedUntil: { lt: now } }],
+                },
+              }),
+            ]
+          : []),
+        this.prisma.recoveryToken.deleteMany({
+          where: {
+            OR: [{ expiresAt: { lt: now } }, { usedAt: { not: null } }],
+          },
+        }),
+        this.prisma.session.deleteMany({
+          where: {
+            OR: [
+              { expiresAt: { lt: now } },
+              { absoluteExpiresAt: { lt: now } },
+              { revokedAt: { not: null } },
+            ],
+          },
+        }),
+        ...(this.prisma.mfaChallenge
+          ? [
+              this.prisma.mfaChallenge.deleteMany({
+                where: {
+                  OR: [
+                    { expiresAt: { lt: now } },
+                    { consumedAt: { not: null } },
+                  ],
+                },
+              }),
+            ]
+          : []),
+        ...(this.prisma.mfaRecoveryCode
+          ? [
+              this.prisma.mfaRecoveryCode.deleteMany({
+                where: { usedAt: { not: null, lt: cutoff } },
+              }),
+            ]
+          : []),
+        ...(this.prisma.outboxEvent
+          ? [
+              this.prisma.outboxEvent.deleteMany({
+                where: { processedAt: { not: null, lt: cutoff } },
+              }),
+            ]
+          : []),
         // Invitations are retained for audit/history. Only mark them archived;
         // never delete them as part of identity maintenance.
         this.prisma.invitation.updateMany({
@@ -33,6 +97,8 @@ export class IdentityCleanupService implements OnApplicationBootstrap, OnModuleD
           data: { archivedAt: now },
         }),
       ]);
-    } finally { this.running = false; }
+    } finally {
+      this.running = false;
+    }
   }
 }

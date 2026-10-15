@@ -52,7 +52,7 @@ function fixture() {
     storage as never,
     { get: () => 1_000 } as never,
   );
-  return { storage, reconciler };
+  return { storage, reconciler, prisma };
 }
 
 describe("StorageReconciler", () => {
@@ -77,10 +77,7 @@ describe("StorageReconciler", () => {
     );
     expect(result.repaired).toBe(1);
     expect(second.storage.copy).toHaveBeenCalled();
-    expect(second.storage.delete).toHaveBeenCalledWith(
-      "quarantine",
-      "file-key",
-    );
+    expect(second.storage.delete).not.toHaveBeenCalled();
   });
 
   it("refuses a stale plan before applying side effects", async () => {
@@ -89,5 +86,28 @@ describe("StorageReconciler", () => {
       reconciler.execute(100, "0".repeat(64), "recovery-1", 7),
     ).rejects.toThrow("RECONCILIATION_PREVIEW_STALE");
     expect(storage.copy).not.toHaveBeenCalled();
+  });
+  it("refuses an exact plan containing unlogged deletion before any repair", async () => {
+    const planned = fixture();
+    planned.storage.list
+      .mockReset()
+      .mockResolvedValueOnce({
+        objects: [{ key: "private-orphan", lastModified: new Date(0) }],
+      })
+      .mockResolvedValueOnce({ objects: [] });
+    const preview = await planned.reconciler.preview();
+    expect(preview.counts).toMatchObject({ DELETE_ORPHAN: 1, PROMOTE: 1 });
+    const current = fixture();
+    current.storage.list
+      .mockReset()
+      .mockResolvedValueOnce({
+        objects: [{ key: "private-orphan", lastModified: new Date(0) }],
+      })
+      .mockResolvedValueOnce({ objects: [] });
+    await expect(
+      current.reconciler.execute(100, preview.planHash!, "recovery-1", 7),
+    ).rejects.toMatchObject({ code: "OBJECT_DELETION_PROTOCOL_REQUIRED" });
+    expect(current.storage.copy).not.toHaveBeenCalled();
+    expect(current.storage.delete).not.toHaveBeenCalled();
   });
 });

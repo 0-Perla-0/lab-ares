@@ -4,6 +4,9 @@ import { Prisma } from "../generated/prisma/client";
 import { EstadoUsuario, type RolUsuario } from "../generated/prisma/enums";
 import { PrismaService } from "../database/prisma.service";
 import { translateUniqueViolation } from "../organization/repositories/prisma-errors";
+import { AuditService } from "../auth/audit.service";
+import { OutboxService } from "../auth/outbox.service";
+import { recordOperationalHistory } from "../common/domain/operational-history";
 
 const publicUserSelect = {
   id: true,
@@ -45,7 +48,11 @@ type CreateUserData = Required<
 
 @Injectable()
 export class UsersRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+    private readonly outbox: OutboxService,
+  ) {}
 
   findAll(scope: UserListScope) {
     return this.prisma.usuario.findMany({
@@ -88,16 +95,93 @@ export class UsersRepository {
 
   create(data: CreateUserData) {
     return translateUniqueViolation(() =>
-      this.prisma.usuario.create({ data, select: publicUserSelect }),
+      this.prisma.$transaction(async (tx) => {
+        const row = await tx.usuario.create({ data, select: publicUserSelect });
+        await recordOperationalHistory(tx, "USER", row.id);
+        return row;
+      }),
     );
   }
 
-  update(id: number, data: UserWriteData) {
+  update(id: number, data: UserWriteData, actorId?: number) {
     return translateUniqueViolation(() =>
-      this.prisma.usuario.update({
-        where: { id },
-        data,
-        select: publicUserSelect,
+      this.prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT id FROM Usuario WHERE id = ${id} FOR UPDATE`;
+        const before = await tx.usuario.findUniqueOrThrow({ where: { id } });
+        const changedFields = Object.entries(data)
+          .filter(
+            ([key, value]) =>
+              value !== undefined &&
+              before[key as keyof typeof before] !== value,
+          )
+          .map(([key]) => key);
+        const result = await tx.usuario.update({
+          where: { id },
+          data,
+          select: publicUserSelect,
+        });
+        if (!changedFields.length) return result;
+        if (
+          changedFields.some((key) =>
+            ["rol", "estado", "sedeId", "areaId", "turnoId"].includes(key),
+          )
+        )
+          await recordOperationalHistory(tx, "USER", id);
+        const sensitive = changedFields.some((key) =>
+          [
+            "email",
+            "passwordHash",
+            "rol",
+            "estado",
+            "sedeId",
+            "areaId",
+            "turnoId",
+          ].includes(key),
+        );
+        if (sensitive) {
+          await tx.session.updateMany({
+            where: { userId: id, revokedAt: null },
+            data: { revokedAt: new Date() },
+          });
+          await tx.recoveryToken.updateMany({
+            where: { userId: id, usedAt: null },
+            data: { usedAt: new Date() },
+          });
+          await tx.mfaChallenge.updateMany({
+            where: { userId: id, consumedAt: null },
+            data: { consumedAt: new Date() },
+          });
+          await tx.notification.create({
+            data: {
+              userId: id,
+              type: "ACCOUNT_CHANGED",
+              payload: { sessionsRevoked: true },
+            },
+          });
+          await this.outbox.enqueue(
+            {
+              type: "ACCOUNT_CHANGED",
+              aggregateId: String(id),
+              payload: { userId: id },
+            },
+            tx,
+          );
+        }
+        await this.audit.append(
+          {
+            actorId,
+            actorType: actorId ? "HUMAN" : "SYSTEM",
+            subjectId: id,
+            action: "USER_UPDATED",
+            resource: "identity",
+            objectId: String(id),
+            sedeId: result.sedeId ?? undefined,
+            areaId: result.areaId ?? undefined,
+            metadata: { fields: changedFields, sessionsRevoked: sensitive },
+          },
+          tx,
+        );
+        return result;
       }),
     );
   }

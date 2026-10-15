@@ -106,7 +106,6 @@ export function PasswordRecoveryForm() {
             type="email"
             autoComplete="email"
             required
-            autoFocus
             placeholder="inventor@ejemplo.com"
             className="mt-2 h-13 w-full rounded-2xl border border-[#12221b]/15 bg-white px-4 text-sm outline-none transition placeholder:text-[#9ba59f] focus:border-[#769a27] focus:ring-4 focus:ring-[#c8f169]/25"
           />
@@ -139,7 +138,6 @@ export function PasswordRecoveryForm() {
               autoComplete="one-time-code"
               minLength={20}
               required
-              autoFocus
               className="mt-2 h-13 w-full rounded-2xl border border-[#12221b]/15 bg-white px-4 font-mono text-sm outline-none transition focus:border-[#769a27] focus:ring-4 focus:ring-[#c8f169]/25"
             />
           </div>

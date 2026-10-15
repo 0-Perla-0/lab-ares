@@ -1,0 +1,383 @@
+{
+  "info": {
+    "name": "Ares - Cierre restante sintético",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Sólo proyecto/base nueva _test/_ci con seed-fullstack-test y acceptanceEnabled=true. Usa security@fullstack.example.test sin sufijo, separado de navegadores y de la colección anterior. No configura plazos institucionales, no borra datos ni ejecuta recuperación. Ejecutar una sola vez por seed, después de navegador y de Ares-Aceptacion-Integral."
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:4321/api" },
+    { "key": "acceptanceEnabled", "value": "false" }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "exec": [
+          "if (pm.variables.get('acceptanceEnabled') !== 'true' || !new RegExp('^http://(localhost|127[.]0[.]0[.]1):[0-9]+/api$').test(pm.variables.get('baseUrl'))) throw new Error('Isolated localhost acceptance only');",
+          "if (!pm.collectionVariables.get('run')) pm.collectionVariables.set('run', pm.variables.replaceIn('{{$guid}}'));",
+          "if (['POST','PUT','PATCH','DELETE'].includes(pm.request.method) && !pm.request.headers.has('Idempotency-Key')) pm.request.headers.upsert({ key: 'Idempotency-Key', value: pm.collectionVariables.get('run') + '-' + pm.info.requestId });"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "exec": [
+          "pm.test('HTTP success', () => pm.expect(pm.response.code).to.be.within(200,299));",
+          "pm.test('Private JSON envelope', () => { pm.expect(pm.response.json()).to.have.property('data'); pm.expect(pm.response.headers.get('Cache-Control')).to.include('no-store'); });"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Login admin",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/auth/login",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"email\":\"admin@fullstack.example.test\",\"password\":\"Acceptance-Test-Only!2026\"}"
+        }
+      }
+    },
+    {
+      "name": "Subject identity",
+      "request": { "method": "GET", "url": "{{baseUrl}}/users" },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const subject = pm.response.json().data.find(u => u.email === 'security@fullstack.example.test'); pm.test('Synthetic subject', () => pm.expect(subject).to.be.an('object')); pm.collectionVariables.set('subjectId', subject.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Institution",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/academic/catalogs/institucion",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"nombre\":\"Remaining {{run}}\"}" }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.collectionVariables.set('institutionId', pm.response.json().data.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Unit",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/academic/catalogs/unidad",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"nombre\":\"Remaining unit\",\"parentId\":{{institutionId}}}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.collectionVariables.set('unitId', pm.response.json().data.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Program",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/academic/catalogs/programa",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"nombre\":\"Remaining program\",\"parentId\":{{unitId}}}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.collectionVariables.set('programId', pm.response.json().data.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Login subject",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/auth/login",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"email\":\"security@fullstack.example.test\",\"password\":\"Acceptance-Test-Only!2026\"}"
+        }
+      }
+    },
+    {
+      "name": "Academic request",
+      "request": {
+        "method": "PUT",
+        "url": "{{baseUrl}}/academic/profile/me",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"institucionId\":{{institutionId}},\"unidadAcademicaId\":{{unitId}},\"programaAcademicoId\":{{programId}},\"cohorteId\":null,\"inicio\":\"2026-01-01\",\"fin\":null}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.collectionVariables.set('academicId', pm.response.json().data.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Login authority",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/auth/login",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"email\":\"admin@fullstack.example.test\",\"password\":\"Acceptance-Test-Only!2026\"}"
+        }
+      }
+    },
+    {
+      "name": "Academic confirmation",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/academic/profile/requests/{{academicId}}/confirm",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"accept\":true}" }
+      }
+    },
+    {
+      "name": "Formalization",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/documents/formalizations",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"usuarioId\":{{subjectId}},\"inicio\":\"2026-10-13\"}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.collectionVariables.set('formalizationId', pm.response.json().data.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Period registration",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/service-periods",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"formalizacionId\":\"{{formalizationId}}\",\"fin\":\"2027-01-31\",\"motivo\":\"Synthetic administrative registration\"}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.collectionVariables.set('periodId', pm.response.json().data.id); pm.collectionVariables.set('periodKey', pm.request.headers.get('Idempotency-Key')); pm.collectionVariables.set('periodResult', JSON.stringify(pm.response.json().data));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Commit lookup without replay",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/operation-intents/{{periodKey}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Committed metadata only', () => { const data = pm.response.json().data; pm.expect(data.state).to.eql('COMMITTED'); pm.expect(data).not.to.have.property('response'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Period registration replay",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/service-periods",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Idempotency-Key", "value": "{{periodKey}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"formalizacionId\":\"{{formalizationId}}\",\"fin\":\"2027-01-31\",\"motivo\":\"Synthetic administrative registration\"}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Exact durable replay', () => pm.expect(pm.response.json().data).to.eql(JSON.parse(pm.collectionVariables.get('periodResult'))));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Period initiation",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/service-periods/{{periodId}}/transition",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"expectedVersion\":1,\"estado\":\"INICIADO\",\"motivo\":\"Synthetic operational initiation\"}"
+        }
+      }
+    },
+    {
+      "name": "Administrative closure only",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/service-periods/{{periodId}}/transition",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"expectedVersion\":2,\"estado\":\"CERRADO\",\"motivo\":\"Synthetic closure without legal release\"}"
+        }
+      }
+    },
+    {
+      "name": "Period history",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/service-periods?userId={{subjectId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Three append-only events and no credit', () => { const data = pm.response.json().data; pm.expect(data.semantics).to.include('NO_HOUR_CREDIT'); pm.expect(data.items[0].eventos).to.have.lengthOf(3); pm.expect(data.items[0].estado).to.eql('CERRADO'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Executable retention adapters",
+      "request": { "method": "GET", "url": "{{baseUrl}}/retention/adapters" },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('No invented log adapter or approval', () => { const data = pm.response.json().data; pm.expect(data.institutionalPoliciesApproved).to.eql(false); pm.expect(data.items.some(a => a.resourceType === 'TechnicalLog')).to.eql(false); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Project creation",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/kairos/projects",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"nombre\":\"Remaining project {{run}}\"}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.collectionVariables.set('projectKey', pm.request.headers.get('Idempotency-Key')); pm.collectionVariables.set('projectResult', JSON.stringify(pm.response.json().data));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Project creation replay",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/kairos/projects",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Idempotency-Key", "value": "{{projectKey}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"nombre\":\"Remaining project {{run}}\"}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Project committed once', () => pm.expect(pm.response.json().data).to.eql(JSON.parse(pm.collectionVariables.get('projectResult'))));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Report history coverage",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/reports/operational-metrics"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Unknown historic placement is not inferred', () => pm.expect(pm.response.json().data.coverage.unknownHistoryExcluded).to.eql(true));"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

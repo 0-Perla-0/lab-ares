@@ -7,6 +7,7 @@ import { EstadoArchivo } from "../generated/prisma/enums";
 import { assertRecoveryBarrier, workersMayMutate } from "../recovery/barrier";
 import { journalHash } from "../recovery/journal-integrity";
 import { S3Storage } from "./s3.storage";
+import { ApiException } from "../common/errors/api.exception";
 
 type Bucket = "quarantine" | "available";
 type ReconciliationAction =
@@ -88,6 +89,14 @@ export class StorageReconciler implements OnModuleInit, OnModuleDestroy {
       const plan = await this.buildPlan(limit);
       if (journalHash(plan.actions) !== expectedPlanHash)
         throw new Error("RECONCILIATION_PREVIEW_STALE");
+      if (
+        plan.actions.some(
+          (action) =>
+            action.kind === "DELETE_FILE_OBJECT" ||
+            action.kind === "DELETE_ORPHAN",
+        )
+      )
+        throw new ApiException("OBJECT_DELETION_PROTOCOL_REQUIRED", 409);
       let repaired = 0;
       for (const action of plan.actions) {
         if (
@@ -215,11 +224,10 @@ export class StorageReconciler implements OnModuleInit, OnModuleDestroy {
           where: { id: action.fileId, status: EstadoArchivo.DISPONIBLE },
           data: { objectKey: action.key },
         });
-        await this.storage.delete("quarantine", action.key);
+        // Retain the private source until a dedicated copy-cleanup intent exists.
         return;
       case "DELETE_FILE_OBJECT":
-        await this.storage.delete(action.bucket, action.key);
-        return;
+        throw new ApiException("OBJECT_DELETION_PROTOCOL_REQUIRED", 409);
       case "MARK_MISSING":
         await this.prisma.archivo.updateMany({
           where: {
@@ -233,7 +241,7 @@ export class StorageReconciler implements OnModuleInit, OnModuleDestroy {
         });
         return;
       case "DELETE_ORPHAN":
-        await this.storage.delete(action.bucket, action.key);
+        throw new ApiException("OBJECT_DELETION_PROTOCOL_REQUIRED", 409);
     }
   }
 

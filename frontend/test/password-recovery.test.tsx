@@ -10,5 +10,6 @@ describe("password recovery", () => {
     expect(html).toContain('type="email"');
     expect(html).toContain("Si existe una cuenta con ese correo");
     expect(html).toContain("Enviar token");
+    expect(html).not.toContain("autofocus");
   });
 });

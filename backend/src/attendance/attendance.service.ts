@@ -1,12 +1,30 @@
 import { createHash } from "node:crypto";
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, Optional } from "@nestjs/common";
+import { CalendarService } from "../calendar/calendar.service";
 import { ConfigService } from "@nestjs/config";
+import { requirePilot } from "../common/domain/operational-pilot";
 import type { AuthUser } from "../auth/auth-user";
 import { ApiException } from "../common/errors/api.exception";
 import { PrismaService } from "../database/prisma.service";
 import { Prisma } from "../generated/prisma/client";
 import { AttendancePolicy } from "./attendance.policy";
 import type { AttendanceQuery } from "./attendance.schemas";
+import { AuditService } from "../auth/audit.service";
+import { closeOverdue } from "./attendance-cutoff";
+import {
+  evaluateSignals,
+  signalRisk,
+  type SignalInput,
+} from "./attendance-signals";
+import {
+  ATTENDANCE_TIME_ZONE,
+  dailyCutoff,
+  DEFAULT_RISK_RULES,
+  evaluateRisk,
+  localParts,
+  riskRulesSchema,
+  type ShiftSnapshot,
+} from "./attendance-risk";
 
 const includeUser = { user: { select: { codigo: true } } } as const;
 type AttendanceRow = Prisma.AsistenciaGetPayload<{
@@ -26,11 +44,13 @@ export class AttendanceService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly policy: AttendancePolicy,
-    config: ConfigService,
+    private readonly config: ConfigService,
+    private readonly audit: AuditService,
+    @Optional() private readonly calendar?: CalendarService,
   ) {
     this.abnormalAfterSeconds =
       config.get<number>("ATTENDANCE_ALERT_HOURS", 12) * 3600;
-    this.timeZone = config.get<string>("APP_TIME_ZONE", "America/Mexico_City");
+    this.timeZone = ATTENDANCE_TIME_ZONE;
   }
 
   async mine(user: AuthUser, query: AttendanceQuery) {
@@ -52,7 +72,11 @@ export class AttendanceService {
         }),
         this.prisma.asistencia.groupBy({
           by: ["status"],
-          where: { userId: user.id, status: { not: "ABIERTA" } },
+          where: {
+            userId: user.id,
+            status: { not: "ABIERTA" },
+            requiresReview: false,
+          },
           _sum: { durationSeconds: true },
         }),
       ],
@@ -86,11 +110,21 @@ export class AttendanceService {
     return this.page(rows, query.limit, new Date());
   }
 
-  checkIn(user: AuthUser, key: string) {
-    return this.write(user, key, { action: "CHECK_IN" });
+  checkIn(user: AuthUser, key: string, signals: SignalInput = {}) {
+    return this.write(user, key, { action: "CHECK_IN" }, signals);
   }
-  checkOut(user: AuthUser, key: string, attendanceId: number) {
-    return this.write(user, key, { action: "CHECK_OUT", attendanceId });
+  checkOut(
+    user: AuthUser,
+    key: string,
+    attendanceId: number,
+    signals: SignalInput = {},
+  ) {
+    return this.write(
+      user,
+      key,
+      { action: "CHECK_OUT", attendanceId },
+      signals,
+    );
   }
   close(user: AuthUser, key: string, attendanceId: number, reason: string) {
     return this.write(user, key, {
@@ -100,15 +134,31 @@ export class AttendanceService {
     });
   }
 
-  private async write(user: AuthUser, key: string, operation: Operation) {
+  private async write(
+    user: AuthUser,
+    key: string,
+    operation: Operation,
+    signals: SignalInput = {},
+  ) {
     const fingerprint = createHash("sha256")
-      .update(JSON.stringify(operation))
+      .update(
+        JSON.stringify({
+          ...operation,
+          ...(signals.coords !== undefined ? { coords: signals.coords } : {}),
+        }),
+      )
       .digest("hex");
     // Retries cover deadlocks and concurrent claims of the same idempotency key.
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
         return await this.prisma.$transaction(
           async (tx) => {
+            await tx.$queryRaw`SELECT id FROM RecoveryWriteBarrier WHERE id = 'global' LOCK IN SHARE MODE`;
+            const barrier = await tx.recoveryWriteBarrier.findUnique({
+              where: { id: "global" },
+            });
+            if (!barrier || barrier.active)
+              throw new ApiException("RECOVERY_WRITE_BARRIER_ACTIVE", 503);
             let targetUserId = user.id;
             if (operation.action !== "CHECK_IN") {
               const target = await tx.asistencia.findUnique({
@@ -133,13 +183,19 @@ export class AttendanceService {
             }
             const now = new Date();
             let row: AttendanceRow;
+            await closeOverdue(tx, targetUserId, now, this.audit);
             if (operation.action === "CHECK_IN") {
               const owner = await tx.usuario.findUnique({
                 where: { id: user.id },
-                include: { sede: true, area: true, turno: true },
+                include: {
+                  sede: true,
+                  area: true,
+                  turno: { include: { dias: true } },
+                },
               });
               if (!owner || owner.estado !== "ACTIVA")
                 throw new ApiException("UNAUTHORIZED", 401);
+              requirePilot(this.config, owner);
               if (
                 !owner.sede?.activa ||
                 !owner.area?.activa ||
@@ -149,12 +205,28 @@ export class AttendanceService {
               ) {
                 throw new ApiException("ATTENDANCE_ASSIGNMENT_REQUIRED", 409);
               }
+              if (owner.turno.horaFin <= owner.turno.horaInicio)
+                throw new ApiException("ATTENDANCE_OVERNIGHT_UNSUPPORTED", 409);
+              if (now >= dailyCutoff(now))
+                throw new ApiException("ATTENDANCE_DAY_CLOSED", 409);
+              const policy = await tx.politicaAsistencia.findFirst({
+                where: { sedeId: owner.sede.id },
+                orderBy: { version: "desc" },
+              });
               if (
                 await tx.asistencia.findUnique({
                   where: { openUserId: user.id },
                 })
               )
                 throw new ApiException("ATTENDANCE_ALREADY_OPEN", 409);
+              const exception = await this.calendar?.exceptionFor(
+                owner,
+                localParts(now).day,
+                tx,
+              );
+              const special = exception?.efecto === "HORARIO_ESPECIAL";
+              const extraordinary =
+                exception?.efecto === "ASISTENCIA_EXTRAORDINARIA";
               row = await tx.asistencia.create({
                 data: {
                   userId: user.id,
@@ -163,6 +235,32 @@ export class AttendanceService {
                   areaId: owner.area.id,
                   turnoId: owner.turno.id,
                   checkInAt: now,
+                  ...evaluateSignals(policy?.locationRules, signals),
+                  shiftSnapshot: {
+                    start: special
+                      ? exception.horaInicio!
+                      : owner.turno.horaInicio.toISOString().slice(11, 19),
+                    end: special
+                      ? exception.horaFin!
+                      : owner.turno.horaFin.toISOString().slice(11, 19),
+                    days:
+                      special || extraordinary
+                        ? [localParts(now).weekDay]
+                        : owner.turno.dias.map((d) => d.dia),
+                    ...(exception
+                      ? {
+                          exceptionId: exception.id,
+                          exceptionEffect: exception.efecto,
+                        }
+                      : {}),
+                  },
+                  policySnapshot: {
+                    version: policy?.version ?? 0,
+                    rules: policy?.rules ?? DEFAULT_RISK_RULES,
+                    locationRules: policy?.locationRules ?? {
+                      mode: "SIN_VALIDACION",
+                    },
+                  },
                 },
                 include: includeUser,
               });
@@ -184,11 +282,34 @@ export class AttendanceService {
                   status: "PENDIENTE",
                   durationSeconds: elapsedSeconds(target.checkInAt, now),
                   closedById: user.id,
+                  version: { increment: 1 },
                   closeReason:
                     operation.action === "MANUAL_CLOSE"
                       ? operation.reason
                       : null,
+                  ...(operation.action === "CHECK_OUT"
+                    ? {
+                        checkoutSignal: evaluateSignals(
+                          (
+                            target.policySnapshot as {
+                              locationRules?: unknown;
+                            } | null
+                          )?.locationRules,
+                          signals,
+                        ),
+                      }
+                    : {}),
                 },
+                include: includeUser,
+              });
+              const risk = this.risk(
+                row,
+                now,
+                operation.action === "MANUAL_CLOSE",
+              );
+              row = await tx.asistencia.update({
+                where: { id: row.id },
+                data: { riskSnapshot: risk },
                 include: includeUser,
               });
             }
@@ -202,6 +323,24 @@ export class AttendanceService {
                   operation.action === "MANUAL_CLOSE" ? operation.reason : null,
               },
             });
+            await this.audit.append(
+              {
+                actorId: user.id,
+                actorRole: user.rol,
+                subjectId: row.userId,
+                action: `ATTENDANCE_${operation.action}`,
+                resource: "attendance",
+                objectId: String(row.id),
+                sedeId: row.sedeId,
+                areaId: row.areaId,
+                metadata: { version: row.version, status: row.status },
+                reason:
+                  operation.action === "MANUAL_CLOSE"
+                    ? operation.reason
+                    : undefined,
+              },
+              tx,
+            );
             const response = this.serialize(row, now);
             await tx.asistenciaSolicitud.create({
               data: { actorId: user.id, key, fingerprint, response },
@@ -254,10 +393,43 @@ export class AttendanceService {
       status: row.status,
       closeReason: row.closeReason,
       closedById: row.closedById,
+      version: row.version,
+      requiresReview: row.requiresReview,
+      isContingency: row.isContingency,
+      locationRiskCode: row.locationRiskCode,
+      risk: this.risk(row, now),
       abnormal:
         row.status === "ABIERTA" &&
         elapsedSeconds(row.checkInAt, now) >= this.abnormalAfterSeconds,
     };
+  }
+  private risk(row: AttendanceRow, now: Date, corrected = false) {
+    const policy = row.policySnapshot as {
+      version?: number;
+      rules?: unknown;
+    } | null;
+    const prior = row.riskSnapshot as { reasons?: string[] } | null;
+    const rules = riskRulesSchema.safeParse(
+      policy?.rules ?? DEFAULT_RISK_RULES,
+    );
+    return signalRisk(
+      evaluateRisk({
+        start: row.checkInAt,
+        end: row.checkOutAt ?? now,
+        omitted: row.requiresReview,
+        corrected:
+          corrected || (prior?.reasons?.includes("SESION_CORREGIDA") ?? false),
+        shift: row.shiftSnapshot as ShiftSnapshot | null,
+        policyVersion: policy?.version ?? 0,
+        rules: rules.success ? rules.data : DEFAULT_RISK_RULES,
+      }),
+      [
+        row.locationRiskCode,
+        (row.checkoutSignal as { locationRiskCode?: string } | null)
+          ?.locationRiskCode,
+        row.isContingency ? "CAPTURA_CONTINGENCIA" : null,
+      ],
+    );
   }
 }
 

@@ -2,11 +2,13 @@ import {
   CanActivate,
   ExecutionContext,
   Injectable,
+  Optional,
   type OnModuleDestroy,
 } from "@nestjs/common";
 import type { Request, Response } from "express";
 
 import { ApiException } from "../common/errors/api.exception";
+import { AuthThrottleService } from "./auth-throttle.service";
 
 const WINDOW_MS = 60_000;
 const MAX_ATTEMPTS = 5;
@@ -73,11 +75,38 @@ export class LoginRateLimiter implements OnModuleDestroy {
 
 @Injectable()
 export class LoginRateLimitGuard implements CanActivate {
-  constructor(private readonly limiter: LoginRateLimiter) {}
+  constructor(
+    private readonly limiter: LoginRateLimiter,
+    @Optional() private readonly durable?: AuthThrottleService,
+  ) {}
 
-  canActivate(context: ExecutionContext): boolean {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
     const response = context.switchToHttp().getResponse<Response>();
+    if (this.durable) {
+      try {
+        await this.durable.consumeNetwork(
+          request.path,
+          request.ip || request.socket.remoteAddress || "unknown",
+        );
+        if (
+          request.path.endsWith("/login") &&
+          typeof request.body?.email === "string"
+        )
+          await this.durable.assertAccount(request.body.email);
+        return true;
+      } catch (error) {
+        if (error instanceof ApiException && error.code === "TOO_MANY_REQUESTS")
+          response.setHeader(
+            "Retry-After",
+            String(
+              (error.details as { retryAfterSeconds?: number })
+                ?.retryAfterSeconds ?? 60,
+            ),
+          );
+        throw error;
+      }
+    }
     const limit = this.limiter.consume(loginRateLimitKey(request));
 
     if (!limit) return true;
@@ -93,5 +122,5 @@ export function loginRateLimitKey(request: Request): string {
     typeof request.body?.email === "string"
       ? request.body.email.trim().toLowerCase().slice(0, 191)
       : "<invalid>";
-  return `${address}:${email}`;
+  return `${request.path ?? "/api/auth/login"}:${address}:${email}`;
 }

@@ -168,7 +168,7 @@ export function KairosProjectsPage() {
             {items.map((project) => (
               <ResponsiveListItem key={project.id}>
                 <div className="flex items-start justify-between gap-3">
-                  <div className="grid min-h-11 min-w-11 place-items-center rounded-xl bg-[#e9f6cb] text-[#557416]">
+                  <div className="grid min-h-11 min-w-11 place-items-center rounded-xl bg-[#ffe0d0] text-[#c2410c]">
                     <FolderKanban size={21} />
                   </div>
                   <button

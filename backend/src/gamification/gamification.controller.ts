@@ -24,6 +24,7 @@ import {
   reverseGamificationEventSchema,
 } from "./gamification.schemas";
 import { GamificationService } from "./gamification.service";
+import { RequireFeature } from "../common/domain/feature-policy.guard";
 
 @Controller("gamification")
 export class GamificationController {
@@ -115,6 +116,7 @@ export class GamificationController {
   }
 
   @Post("admin/recognitions")
+  @RequireFeature("GAMIFICATION.AWARD")
   @RequirePermissions(Permission.GAMIFICATION_MANAGE)
   recognize(
     @Req() req: Request,

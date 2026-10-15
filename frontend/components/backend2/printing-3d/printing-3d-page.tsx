@@ -189,34 +189,34 @@ export function Printing3dPage() {
           </Field>
         </div>
         {page?.items.length ? (
-          <div role="list" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <ul role="list" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {page.items.map((job) => (
-              <button
-                role="listitem"
-                key={job.id}
-                type="button"
-                onClick={() => void refreshDetail(job.id)}
-                className="focus-ring min-h-40 rounded-2xl border border-[var(--ares-border)] p-4 text-left"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <Box className="text-[#769a27]" />
-                  <StatusBadge
-                    label={job.estado.replaceAll("_", " ")}
-                    tone={tone[job.estado]}
-                  />
-                </div>
-                <h2 className="mt-3 line-clamp-2 font-black">
-                  {job.descripcion}
-                </h2>
-                <p className="mt-2 text-sm text-[var(--ares-muted)]">
-                  {job.archivo.originalName}
-                </p>
-                <p className="mt-1 text-xs font-bold text-[var(--ares-muted)]">
-                  Solicita {job.solicitante.codigo}
-                </p>
-              </button>
+              <li key={job.id}>
+                <button
+                  type="button"
+                  onClick={() => void refreshDetail(job.id)}
+                  className="focus-ring min-h-40 w-full rounded-2xl border border-[var(--ares-border)] p-4 text-left"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <Box className="text-[#ea580c]" />
+                    <StatusBadge
+                      label={job.estado.replaceAll("_", " ")}
+                      tone={tone[job.estado]}
+                    />
+                  </div>
+                  <h2 className="mt-3 line-clamp-2 font-black">
+                    {job.descripcion}
+                  </h2>
+                  <p className="mt-2 text-sm text-[var(--ares-muted)]">
+                    {job.archivo.originalName}
+                  </p>
+                  <p className="mt-1 text-xs font-bold text-[var(--ares-muted)]">
+                    Solicita {job.solicitante.codigo}
+                  </p>
+                </button>
+              </li>
             ))}
-          </div>
+          </ul>
         ) : (
           <EmptyState
             title="Sin trabajos"
@@ -266,7 +266,7 @@ export function Printing3dPage() {
           </Field>
           <button
             disabled={busy || !draft.archivoId}
-            className="focus-ring min-h-11 w-full rounded-xl bg-[#12221b] px-5 text-sm font-black text-white disabled:opacity-50"
+            className="focus-ring min-h-11 w-full rounded-xl bg-[#17174a] px-5 text-sm font-black text-white disabled:opacity-50"
           >
             {busy ? "Enviando…" : "Crear solicitud"}
           </button>
@@ -467,7 +467,7 @@ export function Printing3dPage() {
                   {selected.ejecuciones.map((execution) => (
                     <article
                       key={execution.id}
-                      className="rounded-xl bg-[#f4f0e7] p-3 text-sm"
+                      className="rounded-xl bg-[#f6f7fb] p-3 text-sm"
                     >
                       <p className="font-black">
                         Intento {execution.numero} · {execution.material}
@@ -513,7 +513,7 @@ function Action({
     <button
       type="button"
       onClick={onClick}
-      className={`focus-ring inline-flex min-h-11 items-center gap-2 rounded-xl px-4 text-sm font-black ${danger ? "bg-red-700 text-white" : "bg-[#12221b] text-white"}`}
+      className={`focus-ring inline-flex min-h-11 items-center gap-2 rounded-xl px-4 text-sm font-black ${danger ? "bg-red-700 text-white" : "bg-[#17174a] text-white"}`}
     >
       {icon}
       {label}
@@ -522,7 +522,7 @@ function Action({
 }
 function Info({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl bg-[#f4f0e7] p-3">
+    <div className="rounded-xl bg-[#f6f7fb] p-3">
       <dt className="text-xs font-black uppercase text-[var(--ares-muted)]">
         {label}
       </dt>
@@ -534,7 +534,7 @@ function DisabledState({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="grid min-h-[55vh] place-items-center text-center">
       <div className="max-w-md">
-        <Box size={36} className="mx-auto text-[#769a27]" />
+        <Box size={36} className="mx-auto text-[#ea580c]" />
         <h1 className="mt-4 text-3xl font-black">Impresión 3D no disponible</h1>
         <p className="mt-3 text-sm leading-6 text-[var(--ares-muted)]">
           El módulo está deshabilitado por configuración. El resto de Ares
@@ -543,7 +543,7 @@ function DisabledState({ onRetry }: { onRetry: () => void }) {
         <button
           type="button"
           onClick={onRetry}
-          className="focus-ring mt-5 min-h-11 rounded-xl bg-[#12221b] px-5 text-sm font-black text-white"
+          className="focus-ring mt-5 min-h-11 rounded-xl bg-[#17174a] px-5 text-sm font-black text-white"
         >
           Volver a consultar
         </button>

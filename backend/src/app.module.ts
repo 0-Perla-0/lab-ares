@@ -6,6 +6,9 @@ import { AuthModule } from "./auth/auth.module";
 import { AttendanceModule } from "./attendance/attendance.module";
 import { PermissionsGuard } from "./auth/permissions.guard";
 import { SessionAuthGuard } from "./auth/session-auth.guard";
+import { RecentAuthGuard } from "./auth/recent-auth.guard";
+import { FeaturePoliciesModule } from "./common/domain/feature-policies.module";
+import { FeaturePolicyGuard } from "./common/domain/feature-policy.guard";
 import { ApiExceptionFilter } from "./common/errors/api-exception.filter";
 import { NoStoreInterceptor } from "./common/http/no-store.interceptor";
 import { CorrelationInterceptor } from "./common/http/correlation.interceptor";
@@ -32,6 +35,11 @@ import { RetentionModule } from "./retention/retention.module";
 import { OperationsModule } from "./operations/operations.module";
 import { RecoveryModule } from "./recovery/recovery.module";
 import { WriteBarrierGuard } from "./recovery/write-barrier.guard";
+import { JsonSafeInterceptor } from "./common/http/json-safe.interceptor";
+import { CalendarModule } from "./calendar/calendar.module";
+import { AbsencesModule } from "./absences/absences.module";
+import { VisitsModule } from "./visits/visits.module";
+import { InventoryModule } from "./inventory/inventory.module";
 
 @Module({
   imports: [
@@ -43,7 +51,12 @@ import { WriteBarrierGuard } from "./recovery/write-barrier.guard";
     DatabaseModule,
     CorrelationModule,
     AuthModule,
+    FeaturePoliciesModule,
     AttendanceModule,
+    CalendarModule,
+    AbsencesModule,
+    VisitsModule,
+    InventoryModule,
     HealthModule,
     OrganizationModule,
     UsersModule,
@@ -66,11 +79,14 @@ import { WriteBarrierGuard } from "./recovery/write-barrier.guard";
   ],
   providers: [
     { provide: APP_FILTER, useClass: ApiExceptionFilter },
+    { provide: APP_INTERCEPTOR, useClass: JsonSafeInterceptor },
     { provide: APP_INTERCEPTOR, useClass: CorrelationInterceptor },
     { provide: APP_INTERCEPTOR, useClass: NoStoreInterceptor },
     { provide: APP_GUARD, useClass: WriteBarrierGuard },
     { provide: APP_GUARD, useClass: SessionAuthGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
+    { provide: APP_GUARD, useClass: RecentAuthGuard },
+    { provide: APP_GUARD, useClass: FeaturePolicyGuard },
   ],
 })
 export class AppModule {}

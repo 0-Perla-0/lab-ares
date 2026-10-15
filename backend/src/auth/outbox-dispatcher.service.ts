@@ -5,24 +5,32 @@ import type { Environment } from "../config/environment";
 import { OutboxService } from "./outbox.service";
 import { EmailService } from "./email.service";
 import { workersMayMutate } from "../recovery/barrier";
+import { observeWorker } from "../common/domain/worker-heartbeat";
+import { notificationLink } from "../common/domain/operational-notification";
 
 @Injectable()
 export class OutboxDispatcherService implements OnModuleInit, OnModuleDestroy {
   private timer?: NodeJS.Timeout;
   private running = false;
   private readonly enabled: boolean;
+  private readonly origin: string;
   constructor(
     private readonly prisma: PrismaService,
     private readonly outbox: OutboxService,
     private readonly email: EmailService,
     config: ConfigService<Environment, true>,
   ) {
+    this.origin = config.get("FRONTEND_ORIGIN", { infer: true });
     this.enabled =
       config.get("OUTBOX_WORKER_ENABLED", { infer: true }) &&
       config.get("SMTP_ENABLED", { infer: true });
   }
   onModuleInit() {
-    if (this.enabled) this.timer = setInterval(() => void this.tick(), 5000);
+    if (this.enabled)
+      this.timer = setInterval(() => {
+        if (!this.running)
+          void observeWorker(this.prisma, "outbox", () => this.tick());
+      }, 5000);
   }
   onModuleDestroy() {
     if (this.timer) clearInterval(this.timer);
@@ -61,33 +69,84 @@ export class OutboxDispatcherService implements OnModuleInit, OnModuleDestroy {
             leaseUntil: new Date(Date.now() + 60000),
           },
         });
-        const payload = this.outbox.decryptPayload(event.payload);
+        const payload =
+          event.type === "OPERATIONAL_NOTIFICATION"
+            ? {}
+            : this.outbox.decryptPayload(event.payload);
         const handlers: Record<string, (p: any) => Promise<void>> = {
+          IDENTITY_RECOVERY_PREVIOUS_ADDRESS: async (p) => {
+            if (typeof p.email !== "string")
+              throw new Error("MISSING_RECIPIENT");
+            await this.email.send(
+              p.email,
+              "ARES recuperación administrativa",
+              "Una autoridad institucional verificó tu identidad y solicitó recuperar tu acceso. Si no reconoces esta operación, contacta al responsable institucional.",
+              messageId,
+            );
+          },
+          OPERATIONAL_NOTIFICATION: async () => {
+            const notification = await this.prisma.notification.findUnique({
+              where: { id: event.aggregateId },
+              select: { userId: true, type: true },
+            });
+            if (!notification) throw new Error("MISSING_RECIPIENT");
+            const user = await this.prisma.usuario.findUnique({
+              where: { id: notification.userId },
+              select: { email: true },
+            });
+            if (!user) throw new Error("MISSING_RECIPIENT");
+            await this.email.send(
+              user.email,
+              "ARES aviso institucional",
+              `Tienes una actualización institucional. Consulta los detalles en ${this.origin}${notificationLink(notification.type)}`,
+              messageId,
+            );
+          },
           PASSWORD_RECOVERY_REQUESTED: async (p) => {
             if (!p.email || !p.token) throw new Error("MISSING_RECIPIENT");
             await this.email.send(
               p.email,
               "ARES recuperación de contraseña",
-              `Usa este token para recuperar tu contraseña: ${p.token}`,
+              `Restablece tu contraseña: ${this.origin}/recuperar?token=${encodeURIComponent(p.token)}`,
               messageId,
             );
           },
           PASSWORD_CHANGED: async (p) =>
             this.sendUser(p.userId, event.type, messageId),
+          ACCOUNT_CHANGED: async (p) =>
+            this.sendUser(p.userId, event.type, messageId),
           PASSWORD_RECOVERY_RESET: async (p) =>
             this.sendUser(p.userId ?? event.aggregateId, event.type, messageId),
           SESSION_REVOKED: async (p) =>
             this.sendUser(p.actorId, event.type, messageId),
+          OTHER_SESSIONS_REVOKED: async (p) =>
+            this.sendUser(p.actorId, event.type, messageId),
+          INVITATION_ACCEPTED: async () =>
+            this.sendUser(event.aggregateId, event.type, messageId),
+          INVITATION_REVOKED: async () => {
+            const invitation = await this.prisma.invitation.findUnique({
+              where: { id: event.aggregateId },
+              select: { targetEmail: true },
+            });
+            if (!invitation) throw new Error("MISSING_RECIPIENT");
+            await this.email.send(
+              invitation.targetEmail,
+              "ARES invitación revocada",
+              "Tu invitación ya no está disponible. Contacta al responsable institucional.",
+              messageId,
+            );
+          },
           MFA_ENABLED: async (p) =>
             this.sendUser(p.userId ?? event.aggregateId, event.type, messageId),
           MFA_DISABLED: async (p) =>
             this.sendUser(p.userId ?? event.aggregateId, event.type, messageId),
           INVITATION_CREATED: async (p) => {
-            if (!p.email || !p.token) throw new Error("MISSING_RECIPIENT");
+            if (!p.targetEmail || !p.token)
+              throw new Error("MISSING_RECIPIENT");
             await this.email.send(
-              p.email,
+              p.targetEmail,
               "ARES invitación",
-              `Token de invitación: ${p.token}`,
+              `Activa tu cuenta: ${this.origin}/invitacion?token=${encodeURIComponent(p.token)}`,
               messageId,
             );
           },

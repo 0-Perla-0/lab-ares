@@ -1,0 +1,320 @@
+{
+  "info": {
+    "name": "Ares - Aceptación integral sintética",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Sólo stack aislado con seed-fullstack-test. Requiere acceptanceEnabled=true y baseUrl localhost. No restaura, borra ni activa workers. Claves estables por operación; replay de entrada usa exactamente la misma clave y cuerpo."
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:4321/api" },
+    { "key": "acceptanceEnabled", "value": "false" }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "exec": [
+          "if (pm.variables.get('acceptanceEnabled') !== 'true' || !/^http:\\/\\/(localhost|127\\.0\\.0\\.1):\\d+\\/api$/.test(pm.variables.get('baseUrl'))) throw new Error('Only explicitly authorized isolated localhost acceptance is allowed');",
+          "if (/\\/academic\\//.test(pm.request.url.toString()) && ['POST','PUT','PATCH','DELETE'].includes(pm.request.method) && !pm.request.headers.has('Idempotency-Key')) pm.request.headers.upsert({ key: 'Idempotency-Key', value: pm.collectionVariables.get('run') + '-' + pm.info.requestId });"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "exec": [
+          "pm.test('HTTP success confirmed', () => pm.expect(pm.response.code).to.be.within(200, 299));",
+          "pm.test('JSON response envelope', () => pm.expect(pm.response.json()).to.have.property('data'));"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Login prestador",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+               "const run = pm.variables.replaceIn('{{$guid}}'); pm.collectionVariables.set('run', run); pm.collectionVariables.set('entryKey', run + '-entry'); pm.collectionVariables.set('exitKey', run + '-exit'); pm.collectionVariables.set('formalizationKey', run + '-formalize');"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/auth/login",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"email\":\"prestador@fullstack.example.test\",\"password\":\"Acceptance-Test-Only!2026\"}"
+        }
+      }
+    },
+    {
+      "name": "Entrada real",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.collectionVariables.set('attendanceId', pm.response.json().data.id); pm.collectionVariables.set('entryResult', JSON.stringify(pm.response.json().data));",
+              "pm.test('Raw signals private', () => pm.expect(JSON.stringify(pm.response.json())).not.to.match(/geoLatitude|clientIp/));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/attendance/check-in",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Idempotency-Key", "value": "{{entryKey}}" }
+        ],
+        "body": { "mode": "raw", "raw": "{}" }
+      }
+    },
+    {
+      "name": "Replay exacto de entrada",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Same-key replay exact', () => pm.expect(JSON.stringify(pm.response.json().data)).to.eql(pm.collectionVariables.get('entryResult')));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/attendance/check-in",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Idempotency-Key", "value": "{{entryKey}}" }
+        ],
+        "body": { "mode": "raw", "raw": "{}" }
+      }
+    },
+    {
+      "name": "Salida real",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/attendance/check-out",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Idempotency-Key", "value": "{{exitKey}}" }
+        ],
+        "body": { "mode": "raw", "raw": "{\"attendanceId\":{{attendanceId}}}" }
+      }
+    },
+    {
+      "name": "Ausencias propias",
+      "request": { "method": "GET", "url": "{{baseUrl}}/absences/me" }
+    },
+    {
+      "name": "Login coordinador",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/auth/login",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"email\":\"coordinador@fullstack.example.test\",\"password\":\"Acceptance-Test-Only!2026\"}"
+        }
+      }
+    },
+    {
+      "name": "Asignación real",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "const user = pm.response.json().data; pm.collectionVariables.set('sedeId', user.sedeId); pm.collectionVariables.set('areaId', user.areaId);"
+            ]
+          }
+        }
+      ],
+      "request": { "method": "GET", "url": "{{baseUrl}}/auth/me" }
+    },
+    {
+      "name": "Ubicación sintética",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.collectionVariables.set('locationId', pm.response.json().data.id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/inventory/locations",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Idempotency-Key", "value": "{{run}}-location" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"sedeId\":{{sedeId}},\"areaId\":{{areaId}},\"codigo\":\"{{run}}\",\"nombre\":\"Newman sintético\",\"reason\":\"Alta de ensayo\"}"
+        }
+      }
+    },
+    {
+      "name": "Consumible sintético",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.collectionVariables.set('itemId', pm.response.json().data.id); pm.collectionVariables.set('version', pm.response.json().data.version);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/inventory/items",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Idempotency-Key", "value": "{{run}}-item" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"codigo\":\"{{run}}\",\"nombre\":\"Newman sintético\",\"tipo\":\"CONSUMIBLE\",\"unidadMedida\":\"pieza\",\"ubicacionId\":{{locationId}},\"reason\":\"Alta de ensayo\"}"
+        }
+      }
+    },
+    {
+      "name": "Entrada decimal exacta",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Exact balance', () => pm.expect(Number(pm.response.json().data.cantidadStock)).to.eql(2.12));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/inventory/movements",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Idempotency-Key", "value": "{{run}}-movement" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"articuloId\":\"{{itemId}}\",\"version\":{{version}},\"tipo\":\"ENTRADA\",\"cantidad\":2.12,\"motivo\":\"Entrada sintética\"}"
+        }
+      }
+    },
+    {
+      "name": "Ledger real",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/inventory/items/{{itemId}}/movements"
+      }
+    },
+    {
+      "name": "Login admin",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/auth/login",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"email\":\"admin@fullstack.example.test\",\"password\":\"Acceptance-Test-Only!2026\"}"
+        }
+      }
+    },
+    {
+      "name": "Salud real",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Real dependencies connected', () => { const health = pm.response.json().data; ['database','storage','scanner'].forEach(key => pm.expect(health.dependencies[key]).to.eql('connected')); pm.expect(health.smtp.connectivity).to.eql('connected'); });"
+            ]
+          }
+        }
+      ],
+      "request": { "method": "GET", "url": "{{baseUrl}}/operations/status" }
+    },
+    {
+      "name": "Issues históricos",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/operations/absence-evaluation-issues"
+      }
+    },
+    {
+      "name": "Prestador sintético de expediente",
+      "event": [{ "listen": "test", "script": { "exec": [
+        "const target = pm.response.json().data.find(user => user.email === 'expedient@fullstack.example.test'); pm.expect(target).to.exist; pm.collectionVariables.set('expedientUserId', target.id);"
+      ] } }],
+      "request": { "method": "GET", "url": "{{baseUrl}}/users" }
+    },
+    {
+      "name": "Institución sintética",
+      "event": [{ "listen": "test", "script": { "exec": ["pm.collectionVariables.set('institutionId', pm.response.json().data.id);"] } }],
+      "request": { "method": "POST", "url": "{{baseUrl}}/academic/catalogs/institucion", "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"nombre\":\"Institution-{{run}}\"}" } }
+    },
+    {
+      "name": "Unidad sintética",
+      "event": [{ "listen": "test", "script": { "exec": ["pm.collectionVariables.set('unitId', pm.response.json().data.id);"] } }],
+      "request": { "method": "POST", "url": "{{baseUrl}}/academic/catalogs/unidad", "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"nombre\":\"Unit-{{run}}\",\"parentId\":{{institutionId}}}" } }
+    },
+    {
+      "name": "Programa sintético",
+      "event": [{ "listen": "test", "script": { "exec": ["pm.collectionVariables.set('programId', pm.response.json().data.id);"] } }],
+      "request": { "method": "POST", "url": "{{baseUrl}}/academic/catalogs/programa", "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"nombre\":\"Program-{{run}}\",\"parentId\":{{unitId}}}" } }
+    },
+    {
+      "name": "Login expediente",
+      "request": { "method": "POST", "url": "{{baseUrl}}/auth/login", "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"email\":\"expedient@fullstack.example.test\",\"password\":\"Acceptance-Test-Only!2026\"}" } }
+    },
+    {
+      "name": "Solicitar adscripción académica",
+      "event": [{ "listen": "test", "script": { "exec": ["pm.collectionVariables.set('academicRequestId', pm.response.json().data.id);"] } }],
+      "request": { "method": "PUT", "url": "{{baseUrl}}/academic/profile/me", "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"institucionId\":{{institutionId}},\"unidadAcademicaId\":{{unitId}},\"programaAcademicoId\":{{programId}},\"cohorteId\":null,\"inicio\":\"2026-01-01\",\"fin\":null}" } }
+    },
+    {
+      "name": "Login autoridad de formalización",
+      "request": { "method": "POST", "url": "{{baseUrl}}/auth/login", "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"email\":\"admin@fullstack.example.test\",\"password\":\"Acceptance-Test-Only!2026\"}" } }
+    },
+    {
+      "name": "Confirmar adscripción académica",
+      "request": { "method": "POST", "url": "{{baseUrl}}/academic/profile/requests/{{academicRequestId}}/confirm", "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"accept\":true}" } }
+    },
+    {
+      "name": "Formalizar expediente una vez",
+      "event": [{ "listen": "test", "script": { "exec": ["pm.collectionVariables.set('formalizationResult', JSON.stringify(pm.response.json())); pm.test('Immutable academic snapshot recorded', () => pm.expect(pm.response.json().data.academicSnapshot.programaId).to.eql(Number(pm.collectionVariables.get('programId'))));"] } }],
+      "request": { "method": "POST", "url": "{{baseUrl}}/documents/formalizations", "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Idempotency-Key", "value": "{{formalizationKey}}" }],
+        "body": { "mode": "raw", "raw": "{\"usuarioId\":{{expedientUserId}},\"inicio\":\"2026-10-12\"}" } }
+    },
+    {
+      "name": "Replay exacto de formalización",
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('Same immutable receipt', () => pm.expect(pm.response.json()).to.deep.eql(JSON.parse(pm.collectionVariables.get('formalizationResult'))));"] } }],
+      "request": { "method": "POST", "url": "{{baseUrl}}/documents/formalizations", "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Idempotency-Key", "value": "{{formalizationKey}}" }],
+        "body": { "mode": "raw", "raw": "{\"usuarioId\":{{expedientUserId}},\"inicio\":\"2026-10-12\"}" } }
+    },
+    {
+      "name": "Historial de formalizaciones",
+      "event": [{ "listen": "test", "script": { "exec": ["pm.test('No duplicate formalizations', () => pm.expect(pm.response.json().data).to.have.lengthOf(1));"] } }],
+      "request": { "method": "GET", "url": "{{baseUrl}}/documents/formalizations?userId={{expedientUserId}}" }
+    }
+  ]
+}

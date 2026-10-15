@@ -2,6 +2,17 @@ import { RolUsuario } from "../generated/prisma/enums";
 import type { AuthUser } from "./auth-user";
 
 export enum Permission {
+  VISITS_REQUEST = "visits:request",
+  VISITS_CONTROL = "visits:control",
+  VISITS_MANAGE = "visits:manage",
+  INVENTORY_READ = "inventory:read",
+  INVENTORY_MANAGE = "inventory:manage",
+  INVENTORY_LOAN = "inventory:loan",
+  ABSENCES_SELF = "absences:self",
+  ABSENCES_REVIEW = "absences:review",
+  ABSENCES_APPEAL_RESOLVE = "absences:appeal:resolve",
+  CALENDAR_READ = "calendar:read",
+  CALENDAR_MANAGE = "calendar:manage",
   ATTENDANCE_SELF_READ = "attendance:self:read",
   ATTENDANCE_CHECK_IN = "attendance:check-in",
   ATTENDANCE_MANAGE = "attendance:manage",
@@ -12,6 +23,7 @@ export enum Permission {
   USERS_MANAGE = "users:manage",
   DIRECTORY_READ = "directory:read",
   KAIROS_PROJECT_CREATE = "kairos:project:create",
+  KAIROS_PROJECT_READ = "kairos:project:read",
   ACADEMIC_PROFILE_READ = "academic:profile:read",
   ACADEMIC_PROFILE_UPDATE = "academic:profile:update",
   ACADEMIC_CATALOG_MANAGE = "academic:catalog:manage",
@@ -58,6 +70,9 @@ export enum AccessScope {
 type RoleGrants = Readonly<Partial<Record<Permission, AccessScope>>>;
 
 const commonUserGrants: RoleGrants = {
+  [Permission.ABSENCES_SELF]: AccessScope.SELF,
+  [Permission.CALENDAR_READ]: AccessScope.SELF,
+  [Permission.KAIROS_PROJECT_READ]: AccessScope.SELF,
   [Permission.ATTENDANCE_SELF_READ]: AccessScope.SELF,
   [Permission.ATTENDANCE_CHECK_IN]: AccessScope.SELF,
   [Permission.ACADEMIC_PROFILE_READ]: AccessScope.SELF,
@@ -77,6 +92,15 @@ const commonUserGrants: RoleGrants = {
 
 const areaManagerGrants: RoleGrants = {
   ...commonUserGrants,
+  [Permission.VISITS_REQUEST]: AccessScope.AREA,
+  [Permission.VISITS_CONTROL]: AccessScope.AREA,
+  [Permission.VISITS_MANAGE]: AccessScope.AREA,
+  [Permission.INVENTORY_READ]: AccessScope.AREA,
+  [Permission.INVENTORY_MANAGE]: AccessScope.AREA,
+  [Permission.INVENTORY_LOAN]: AccessScope.AREA,
+  [Permission.ABSENCES_REVIEW]: AccessScope.AREA,
+  [Permission.CALENDAR_READ]: AccessScope.AREA,
+  [Permission.CALENDAR_MANAGE]: AccessScope.AREA,
   [Permission.ATTENDANCE_MANAGE]: AccessScope.AREA,
   [Permission.USERS_READ]: AccessScope.AREA,
   [Permission.USERS_MANAGE]: AccessScope.AREA,
@@ -98,6 +122,7 @@ const permissionsByRole: Record<RolUsuario, RoleGrants> = {
   [RolUsuario.COORDINADOR]: areaManagerGrants,
   [RolUsuario.JEFE_AREA]: {
     ...areaManagerGrants,
+    [Permission.ABSENCES_APPEAL_RESOLVE]: AccessScope.AREA,
     [Permission.HOURS_VALIDATE]: AccessScope.AREA,
     [Permission.LIBRARY_REVIEW]: AccessScope.AREA,
     [Permission.LIBRARY_PUBLISH]: AccessScope.AREA,
@@ -107,6 +132,16 @@ const permissionsByRole: Record<RolUsuario, RoleGrants> = {
   },
   [RolUsuario.JEFE_SEDE]: {
     ...areaManagerGrants,
+    [Permission.VISITS_REQUEST]: AccessScope.SEDE,
+    [Permission.VISITS_CONTROL]: AccessScope.SEDE,
+    [Permission.VISITS_MANAGE]: AccessScope.SEDE,
+    [Permission.INVENTORY_READ]: AccessScope.SEDE,
+    [Permission.INVENTORY_MANAGE]: AccessScope.SEDE,
+    [Permission.INVENTORY_LOAN]: AccessScope.SEDE,
+    [Permission.ABSENCES_REVIEW]: AccessScope.SEDE,
+    [Permission.ABSENCES_APPEAL_RESOLVE]: AccessScope.SEDE,
+    [Permission.CALENDAR_READ]: AccessScope.SEDE,
+    [Permission.CALENDAR_MANAGE]: AccessScope.SEDE,
     [Permission.ATTENDANCE_MANAGE]: AccessScope.SEDE,
     [Permission.HOURS_VALIDATE]: AccessScope.SEDE,
     [Permission.ORGANIZATION_MANAGE]: AccessScope.SEDE,
@@ -130,6 +165,16 @@ const permissionsByRole: Record<RolUsuario, RoleGrants> = {
   },
   [RolUsuario.JEFE_COORDINADORES]: {
     ...areaManagerGrants,
+    [Permission.VISITS_REQUEST]: AccessScope.GLOBAL,
+    [Permission.VISITS_CONTROL]: AccessScope.GLOBAL,
+    [Permission.VISITS_MANAGE]: AccessScope.GLOBAL,
+    [Permission.INVENTORY_READ]: AccessScope.GLOBAL,
+    [Permission.INVENTORY_MANAGE]: AccessScope.GLOBAL,
+    [Permission.INVENTORY_LOAN]: AccessScope.GLOBAL,
+    [Permission.ABSENCES_REVIEW]: AccessScope.GLOBAL,
+    [Permission.ABSENCES_APPEAL_RESOLVE]: AccessScope.GLOBAL,
+    [Permission.CALENDAR_READ]: AccessScope.GLOBAL,
+    [Permission.CALENDAR_MANAGE]: AccessScope.GLOBAL,
     [Permission.ATTENDANCE_MANAGE]: AccessScope.GLOBAL,
     [Permission.HOURS_VALIDATE]: AccessScope.GLOBAL,
     [Permission.USERS_READ]: AccessScope.GLOBAL,

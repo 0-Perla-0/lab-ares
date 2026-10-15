@@ -6,6 +6,27 @@ import { StorageService } from "./storage.service";
 import { StorageWorker } from "./storage.worker";
 import { StorageReconciler } from "./storage.reconciler";
 import { FilesController } from "./files.controller";
+import { ObjectDeletionService } from "./object-deletion.service";
 
-@Module({ imports: [DatabaseModule], controllers: [FilesController], providers: [S3Storage, ClamAvScanner, StorageService, StorageWorker, StorageReconciler, { provide: "MALWARE_SCANNER", useExisting: ClamAvScanner }], exports: [StorageService, StorageWorker, StorageReconciler, S3Storage, ClamAvScanner] })
+@Module({
+  imports: [DatabaseModule],
+  controllers: [FilesController],
+  providers: [
+    S3Storage,
+    ClamAvScanner,
+    StorageService,
+    ObjectDeletionService,
+    StorageWorker,
+    StorageReconciler,
+    { provide: "MALWARE_SCANNER", useExisting: ClamAvScanner },
+  ],
+  exports: [
+    ObjectDeletionService,
+    StorageService,
+    StorageWorker,
+    StorageReconciler,
+    S3Storage,
+    ClamAvScanner,
+  ],
+})
 export class StorageModule {}

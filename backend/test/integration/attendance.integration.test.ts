@@ -14,6 +14,8 @@ import type { AuthUser } from "../../src/auth/auth-user";
 import { AttendancePolicy } from "../../src/attendance/attendance.policy";
 import { AttendanceService } from "../../src/attendance/attendance.service";
 import { PrismaService } from "../../src/database/prisma.service";
+import { AuditService } from "../../src/auth/audit.service";
+import { AttendanceReviewService } from "../../src/attendance/attendance-review.service";
 
 config({ path: [".env", "../.env"], quiet: true });
 const databaseUrl = process.env.DATABASE_URL;
@@ -29,12 +31,14 @@ const service = new AttendanceService(
   prisma,
   new AttendancePolicy(),
   new ConfigService({ ATTENDANCE_ALERT_HOURS: 12 }),
+  new AuditService(prisma),
 );
 const prefix = `attendance-${randomUUID().slice(0, 8)}`;
 let owner: AuthUser;
 let colleague: AuthUser;
 let manager: AuthUser;
 let otherManager: AuthUser;
+let validator: AuthUser;
 const userIds: number[] = [];
 const sedeIds: number[] = [];
 const areaIds: number[] = [];
@@ -42,6 +46,10 @@ const turnoIds: number[] = [];
 
 async function clearAttendance() {
   if (userIds.length === 0) return;
+  await prisma.asistenciaValidacion.deleteMany({
+    where: { attendance: { userId: { in: userIds } } },
+  });
+  await prisma.notification.deleteMany({ where: { userId: { in: userIds } } });
   await prisma.asistenciaEvento.deleteMany({
     where: { attendance: { userId: { in: userIds } } },
   });
@@ -64,15 +72,15 @@ describe("Attendance on real MariaDB", () => {
       areaIds.push(area.id);
       const turno = await prisma.turno.create({
         data: {
-          nombre: "Nocturno",
+          nombre: "Diurno",
           areaId: area.id,
-          horaInicio: new Date("1970-01-01T22:00:00Z"),
-          horaFin: new Date("1970-01-01T06:00:00Z"),
+          horaInicio: new Date("1970-01-01T08:00:00Z"),
+          horaFin: new Date("1970-01-01T18:00:00Z"),
           dias: { create: [{ dia: "LUNES" }] },
         },
       });
       turnoIds.push(turno.id);
-      for (const role of ["PRESTADOR", "COORDINADOR"] as const) {
+      for (const role of ["PRESTADOR", "COORDINADOR", "JEFE_AREA"] as const) {
         const user = await prisma.usuario.create({
           data: {
             codigo: `${prefix}-${index}-${role}`,
@@ -90,11 +98,16 @@ describe("Attendance on real MariaDB", () => {
         if (index === 0 && role === "COORDINADOR") manager = user;
         if (index === 1 && role === "PRESTADOR") colleague = user;
         if (index === 1 && role === "COORDINADOR") otherManager = user;
+        if (index === 0 && role === "JEFE_AREA") validator = user;
       }
     }
   });
 
-  beforeEach(clearAttendance);
+  beforeEach(async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-09-22T20:00:00Z"));
+    await clearAttendance();
+  });
   afterAll(async () => {
     vi.useRealTimers();
     await clearAttendance();
@@ -136,20 +149,20 @@ describe("Attendance on real MariaDB", () => {
     expect((await service.mine(owner, { limit: 20 })).open).toBeNull();
   });
 
-  it("records overnight time without approving hours and preserves checkout on replay", async () => {
+  it("records same-day time without approving hours and preserves checkout on replay", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     try {
-      vi.setSystemTime(new Date("2026-09-22T05:30:00Z"));
+      vi.setSystemTime(new Date("2026-09-22T15:30:00Z"));
       await service.checkIn(owner, randomUUID());
       const current = (await service.mine(owner, { limit: 20 })).open!;
-      vi.setSystemTime(new Date("2026-09-22T07:00:15Z"));
+      vi.setSystemTime(new Date("2026-09-22T17:00:15Z"));
       const key = randomUUID();
       const closed = await service.checkOut(owner, key, current.id);
       expect(closed).toMatchObject({
         durationSeconds: 5415,
         status: "PENDIENTE",
       });
-      vi.setSystemTime(new Date("2026-09-22T08:00:00Z"));
+      vi.setSystemTime(new Date("2026-09-22T18:00:00Z"));
       expect(await service.checkOut(owner, key, current.id)).toEqual(closed);
       expect((await service.mine(owner, { limit: 20 })).bank).toEqual({
         pendingSeconds: 5415,
@@ -241,6 +254,84 @@ describe("Attendance on real MariaDB", () => {
     expect(older.items.map((item) => item.id)).toEqual([id]);
     expect(older.nextCursor).toBeNull();
     expect(older.open!.id).toBe(page.open!.id);
+  });
+
+  it("closes omitted checkout atomically before next-day entry and excludes provisional hours", async () => {
+    await service.checkIn(owner, randomUUID());
+    const old = (await service.mine(owner, { limit: 20 })).open!;
+    vi.setSystemTime(new Date("2026-09-23T15:00:00Z"));
+    await service.checkIn(owner, randomUUID());
+    const result = await service.mine(owner, { limit: 20 });
+    expect(result.open?.id).not.toBe(old.id);
+    expect(result.items.find((row) => row.id === old.id)).toMatchObject({
+      checkOutAt: "2026-09-23T05:59:00.000Z",
+      requiresReview: true,
+      closeReason: "CHECKOUT_OMITIDO",
+      risk: { color: "ROJO" },
+    });
+    expect(result.bank.pendingSeconds).toBe(0);
+    expect(
+      await prisma.asistenciaEvento.count({
+        where: { attendanceId: old.id, action: "DAILY_CUTOFF" },
+      }),
+    ).toBe(1);
+  });
+
+  it("rolls back validation on audit failure on real MariaDB", async () => {
+    await service.checkIn(owner, randomUUID());
+    const id = (await service.mine(owner, { limit: 20 })).open!.id;
+    vi.setSystemTime(new Date("2026-09-22T21:00:00Z"));
+    await service.checkOut(owner, randomUUID(), id);
+    const closed = await prisma.asistencia.findUniqueOrThrow({ where: { id } });
+    const review = new AttendanceReviewService(prisma, new AttendancePolicy(), {
+      append: async () => {
+        throw new Error("intentional audit failure");
+      },
+    } as any);
+    await expect(
+      review.validate(validator, id, randomUUID(), {
+        version: closed.version,
+        decision: "AUTORIZADA",
+        reason: "Revisión comprobada",
+      }),
+    ).rejects.toThrow("intentional audit failure");
+    expect(await prisma.asistencia.findUnique({ where: { id } })).toMatchObject(
+      { status: "PENDIENTE", version: closed.version },
+    );
+    expect(
+      await prisma.asistenciaValidacion.count({ where: { attendanceId: id } }),
+    ).toBe(0);
+  });
+
+  it("serializes concurrent final decisions and accounts authorized hours once", async () => {
+    await service.checkIn(owner, randomUUID());
+    const id = (await service.mine(owner, { limit: 20 })).open!.id;
+    vi.setSystemTime(new Date("2026-09-22T21:00:00Z"));
+    await service.checkOut(owner, randomUUID(), id);
+    const closed = await prisma.asistencia.findUniqueOrThrow({ where: { id } });
+    const review = new AttendanceReviewService(
+      prisma,
+      new AttendancePolicy(),
+      new AuditService(prisma),
+    );
+    const outcomes = await Promise.allSettled(
+      Array.from({ length: 3 }, () =>
+        review.validate(validator, id, randomUUID(), {
+          version: closed.version,
+          decision: "AUTORIZADA",
+          reason: "Revisión comprobada",
+        }),
+      ),
+    );
+    expect(
+      outcomes.filter((result) => result.status === "fulfilled"),
+    ).toHaveLength(1);
+    expect(
+      await prisma.asistenciaValidacion.count({ where: { attendanceId: id } }),
+    ).toBe(1);
+    expect(
+      (await service.mine(owner, { limit: 20 })).bank.authorizedSeconds,
+    ).toBe(3600);
   });
 
   it("requires a usable assignment for new entries but allows closing after a transfer", async () => {

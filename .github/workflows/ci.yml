@@ -25,6 +25,7 @@ jobs:
           MARIADB_USER: ci
           MARIADB_PASSWORD: ci
           MARIADB_ROOT_PASSWORD: root-ci-password
+          MARIADB_ROOT_HOST: "%"
         ports:
           - 3306:3306
         options: >-
@@ -34,6 +35,7 @@ jobs:
           --health-retries=20
     env:
       DATABASE_URL: mysql://ci:ci@127.0.0.1:3306/ares_ci
+      DB_ADMIN_URL: mysql://root:root-ci-password@127.0.0.1:3306/ares_ci
 
     steps:
       - name: Checkout
@@ -48,8 +50,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Reject production dependency advisories
+        run: npm audit --omit=dev --audit-level=moderate
+
       - name: Apply database migrations
         run: npm run prisma:migrate:deploy
+
+      - name: Reject Prisma schema drift
+        run: npm run prisma:drift:check
 
       - name: Run quality checks (including tests)
         run: npm run quality
@@ -62,3 +70,96 @@ jobs:
 
       - name: Build frontend container
         run: docker build --target runtime --file frontend/Dockerfile .
+
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: ".nvmrc"
+          cache: "npm"
+      - name: Install dependencies
+        run: npm ci
+      - name: Install browser runtimes
+        run: npm exec --workspace @ares/frontend -- playwright install --with-deps chromium firefox webkit
+      - name: Run deterministic browser journeys
+        run: npm exec --workspace @ares/frontend -- playwright test
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-evidence
+          path: |
+            frontend/playwright-report/
+            frontend/test-results/
+          retention-days: 7
+
+  fullstack:
+    runs-on: ubuntu-latest
+    needs: quality
+    env:
+      ARES_DATABASE_NAME: ares_acceptance_ci
+      SESSION_SECRET: acceptance-only-session-key-do-not-use-in-production
+      ARES_FULLSTACK_URL: http://localhost:4321
+      ARES_MAILPIT_URL: http://localhost:8025
+      ARES_FULLSTACK_DB_URL: mysql://root:ares-local-root-password@127.0.0.1:3307/ares_acceptance_ci
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Start isolated real stack and seed synthetic users
+        run: docker compose -p ares-acceptance-ci -f compose.yaml -f compose.acceptance.yaml up --build --wait --wait-timeout 600
+      - name: Install browser runtimes
+        run: npm exec --workspace @ares/frontend -- playwright install --with-deps chromium firefox webkit
+      - name: Real browser, backend, storage, scanner and SMTP journeys
+        run: npm exec --workspace @ares/frontend -- playwright test --config playwright.fullstack.config.ts
+      - name: Operational Postman assertions
+        run: npx --yes newman@6.2.1 run postman/Ares-Aceptacion-Integral.postman_collection.json --env-var acceptanceEnabled=true --env-var baseUrl=http://localhost:4321/api --bail
+      - name: Remaining closure Postman assertions (separate synthetic subject, sequential)
+        run: npx --yes newman@6.2.1 run postman/Ares-Cierre-Restante.postman_collection.json --env-var acceptanceEnabled=true --env-var baseUrl=http://localhost:4321/api --bail
+      - name: Create dedicated SMTP retry database in the isolated project
+        run: docker compose -p ares-acceptance-ci -f compose.yaml -f compose.acceptance.yaml exec -T database sh -c 'MYSQL_PWD="$MARIADB_ROOT_PASSWORD" mariadb -uroot -e "CREATE DATABASE ares_closure_mail_ci CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"'
+      - name: Real refused SMTP, retry and generic Mailpit delivery
+        env:
+          DATABASE_URL: mysql://root:ares-local-root-password@127.0.0.1:3307/ares_closure_mail_ci
+          ARES_TEST_MAILPIT_URL: http://localhost:8025
+        run: |
+          npm run prisma:generate
+          npm run prisma:migrate:deploy
+          npm exec --workspace @ares/backend -- vitest run test/integration/operational-mail.integration.test.ts
+      - name: Create a separate worker-safety database (never consume acceptance decisions)
+        run: docker compose -p ares-acceptance-ci -f compose.yaml -f compose.acceptance.yaml exec -T database sh -c 'MYSQL_PWD="$MARIADB_ROOT_PASSWORD" mariadb -uroot -e "CREATE DATABASE ares_retention_safety_ci CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"'
+      - name: Two-connection retention races and real immutable journal reconciliation
+        env:
+          DATABASE_URL: mysql://root:ares-local-root-password@127.0.0.1:3307/ares_retention_safety_ci
+          ARES_TEST_JOURNAL_S3_ENDPOINT: http://localhost:9000
+        run: |
+          npm run prisma:migrate:deploy
+          npm exec --workspace @ares/backend -- vitest run test/integration/retention-worker-safety.integration.test.ts
+      - name: Create a dedicated object-deletion database (versioned synthetic buckets only)
+        run: docker compose -p ares-acceptance-ci -f compose.yaml -f compose.acceptance.yaml exec -T database sh -c 'MYSQL_PWD="$MARIADB_ROOT_PASSWORD" mariadb -uroot -e "CREATE DATABASE ares_object_deletion_ci CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"'
+      - name: Durable exact-version deletion and real MinIO verification
+        env:
+          DATABASE_URL: mysql://root:ares-local-root-password@127.0.0.1:3307/ares_object_deletion_ci
+          ARES_TEST_DELETION_S3_ENDPOINT: http://localhost:9000
+        run: |
+          npm run prisma:migrate:deploy
+          npm exec --workspace @ares/backend -- vitest run test/integration/object-deletion.integration.test.ts
+      - name: Upload full-stack evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fullstack-evidence
+          path: |
+            frontend/playwright-fullstack-report/
+            frontend/fullstack-results/
+          retention-days: 7
+      - name: Stop only the isolated acceptance project
+        if: always()
+        run: docker compose -p ares-acceptance-ci -f compose.yaml -f compose.acceptance.yaml down

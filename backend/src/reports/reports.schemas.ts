@@ -4,6 +4,6 @@ export const rangeSchema = z
   .object({ from: iso.optional(), to: iso.optional() })
   .strict();
 export const exportSchema = rangeSchema
-  .extend({ type: z.enum(["ATTENDANCE", "DOCUMENTS", "KAIROS"]) })
+  .extend({ type: z.enum(["ATTENDANCE", "ABSENCES", "DOCUMENTS", "KAIROS"]) })
   .strict();
 export type ReportRange = z.infer<typeof rangeSchema>;
