@@ -9,15 +9,24 @@ import { AuditQueryService } from "./audit-query.service";
 import { OperationsController } from "./operations.controller";
 import { OperationsService } from "./operations.service";
 import { TechnicalLogger } from "./technical-logger.service";
+import { DomainTransaction } from "../common/domain/domain-transaction";
+import { QueueMonitorWorker } from "./queue-monitor.worker";
+import { OperationIntentsController } from "./operation-intents.controller";
 
 @Module({
   imports: [AuthModule, HealthModule, StorageModule],
-  controllers: [AuditController, OperationsController],
+  controllers: [
+    AuditController,
+    OperationsController,
+    OperationIntentsController,
+  ],
   providers: [
     AuditQueryService,
     OperationsService,
+    DomainTransaction,
     TechnicalLogger,
     AuditManifestWorker,
+    QueueMonitorWorker,
   ],
   exports: [AuditQueryService, OperationsService],
 })

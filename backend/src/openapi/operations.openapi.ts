@@ -1,4 +1,12 @@
 const security = [{ cookieAuth: [] }];
+const retryKey = {
+  name: "Idempotency-Key",
+  in: "header",
+  required: false,
+  schema: { type: "string", pattern: "^[A-Za-z0-9_-]{16,100}$" },
+  description:
+    "Optional for compatibility; the operational console always sends it for durable transactional replay. Reuse only for the same body and target.",
+};
 const errors = {
   400: { description: "Invalid request" },
   401: { description: "Authentication required" },
@@ -140,8 +148,44 @@ export const operationsPaths = {
       tags: ["Operations"],
       security,
       description:
-        "GLOBAL operations view with independently attributed database, storage, and scanner health plus job/alert/incident metrics.",
+        "GLOBAL operations view with database/storage/scanner/SMTP connectivity probes (not email delivery proof), worker configuration and durable cycle heartbeats/staleness, absence evaluation issue count, and job/alert/incident metrics.",
       responses: { 200: { description: "Operational status" }, ...errors },
+    },
+  },
+  "/api/operations/absence-evaluation-issues": {
+    get: {
+      tags: ["Operations"],
+      security,
+      parameters: paging,
+      "x-permission": "operations:read",
+      description:
+        "GLOBAL paginated unresolved historical-duty issues. No private narratives.",
+      responses: { 200: { description: "Issue page and total" }, ...errors },
+    },
+  },
+  "/api/operations/absence-evaluation/reprocess": {
+    post: {
+      tags: ["Operations"],
+      security,
+      "x-permission": "operations:manage",
+      parameters: [{ ...retryKey, required: true }],
+      requestBody: jsonBody({
+        type: "object",
+        additionalProperties: false,
+        required: ["date", "reason"],
+        properties: {
+          date: { type: "string", format: "date" },
+          reason: { type: "string", minLength: 10, maxLength: 500 },
+        },
+      }),
+      description:
+        "Schedule re-evaluation from a past Mexico civil date within 31 days. Does not execute, infer unknown history, change definitive decisions, or duplicate existing absences; preserves an older unfinished checkpoint.",
+      responses: {
+        201: {
+          description: "Scheduled checkpoint and historicalInference=false",
+        },
+        ...errors,
+      },
     },
   },
   "/api/operations/jobs": {
@@ -239,7 +283,7 @@ export const operationsPaths = {
     post: {
       tags: ["Operations"],
       security,
-      parameters: [id],
+      parameters: [id, retryKey],
       responses: {
         201: { description: "Alert acknowledged with CAS" },
         ...errors,
@@ -250,7 +294,7 @@ export const operationsPaths = {
     post: {
       tags: ["Operations"],
       security,
-      parameters: [id],
+      parameters: [id, retryKey],
       requestBody: jsonBody({
         type: "object",
         required: ["resolution"],
@@ -273,6 +317,7 @@ export const operationsPaths = {
     post: {
       tags: ["Operations"],
       security,
+      parameters: [retryKey],
       requestBody: jsonBody({
         $ref: "#/components/schemas/OperationalIncidentInput",
       }),
@@ -289,7 +334,7 @@ export const operationsPaths = {
     patch: {
       tags: ["Operations"],
       security,
-      parameters: [id],
+      parameters: [id, retryKey],
       requestBody: jsonBody({
         $ref: "#/components/schemas/OperationalIncidentUpdate",
       }),

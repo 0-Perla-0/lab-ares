@@ -51,6 +51,11 @@ function setup() {
   const prisma: any = {
     $transaction: mock(),
     $executeRaw: mock(),
+    $queryRaw: mock(),
+    recoveryWriteBarrier: {
+      findUnique: vi.fn().mockResolvedValue({ active: false, version: 1 }),
+    },
+    usuario: { findUnique: vi.fn().mockResolvedValue(actor) },
   };
   const names = [
     "reglaRetencion",
@@ -67,6 +72,7 @@ function setup() {
     "recoveryToken",
     "mfaChallenge",
     "notification",
+    "objectDeletionJob",
   ];
   for (const name of names) {
     prisma[name] = Object.fromEntries(
@@ -87,6 +93,7 @@ function setup() {
   prisma.$transaction.mockImplementation(async (arg: any) =>
     typeof arg === "function" ? arg(prisma) : Promise.all(arg),
   );
+  prisma.registroRetencion.findMany.mockResolvedValue([]);
   const audit = { append: mock() };
   const notifications = { create: mock() };
   const config = {
@@ -328,6 +335,7 @@ describe("RetentionService", () => {
 
   it("keeps deletion requests pending, without directly deleting records, and notifies on resolution", async () => {
     const requester = { ...actor, rol: RolUsuario.PRESTADOR };
+    ctx.prisma.usuario.findUnique.mockResolvedValueOnce(requester);
     ctx.prisma.solicitudSupresion.findFirst.mockResolvedValue(null);
     ctx.prisma.solicitudSupresion.create.mockResolvedValue({
       id: "request-1",
@@ -500,9 +508,14 @@ describe("RetentionService", () => {
     };
     ctx.prisma.reporteExportacion.findUnique.mockResolvedValue({
       archivoId: "file-1",
+      status: "EXPIRADO",
     });
     await (ctx.service as any).executeAdapter(item.registro);
-    expect(ctx.storage.removeGenerated).toHaveBeenCalledWith("file-1");
+    expect(ctx.storage.removeGenerated).toHaveBeenCalledWith(
+      "file-1",
+      ctx.prisma,
+      "secret-resource-id",
+    );
     ctx.prisma.registroSupresion.upsert.mockImplementation(
       async ({ create }: any) => {
         expect(create.resourceFingerprint).toMatch(/^[a-f0-9]{64}$/);
@@ -670,10 +683,10 @@ describe("RetentionService", () => {
     expect(ctx.prisma.registroRetencion.findMany).not.toHaveBeenCalled();
   });
 
-  it("serializes legal holds against records already being suppressed", async () => {
+  it("does not pretend a new legal hold can reverse completed suppression", async () => {
     ctx.prisma.registroRetencion.findUnique.mockResolvedValue({
       id: cuid,
-      estado: EstadoRegistroRetencion.SUPRESION_PROGRAMADA,
+      estado: EstadoRegistroRetencion.SUPRIMIDO,
       subjectId: 2,
     });
     ctx.prisma.elementoLoteSupresion.findFirst.mockResolvedValue({
@@ -690,7 +703,7 @@ describe("RetentionService", () => {
         },
         "hold-processing-0001",
       ),
-    ).rejects.toMatchObject({ code: "RETENTION_SUPPRESSION_IN_PROGRESS" });
+    ).rejects.toMatchObject({ code: "RETENTION_RECORD_TERMINAL" });
     expect(ctx.prisma.retencionLegal.create).not.toHaveBeenCalled();
   });
 
@@ -707,11 +720,11 @@ describe("RetentionService", () => {
       },
     });
     expect(ctx.prisma.session.deleteMany).toHaveBeenCalledWith({
-      where: { id: "session-1" },
+      where: { id: "session-1", OR: expect.any(Array) },
     });
   });
 
-  it("does not mark a rejected file suppressed when object storage deletion fails", async () => {
+  it("does not fall back to root-client deletion outside the phased protocol", async () => {
     const batch = {
       id: "batch-file",
       estado: EstadoLoteSupresion.AUTORIZADO,
@@ -751,7 +764,7 @@ describe("RetentionService", () => {
       expect.objectContaining({
         data: expect.objectContaining({
           estado: EstadoElementoSupresion.PENDIENTE,
-          errorCode: "Error",
+          errorCode: "OBJECT_DELETION_PROTOCOL_REQUIRED",
         }),
       }),
     );
@@ -773,42 +786,208 @@ describe("RetentionService", () => {
     expect(ctx.prisma.loteSupresion.update).not.toHaveBeenCalled();
   });
 
-  it("renews the item lease while a long side effect is still running", async () => {
-    vi.useFakeTimers();
-    try {
-      ctx.prisma.elementoLoteSupresion.updateMany.mockResolvedValue({
-        count: 1,
-      });
-      let finish!: () => void;
-      const work = new Promise<void>((resolve) => {
-        finish = resolve;
-      });
-      const running = (ctx.service as any).withLeaseHeartbeat(
-        "item-long",
-        "worker-long",
-        () => work,
-      );
-      await Promise.resolve();
-      await vi.advanceTimersByTimeAsync(40_000);
-      expect(
-        ctx.prisma.elementoLoteSupresion.updateMany.mock.calls.length,
-      ).toBeGreaterThanOrEqual(2);
-      finish();
-      await running;
-      expect(
-        ctx.prisma.elementoLoteSupresion.updateMany,
-      ).toHaveBeenLastCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            estado: EstadoElementoSupresion.PROCESANDO,
-            leaseOwner: "worker-long",
-          }),
-          data: { leaseUntil: expect.any(Date) },
+  it("does not reclaim or advance retention during a freeze", async () => {
+    ctx.prisma.recoveryWriteBarrier.findUnique.mockResolvedValue({
+      active: true,
+      version: 2,
+    });
+    await expect(ctx.service.processBatch(cuid)).rejects.toMatchObject({
+      code: "RECOVERY_WRITE_BARRIER_ACTIVE",
+    });
+    expect(ctx.prisma.elementoLoteSupresion.updateMany).not.toHaveBeenCalled();
+  });
+  function pendingSession(ctx: ReturnType<typeof setup>) {
+    const batch = {
+      id: cuid,
+      estado: EstadoLoteSupresion.AUTORIZADO,
+      autorizadoPorId: actor.id,
+      cutoffAt: new Date(),
+    };
+    const record = {
+      id: cuid,
+      estado: EstadoRegistroRetencion.SUPRESION_PROGRAMADA,
+      actionDueAt: new Date(0),
+      categoria: CategoriaRetencion.SESIONES_TOKENS,
+      resourceType: "Session",
+      resourceId: "expired-session",
+      regla: { ...rule, categoria: CategoriaRetencion.SESIONES_TOKENS },
+    };
+    ctx.prisma.loteSupresion.findUnique.mockResolvedValue(batch);
+    ctx.prisma.registroRetencion.findUnique.mockResolvedValue(record);
+    ctx.prisma.elementoLoteSupresion.updateMany.mockResolvedValue({ count: 1 });
+    return {
+      batch,
+      item: { id: "item", registroId: cuid, registro: record, attempts: 0 },
+    };
+  }
+  it("rechecks a hold acquired after the claim before executing the adapter", async () => {
+    const job = pendingSession(ctx);
+    ctx.prisma.retencionLegal.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValue({ id: "late-hold" });
+    await (ctx.service as any).processItem(job.batch, job.item);
+    expect(ctx.prisma.session.deleteMany).not.toHaveBeenCalled();
+    expect(ctx.prisma.registroSupresion.upsert).not.toHaveBeenCalled();
+    expect(
+      ctx.prisma.elementoLoteSupresion.updateMany,
+    ).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          errorCode: "SUPPRESSION_RECORD_LEGAL_HOLD",
         }),
-      );
-    } finally {
-      vi.useRealTimers();
-    }
+      }),
+    );
+  });
+  it("stops an old claim after a freeze/unfreeze epoch", async () => {
+    const job = pendingSession(ctx);
+    ctx.prisma.recoveryWriteBarrier.findUnique
+      .mockResolvedValueOnce({ active: false, version: 1 })
+      .mockResolvedValue({ active: false, version: 3 });
+    await expect(
+      (ctx.service as any).processItem(job.batch, job.item),
+    ).rejects.toMatchObject({ code: "RECOVERY_WRITE_BARRIER_ACTIVE" });
+    expect(ctx.prisma.session.deleteMany).not.toHaveBeenCalled();
+    expect(ctx.prisma.elementoLoteSupresion.updateMany).toHaveBeenCalledOnce();
+  });
+  it("does not renew or execute an expired or stolen lease", async () => {
+    const job = pendingSession(ctx);
+    ctx.prisma.elementoLoteSupresion.updateMany
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValue({ count: 0 });
+    await expect(
+      (ctx.service as any).processItem(job.batch, job.item),
+    ).rejects.toMatchObject({ code: "SUPPRESSION_ITEM_LEASE_LOST" });
+    expect(ctx.prisma.session.deleteMany).not.toHaveBeenCalled();
+  });
+  it("does not execute an item paused after its claim", async () => {
+    const job = pendingSession(ctx);
+    ctx.prisma.loteSupresion.findUnique
+      .mockResolvedValueOnce(job.batch)
+      .mockResolvedValue({ ...job.batch, estado: EstadoLoteSupresion.PAUSADO });
+    await (ctx.service as any).processItem(job.batch, job.item);
+    expect(ctx.prisma.session.deleteMany).not.toHaveBeenCalled();
+    expect(ctx.prisma.registroSupresion.upsert).not.toHaveBeenCalled();
+  });
+  it("does not override a pause with a stale batch completion", async () => {
+    ctx.prisma.loteSupresion.findUnique.mockResolvedValue({
+      id: cuid,
+      estado: EstadoLoteSupresion.PAUSADO,
+      elementos: [],
+    });
+    expect((await ctx.service.processBatch(cuid))!.estado).toBe(
+      EstadoLoteSupresion.PAUSADO,
+    );
+    expect(ctx.prisma.loteSupresion.update).not.toHaveBeenCalled();
+    expect(ctx.prisma.elementoLoteSupresion.updateMany).not.toHaveBeenCalled();
+  });
+  it.each(["Session", "RecoveryToken", "MfaChallenge"])(
+    "refuses to certify deletion of a live %s",
+    async (resourceType) => {
+      const table =
+        resourceType === "Session"
+          ? "session"
+          : resourceType === "RecoveryToken"
+            ? "recoveryToken"
+            : "mfaChallenge";
+      ctx.prisma[table].findUnique.mockResolvedValue({
+        id: "live",
+        expiresAt: new Date(Date.now() + 60000),
+      });
+      await expect(
+        (ctx.service as any).executeAdapter({
+          categoria: CategoriaRetencion.SESIONES_TOKENS,
+          resourceType,
+          resourceId: "live",
+          regla: rule,
+        }),
+      ).rejects.toMatchObject({ code: "RETENTION_RESOURCE_NOT_TERMINAL" });
+    },
+  );
+  it("rejects administrative mutations and replay after the account was disabled", async () => {
+    ctx.prisma.usuario.findUnique.mockResolvedValue({
+      ...actor,
+      estado: EstadoUsuario.SUSPENDIDA,
+    });
+    await expect(
+      ctx.service.createRequest(
+        actor as any,
+        "Synthetic administrative request",
+        "safe-receipt-0001",
+      ),
+    ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    expect(ctx.prisma.operacionRetencion.findUnique).not.toHaveBeenCalled();
+  });
+  it.each(["PENDIENTE", "GENERANDO", "COMPLETADO"])(
+    "does not delete a nonterminal %s export",
+    async (status) => {
+      ctx.prisma.reporteExportacion.findUnique.mockResolvedValue({
+        status,
+        archivoId: "private-file",
+        expiresAt:
+          status === "COMPLETADO" ? new Date(Date.now() + 60000) : null,
+      });
+      await expect(
+        (ctx.service as any).executeAdapter({
+          categoria: CategoriaRetencion.EXPORTACIONES,
+          resourceType: "ReporteExportacion",
+          resourceId: "report",
+          regla: rule,
+        }),
+      ).rejects.toMatchObject({ code: "RETENTION_RESOURCE_NOT_TERMINAL" });
+      expect(ctx.storage.removeGenerated).not.toHaveBeenCalled();
+    },
+  );
+  it("honors a hold attached directly to a generated export file", async () => {
+    ctx.prisma.reporteExportacion.findUnique.mockResolvedValue({
+      status: "EXPIRADO",
+      archivoId: "held-file",
+    });
+    ctx.prisma.retencionLegal.count.mockResolvedValue(1);
+    await expect(
+      (ctx.service as any).executeAdapter({
+        categoria: CategoriaRetencion.EXPORTACIONES,
+        resourceType: "ReporteExportacion",
+        resourceId: "report",
+        regla: rule,
+      }),
+    ).rejects.toMatchObject({ code: "RETENTION_SHARED_EVIDENCE_OR_HOLD" });
+    expect(ctx.storage.removeGenerated).not.toHaveBeenCalled();
+  });
+  it("does not treat a retryable failed export as terminal", async () => {
+    ctx.prisma.reporteExportacion.findUnique.mockResolvedValue({
+      status: "FALLIDO",
+      archivoId: "private-file",
+      nextAttemptAt: new Date(Date.now() + 60000),
+    });
+    await expect(
+      (ctx.service as any).executeAdapter({
+        categoria: CategoriaRetencion.EXPORTACIONES,
+        resourceType: "ReporteExportacion",
+        resourceId: "report",
+        regla: rule,
+      }),
+    ).rejects.toMatchObject({ code: "RETENTION_RESOURCE_NOT_TERMINAL" });
+    expect(ctx.storage.removeGenerated).not.toHaveBeenCalled();
+  });
+  it("refuses to delete an export file referenced by another domain", async () => {
+    ctx.prisma.reporteExportacion.findUnique.mockResolvedValue({
+      status: "EXPIRADO",
+      archivoId: "shared-file",
+    });
+    ctx.prisma.archivo.findUnique.mockResolvedValue({
+      _count: { documentoVersiones: 1, reportExports: 0 },
+      bibliotecaVersion: null,
+      activoPublico: null,
+    });
+    await expect(
+      (ctx.service as any).executeAdapter({
+        categoria: CategoriaRetencion.EXPORTACIONES,
+        resourceType: "ReporteExportacion",
+        resourceId: "report",
+        regla: rule,
+      }),
+    ).rejects.toMatchObject({ code: "RETENTION_SHARED_EVIDENCE_OR_HOLD" });
+    expect(ctx.storage.removeGenerated).not.toHaveBeenCalled();
   });
 
   it("explicitly resumes paused or failed batches and resets failed items", async () => {
@@ -928,6 +1107,10 @@ describe("RetentionService", () => {
   });
 
   it("reapplies registry adapters and enforces idempotency keys against changed requests", async () => {
+    ctx.prisma.usuario.findUnique.mockResolvedValueOnce({
+      ...actor,
+      rol: RolUsuario.PRESTADOR,
+    });
     ctx.prisma.operacionRetencion.findUnique.mockResolvedValue({
       tipo: "CREAR_SOLICITUD",
       requestHash: "different",

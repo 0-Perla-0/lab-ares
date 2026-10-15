@@ -3,14 +3,18 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, LoaderCircle } from "lucide-react";
+import Link from "next/link";
 
 import { apiRequest, getApiErrorMessage } from "@/lib/api";
+import type { ApiEnvelope } from "@/lib/types";
 
 export function LoginForm({ redirectTo }: { redirectTo: string }) {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [challenge, setChallenge] = useState<string | null>(null);
+  const [recovery, setRecovery] = useState(false);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -20,13 +24,28 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
     const formData = new FormData(event.currentTarget);
 
     try {
-      await apiRequest("/api/auth/login", {
-        method: "POST",
-        body: JSON.stringify({
-          email: formData.get("email"),
-          password: formData.get("password"),
-        }),
-      });
+      const result = await apiRequest<
+        ApiEnvelope<{ mfaRequired?: boolean; challenge?: string }>
+      >(
+        challenge
+          ? `/api/auth/mfa/${recovery ? "recovery" : "verify"}`
+          : "/api/auth/login",
+        {
+          method: "POST",
+          body: JSON.stringify(
+            challenge
+              ? { challenge, code: formData.get("code") }
+              : {
+                  email: formData.get("email"),
+                  password: formData.get("password"),
+                },
+          ),
+        },
+      );
+      if (result.data.mfaRequired && result.data.challenge) {
+        setChallenge(result.data.challenge);
+        return;
+      }
       router.replace(redirectTo);
       router.refresh();
     } catch (requestError) {
@@ -38,60 +57,105 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
 
   return (
     <form onSubmit={submit} className="mt-10 space-y-5">
-      <div>
-        <label
-          htmlFor="email"
-          className="text-sm font-extrabold text-[#25256d]"
-        >
-          Correo electrónico
-        </label>
-        <input
-          id="email"
-          name="email"
-          type="email"
-          autoComplete="email"
-          required
-          autoFocus
-          placeholder="inventor@ejemplo.com"
-          className="mt-2 h-13 w-full rounded-2xl border border-[#dde1ea] bg-white px-4 text-sm outline-none transition placeholder:text-[#98a2b3] focus:border-[#ea580c] focus:ring-4 focus:ring-[#f97316]/25"
-        />
-      </div>
-
-      <div>
-        <div className="flex items-center justify-between">
-          <label
-            htmlFor="password"
-            className="text-sm font-extrabold text-[#25256d]"
-          >
-            Contraseña
+      {challenge ? (
+        <div className="space-y-4">
+          <label htmlFor="mfa-code" className="text-sm font-extrabold">
+            {recovery
+              ? "Código de recuperación"
+              : "Código de tu aplicación autenticadora"}
           </label>
-          <span className="text-xs font-semibold text-[#667085]">
-            Acceso seguro
-          </span>
-        </div>
-        <div className="relative mt-2">
           <input
-            id="password"
-            name="password"
-            type={showPassword ? "text" : "password"}
-            autoComplete="current-password"
+            id="mfa-code"
+            name="code"
             required
-            maxLength={128}
-            placeholder="Tu contraseña"
-            className="h-13 w-full rounded-2xl border border-[#dde1ea] bg-white px-4 pr-12 text-sm outline-none transition placeholder:text-[#98a2b3] focus:border-[#ea580c] focus:ring-4 focus:ring-[#f97316]/25"
+            autoComplete="one-time-code"
+            inputMode={recovery ? "text" : "numeric"}
+            pattern={recovery ? undefined : "[0-9]{6}"}
+            maxLength={recovery ? 32 : 6}
+            className="mt-2 h-13 w-full rounded-2xl border px-4"
           />
           <button
             type="button"
-            onClick={() => setShowPassword((visible) => !visible)}
-            className="focus-ring absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-2 text-[#667085] hover:bg-[#f6f7fb]"
-            aria-label={
-              showPassword ? "Ocultar contraseña" : "Mostrar contraseña"
-            }
+            className="focus-ring text-sm underline"
+            onClick={() => setRecovery((value) => !value)}
           >
-            {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            {recovery
+              ? "Usar aplicación autenticadora"
+              : "Usar un código de recuperación"}
+          </button>
+          <button
+            type="button"
+            className="focus-ring ml-4 text-sm underline"
+            onClick={() => {
+              setChallenge(null);
+              setError("");
+            }}
+          >
+            Volver al inicio de sesión
           </button>
         </div>
-      </div>
+      ) : (
+        <>
+          <div>
+            <label
+              htmlFor="email"
+              className="text-sm font-extrabold text-[#25256d]"
+            >
+              Correo electrónico
+            </label>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              autoComplete="email"
+              required
+              placeholder="inventor@ejemplo.com"
+              className="mt-2 h-13 w-full rounded-2xl border border-[#dde1ea] bg-white px-4 text-sm outline-none transition placeholder:text-[#98a2b3] focus:border-[#ea580c] focus:ring-4 focus:ring-[#f97316]/25"
+            />
+          </div>
+          <Link
+            href="/recuperar"
+            className="focus-ring inline-block text-sm font-semibold underline"
+          >
+            Recuperar acceso
+          </Link>
+          <div>
+            <div className="flex items-center justify-between">
+              <label
+                htmlFor="password"
+                className="text-sm font-extrabold text-[#25256d]"
+              >
+                Contraseña
+              </label>
+              <span className="text-xs font-semibold text-[#667085]">
+                Acceso seguro
+              </span>
+            </div>
+            <div className="relative mt-2">
+              <input
+                id="password"
+                name="password"
+                type={showPassword ? "text" : "password"}
+                autoComplete="current-password"
+                required
+                maxLength={128}
+                placeholder="Tu contraseña"
+                className="h-13 w-full rounded-2xl border border-[#dde1ea] bg-white px-4 pr-12 text-sm outline-none transition placeholder:text-[#98a2b3] focus:border-[#ea580c] focus:ring-4 focus:ring-[#f97316]/25"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((visible) => !visible)}
+                className="focus-ring absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-2 text-[#667085] hover:bg-[#f6f7fb]"
+                aria-label={
+                  showPassword ? "Ocultar contraseña" : "Mostrar contraseña"
+                }
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
 
       {error && (
         <div
@@ -113,6 +177,8 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
             <LoaderCircle size={18} className="animate-spin" />
             Ingresando…
           </>
+        ) : challenge ? (
+          "Verificar y entrar"
         ) : (
           "Ingresar"
         )}

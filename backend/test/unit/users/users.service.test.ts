@@ -72,7 +72,10 @@ describe("UsersService", () => {
       }),
     ).resolves.toBe(user);
 
-    expect(mockedHashPassword).toHaveBeenCalledWith("A-secure-password-123!");
+    expect(mockedHashPassword).toHaveBeenCalledWith(
+      "A-secure-password-123!",
+      expect.objectContaining({ codigo: user.codigo, email: user.email }),
+    );
     expect(users.create).toHaveBeenCalledWith({
       codigo: user.codigo,
       email: user.email,
@@ -147,7 +150,10 @@ describe("UsersService", () => {
       estado: EstadoUsuario.DESACTIVADA,
     });
 
-    users.findById.mockResolvedValue({ ...user, estado: EstadoUsuario.DESACTIVADA });
+    users.findById.mockResolvedValue({
+      ...user,
+      estado: EstadoUsuario.DESACTIVADA,
+    });
     users.update.mockClear();
     await expect(service.darDeBaja(user.id)).resolves.toMatchObject({
       estado: EstadoUsuario.DESACTIVADA,

@@ -6,6 +6,8 @@ import {
   Param,
   Post,
   Put,
+  Headers,
+  Optional,
   Req,
 } from "@nestjs/common";
 import type { Request } from "express";
@@ -23,12 +25,20 @@ import {
 } from "./user.schemas";
 import { UsersPolicy } from "./users.policy";
 import { UsersService } from "./users.service";
+import { ApiException } from "../common/errors/api.exception";
+import {
+  AdministrativeRecoveryService,
+  administrativeRecoverySchema,
+} from "./administrative-recovery.service";
+import { idempotencyKeySchema } from "../attendance/attendance.schemas";
+import type { z } from "zod";
 
 @Controller("users")
 export class UsersController {
   constructor(
     private readonly users: UsersService,
     private readonly policy: UsersPolicy,
+    @Optional() private readonly recovery?: AdministrativeRecoveryService,
   ) {}
 
   @Get()
@@ -38,6 +48,25 @@ export class UsersController {
     return { data: await this.users.listar(scope) };
   }
 
+  @Post(":id/recovery")
+  @RequirePermissions(Permission.USERS_MANAGE)
+  async administrativeRecovery(
+    @Req() request: Request,
+    @Param("id", PositiveIntPipe) id: number,
+    @Headers("idempotency-key") key: string,
+    @Body(new ZodValidationPipe(administrativeRecoverySchema))
+    input: z.infer<typeof administrativeRecoverySchema>,
+  ) {
+    return {
+      data: await this.recovery!.recover(
+        getAuthenticatedUser(request),
+        id,
+        new ZodValidationPipe(idempotencyKeySchema).transform(key),
+        input,
+      ),
+    };
+  }
+
   @Post()
   @RequirePermissions(Permission.USERS_MANAGE)
   async crear(
@@ -45,7 +74,7 @@ export class UsersController {
     @Req() request: Request,
   ) {
     this.policy.requireCreation(getAuthenticatedUser(request), input);
-    return { data: await this.users.crear(input) };
+    throw new ApiException("USER_INVITATION_REQUIRED", 410);
   }
 
   @Get(":id")
@@ -66,8 +95,16 @@ export class UsersController {
     input: ActualizarUsuarioInput,
     @Req() request: Request,
   ) {
+    if (input.password !== undefined)
+      throw new ApiException("USER_PASSWORD_RESET_REQUIRED", 400);
     await this.policy.requireUpdate(getAuthenticatedUser(request), id, input);
-    return { data: await this.users.actualizar(id, input) };
+    return {
+      data: await this.users.actualizar(
+        id,
+        input,
+        getAuthenticatedUser(request).id,
+      ),
+    };
   }
 
   @Delete(":id")
@@ -77,6 +114,8 @@ export class UsersController {
     @Req() request: Request,
   ) {
     await this.policy.requireDeletion(getAuthenticatedUser(request), id);
-    return { data: await this.users.darDeBaja(id) };
+    return {
+      data: await this.users.darDeBaja(id, getAuthenticatedUser(request).id),
+    };
   }
 }

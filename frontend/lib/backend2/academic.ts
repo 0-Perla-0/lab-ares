@@ -1,5 +1,6 @@
 import { apiRequest } from "@/lib/api";
 import type { ApiEnvelope } from "@/lib/types";
+import { criticalMutation } from "@/lib/service-social";
 
 export type AcademicCatalogKind =
   "institucion" | "unidad" | "programa" | "cohorte";
@@ -84,12 +85,11 @@ export async function getMyAcademicProfile() {
 }
 
 export async function requestAcademicProfile(input: AcademicProfileInput) {
-  return (
-    await apiRequest<ApiEnvelope<AcademicProfile>>("/api/academic/profile/me", {
-      method: "PUT",
-      body: JSON.stringify(input),
-    })
-  ).data;
+  return criticalMutation<AcademicProfile>(
+    "/api/academic/profile/me",
+    input,
+    "PUT",
+  );
 }
 
 export async function getAcademicHistory(userId: number, page = 1) {
@@ -113,28 +113,18 @@ export async function resolveAcademicRequest(
   accept: boolean,
   motivo?: string,
 ) {
-  return (
-    await apiRequest<ApiEnvelope<AcademicProfile>>(
-      `/api/academic/profile/requests/${requestId}/confirm`,
-      {
-        method: "POST",
-        body: JSON.stringify({
-          accept,
-          ...(motivo?.trim() ? { motivo: motivo.trim() } : {}),
-        }),
-      },
-    )
-  ).data;
+  return criticalMutation<AcademicProfile>(
+    `/api/academic/profile/requests/${requestId}/confirm`,
+    { accept, ...(motivo?.trim() ? { motivo: motivo.trim() } : {}) },
+  );
 }
 
 export async function createAcademicCatalog(
   kind: AcademicCatalogKind,
   input: { nombre: string; parentId?: number | null },
 ) {
-  return (
-    await apiRequest<ApiEnvelope<AcademicCatalogItem>>(
-      `/api/academic/catalogs/${kind}`,
-      { method: "POST", body: JSON.stringify(input) },
-    )
-  ).data;
+  return criticalMutation<AcademicCatalogItem>(
+    `/api/academic/catalogs/${kind}`,
+    input,
+  );
 }

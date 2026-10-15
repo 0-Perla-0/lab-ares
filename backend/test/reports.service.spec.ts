@@ -58,6 +58,11 @@ function make(overrides: any = {}) {
       count: vi.fn().mockResolvedValue(1),
       findMany: vi.fn().mockResolvedValue(attendance),
     },
+    ausencia: {
+      groupBy: vi.fn().mockResolvedValue([]),
+      count: vi.fn().mockResolvedValue(0),
+      findMany: vi.fn().mockResolvedValue([]),
+    },
     documentoVersion: {
       groupBy: vi.fn().mockResolvedValue([]),
       count: vi.fn().mockResolvedValue(0),
@@ -79,6 +84,10 @@ function make(overrides: any = {}) {
       update: vi.fn().mockResolvedValue({}),
     },
     usuario: { findUnique: vi.fn().mockResolvedValue({ ...actor() }) },
+    recoveryWriteBarrier: {
+      findUnique: vi.fn().mockResolvedValue({ active: false, version: 1 }),
+    },
+    $queryRaw: vi.fn().mockResolvedValue([]),
     $executeRaw: vi.fn().mockResolvedValue(1),
   };
   const db: any = { ...base, ...overrides };
@@ -97,6 +106,12 @@ function make(overrides: any = {}) {
     storeGeneratedCsv: vi
       .fn()
       .mockResolvedValue({ id: "cmfileabcdefghijklmnopqr" }),
+    storeGeneratedCsvStream: vi.fn(async (_owner, _id, chunks) => {
+      for await (const _chunk of chunks) {
+        /* consume like real storage */
+      }
+      return { id: "cmfileabcdefghijklmnopqr" };
+    }),
     removeGenerated: vi.fn().mockResolvedValue(undefined),
   };
   return {
@@ -174,21 +189,37 @@ describe("operational reports contracts", () => {
   it("passes scoped sede and area predicates to attendance and documents", async () => {
     const { service, db } = make();
     await service.metrics(actor(), {});
-    expect(db.asistencia.groupBy.mock.calls[0][0].where.user).toEqual({
-      estado: EstadoUsuario.ACTIVA,
+    expect(db.asistencia.groupBy.mock.calls[0][0].where).toMatchObject({
       sedeId: 20,
       areaId: 10,
     });
+    expect(db.asistencia.groupBy.mock.calls[0][0].where).not.toHaveProperty(
+      "user",
+    );
+    expect(db.ausencia.groupBy.mock.calls[0][0].where).toMatchObject({
+      sedeId: 20,
+      areaId: 10,
+    });
+    expect(db.documentoVersion.groupBy.mock.calls[0][0].where).toMatchObject({
+      reportSedeId: 20,
+      reportAreaId: 10,
+      reportSnapshotAt: { not: null },
+    });
     expect(
-      db.documentoVersion.groupBy.mock.calls[0][0].where.requisito.usuario,
-    ).toEqual({ estado: EstadoUsuario.ACTIVA, sedeId: 20, areaId: 10 });
+      db.documentoVersion.groupBy.mock.calls[0][0].where,
+    ).not.toHaveProperty("requisito");
   });
-  it("scopes each Kairos activity through its responsible user organization", async () => {
+  it("scopes Kairos through captured placement, not the current responsible user", async () => {
     const { service, db } = make();
     await service.metrics(actor(), {});
+    expect(db.actividadKairos.groupBy.mock.calls[0][0].where).toMatchObject({
+      reportSedeId: 20,
+      reportAreaId: 10,
+      reportSnapshotAt: { not: null },
+    });
     expect(
-      db.actividadKairos.groupBy.mock.calls[0][0].where.responsable,
-    ).toEqual({ estado: EstadoUsuario.ACTIVA, sedeId: 20, areaId: 10 });
+      db.actividadKairos.groupBy.mock.calls[0][0].where,
+    ).not.toHaveProperty("responsable");
   });
   it("documents overdue semantics in the response", async () => {
     const { service } = make();
@@ -297,12 +328,14 @@ describe("operational reports contracts", () => {
         action: "REPORT_EXPORT_REQUESTED",
         metadata: expect.objectContaining({ mode: "sync" }),
       }),
+      expect.anything(),
     );
     expect(audit.append).toHaveBeenCalledWith(
       expect.objectContaining({
         action: "REPORT_EXPORT_COMPLETED",
         metadata: expect.objectContaining({ mode: "sync" }),
       }),
+      expect.anything(),
     );
   });
   it("restricts status and download to the requesting owner", async () => {
@@ -426,10 +459,11 @@ describe("operational reports contracts", () => {
       },
     });
     await service.processDue();
-    expect(storage.storeGeneratedCsv).toHaveBeenCalledWith(
+    expect(storage.storeGeneratedCsvStream).toHaveBeenCalledWith(
       7,
       baseJob.id,
-      expect.any(Buffer),
+      expect.anything(),
+      1,
     );
     expect(audit.append).toHaveBeenCalledWith(
       expect.objectContaining({ action: "REPORT_EXPORT_COMPLETED" }),
@@ -437,12 +471,9 @@ describe("operational reports contracts", () => {
     );
   });
   it("removes a generated file when the completion lease is lost", async () => {
-    const updates = vi
-      .fn()
-      .mockResolvedValueOnce({ count: 0 })
-      .mockResolvedValueOnce({ count: 0 })
-      .mockResolvedValueOnce({ count: 1 })
-      .mockResolvedValueOnce({ count: 0 });
+    const updates = vi.fn(async (input) => ({
+      count: input.data.status === EstadoReporteExportacion.COMPLETADO ? 0 : 1,
+    }));
     const { service, storage } = make({
       reporteExportacion: {
         findMany: vi
@@ -456,6 +487,9 @@ describe("operational reports contracts", () => {
     await service.processDue();
     expect(storage.removeGenerated).toHaveBeenCalledWith(
       "cmfileabcdefghijklmnopqr",
+      undefined,
+      undefined,
+      1,
     );
   });
   it("marks generation failures retryable with backoff without a long transaction", async () => {
@@ -464,7 +498,7 @@ describe("operational reports contracts", () => {
       { ...baseJob, status: EstadoReporteExportacion.PENDIENTE },
     ]);
     db.reporteExportacion.updateMany.mockResolvedValue({ count: 1 });
-    storage.storeGeneratedCsv.mockRejectedValue(new Error("S3_DOWN"));
+    storage.storeGeneratedCsvStream.mockRejectedValue(new Error("S3_DOWN"));
     await service.processDue();
     expect(db.reporteExportacion.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -490,7 +524,11 @@ describe("operational reports contracts", () => {
     });
     await service.cleanup();
     await service.cleanup();
-    expect(storage.removeGenerated).toHaveBeenCalledWith(baseJob.archivoId);
+    expect(storage.removeGenerated).toHaveBeenCalledWith(
+      baseJob.archivoId,
+      undefined,
+      baseJob.id,
+    );
     expect(db.reporteExportacion.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({ id: baseJob.id }),
@@ -540,6 +578,107 @@ describe("operational reports contracts", () => {
         purpose: "download",
       }),
       "7",
+    );
+  });
+  it.each([{ areaId: 99 }, { sedeId: 99 }, { rol: RolUsuario.ADMIN }])(
+    "denies a completed export after scope changes: %j",
+    async (change) => {
+      const h = make();
+      h.db.reporteExportacion.findFirst.mockResolvedValue({
+        ...baseJob,
+        expiresAt: new Date("2099-01-01"),
+      });
+      h.db.usuario.findUnique.mockResolvedValue(actor(change));
+      await expect(
+        h.service.download(actor(), baseJob.id),
+      ).rejects.toMatchObject({ status: 403 });
+      expect(h.storage.downloadUrl).not.toHaveBeenCalled();
+    },
+  );
+  it("fails closed for legacy exports without a scope snapshot", async () => {
+    const h = make();
+    h.db.reporteExportacion.findFirst.mockResolvedValue({
+      ...baseJob,
+      filters: null,
+      expiresAt: new Date("2099-01-01"),
+    });
+    await expect(h.service.download(actor(), baseJob.id)).rejects.toMatchObject(
+      { status: 403 },
+    );
+  });
+  it("does not reclaim or delete work during a freeze", async () => {
+    const h = make();
+    h.db.recoveryWriteBarrier.findUnique.mockResolvedValue({
+      active: true,
+      version: 2,
+    });
+    expect(await h.service.processDue()).toBe(0);
+    expect(h.db.reporteExportacion.updateMany).not.toHaveBeenCalled();
+    expect(h.storage.removeGenerated).not.toHaveBeenCalled();
+  });
+  it("rejects publication after a freeze/unfreeze epoch, even if currently unfrozen", async () => {
+    const h = make();
+    h.db.reporteExportacion.findMany.mockResolvedValue([
+      { ...baseJob, status: EstadoReporteExportacion.PENDIENTE },
+    ]);
+    h.storage.storeGeneratedCsvStream.mockImplementation(
+      async (_owner, _id, chunks) => {
+        for await (const _chunk of chunks) {
+          /* spool */
+        }
+        h.db.recoveryWriteBarrier.findUnique.mockResolvedValue({
+          active: false,
+          version: 3,
+        });
+        return { id: "private-orphan" };
+      },
+    );
+    expect(await h.service.processDue()).toBe(1);
+    expect(
+      h.db.reporteExportacion.updateMany.mock.calls.some(
+        ([input]: any[]) =>
+          input.data.status === EstadoReporteExportacion.COMPLETADO,
+      ),
+    ).toBe(false);
+    expect(h.storage.removeGenerated).not.toHaveBeenCalled();
+  });
+  it("exports bounded pages with a stable keyset cursor and one BOM", async () => {
+    const h = make();
+    h.db.reporteExportacion.findMany.mockResolvedValue([
+      { ...baseJob, status: EstadoReporteExportacion.PENDIENTE },
+    ]);
+    const row = {
+      userId: 7,
+      status: "AUTORIZADA",
+      checkInAt: now,
+      checkOutAt: null,
+      durationSeconds: 1,
+    };
+    h.db.asistencia.findMany
+      .mockResolvedValueOnce(
+        Array.from({ length: 1000 }, (_, id) => ({ ...row, id: id + 1 })),
+      )
+      .mockResolvedValueOnce([{ ...row, id: 1001 }]);
+    const parts: Buffer[] = [];
+    h.storage.storeGeneratedCsvStream.mockImplementation(
+      async (_owner, _id, chunks) => {
+        for await (const chunk of chunks) parts.push(chunk);
+        return { id: "file" };
+      },
+    );
+    await h.service.processDue();
+    expect(h.db.asistencia.findMany.mock.calls[1][0]).toMatchObject({
+      take: 1000,
+      where: { id: { gt: 1000 } },
+    });
+    expect(Buffer.concat(parts).toString().split("\uFEFF")).toHaveLength(2);
+    expect(h.db.reporteExportacion.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: EstadoReporteExportacion.COMPLETADO,
+          totalFilas: 1001,
+        }),
+      }),
     );
   });
 });

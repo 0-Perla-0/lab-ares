@@ -31,6 +31,10 @@ export function parseDatabaseUrl(
   if (!SUPPORTED_PROTOCOLS.has(url.protocol)) {
     throw new Error("DATABASE_URL must use the mysql or mariadb protocol");
   }
+  if (url.searchParams.size)
+    throw new Error(
+      "DATABASE_URL query options are unsupported; configure verified TLS with DATABASE_TLS_ENABLED/CA/SERVERNAME",
+    );
 
   const database = decodeURIComponent(url.pathname.replace(/^\/+/, ""));
 

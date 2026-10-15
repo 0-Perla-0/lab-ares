@@ -4,6 +4,7 @@ import { PrismaMariaDb } from "@prisma/adapter-mariadb";
 
 import { PrismaClient } from "../generated/prisma/client";
 import { parseDatabaseUrl } from "./database-url";
+import { databaseTls } from "./database-tls";
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleDestroy {
@@ -12,6 +13,11 @@ export class PrismaService extends PrismaClient implements OnModuleDestroy {
     const adapter = new PrismaMariaDb({
       ...parseDatabaseUrl(databaseUrl),
       connectionLimit: 5,
+      ssl: databaseTls({
+        enabled: config.get("DATABASE_TLS_ENABLED", false),
+        ca: config.get("DATABASE_TLS_CA"),
+        servername: config.get("DATABASE_TLS_SERVERNAME"),
+      }),
     });
 
     super({ adapter });

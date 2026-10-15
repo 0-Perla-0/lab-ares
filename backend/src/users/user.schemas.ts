@@ -16,17 +16,11 @@ const email = z
   .max(EMAIL_MAX_LENGTH)
   .pipe(z.email());
 
-const password = z
-  .string()
-  .min(PASSWORD_MIN_LENGTH)
-  .max(PASSWORD_MAX_LENGTH)
+const password = z.string().min(PASSWORD_MIN_LENGTH).max(PASSWORD_MAX_LENGTH);
 
 const referenciaIdNullable = z.number().int().positive().nullable();
 
-const estadoInicial = z.enum([
-  EstadoUsuario.ACTIVA,
-  EstadoUsuario.INVITADA,
-]);
+const estadoInicial = z.enum([EstadoUsuario.ACTIVA, EstadoUsuario.INVITADA]);
 
 export const crearUsuarioSchema = z.object({
   codigo,

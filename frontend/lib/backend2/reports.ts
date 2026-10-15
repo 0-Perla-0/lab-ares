@@ -1,6 +1,6 @@
 import { ApiError } from "@/lib/api";
 
-export type ReportType = "ATTENDANCE" | "DOCUMENTS" | "KAIROS";
+export type ReportType = "ATTENDANCE" | "ABSENCES" | "DOCUMENTS" | "KAIROS";
 
 export type GroupMetric = {
   status?: string;
@@ -14,6 +14,8 @@ export type OperationalMetrics = {
   from: string;
   to: string;
   attendance: GroupMetric[];
+  attendanceReview?: (GroupMetric & { requiresReview: boolean })[];
+  absences?: (GroupMetric & { tipo: string })[];
   documents: GroupMetric[];
   kairos: { byState: GroupMetric[]; overdue: number };
   semantics: string;

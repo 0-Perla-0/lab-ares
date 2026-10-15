@@ -7,6 +7,9 @@ export default defineConfig({
     exclude: [
       ...configDefaults.exclude,
       "e2e/**",
+      "fullstack/**",
+      "fullstack-results/**",
+      "playwright-fullstack-report/**",
       "test-results/**",
       "playwright-report/**",
     ],

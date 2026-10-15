@@ -6,6 +6,8 @@ import { LoaderCircle, RefreshCw } from "lucide-react";
 
 import { ApiError, apiRequest, getApiErrorMessage } from "@/lib/api";
 import type { ApiEnvelope, AuthUser } from "@/lib/types";
+import { ReauthenticationDialog } from "./reauthentication-dialog";
+import { SessionExpirationWarning } from "./session-expiration-warning";
 
 type AuthContextValue = {
   user: AuthUser;
@@ -50,12 +52,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       window.removeEventListener("ares:unauthorized", handleUnauthorized);
     };
     // Authentication is revalidated when the protected shell is mounted.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const value = useMemo(
     () => (user ? { user, refreshUser: loadUser } : null),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [user],
   );
 
@@ -93,7 +93,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      <ReauthenticationDialog />
+      <SessionExpirationWarning />
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuth() {

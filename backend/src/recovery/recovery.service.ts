@@ -1,4 +1,4 @@
-import { HttpStatus, Injectable } from "@nestjs/common";
+import { HttpStatus, Injectable, Optional } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 
 import type { AuthUser } from "../auth/auth-user";
@@ -10,6 +10,7 @@ import { HealthService } from "../health/health.service";
 import { AuditQueryService } from "../operations/audit-query.service";
 import { RetentionService } from "../retention/retention.service";
 import { StorageReconciler } from "../storage/storage.reconciler";
+import { ObjectDeletionService } from "../storage/object-deletion.service";
 import { readWriteBarrier } from "./barrier";
 import {
   journalHash,
@@ -69,6 +70,7 @@ export class RecoveryService {
     private readonly retention: RetentionService,
     private readonly health: HealthService,
     private readonly config: ConfigService<Environment, true>,
+    @Optional() private readonly objectDeletions?: ObjectDeletionService,
   ) {}
 
   async status() {
@@ -108,9 +110,11 @@ export class RecoveryService {
   async create(actor: AuthUser, input: CreateRecoveryRunInput, key: string) {
     return this.mutate(actor, key, "CREATE", null, input, async (tx) => {
       const target =
-        input.scope === "IMPORTANTE"
-          ? { rpoTargetMinutes: 60, rtoTargetMinutes: 480 }
-          : { rpoTargetMinutes: 1440, rtoTargetMinutes: 480 };
+        input.scope === "CRITICO"
+          ? { rpoTargetMinutes: 15, rtoTargetMinutes: 240 }
+          : input.scope === "IMPORTANTE"
+            ? { rpoTargetMinutes: 60, rtoTargetMinutes: 480 }
+            : { rpoTargetMinutes: 1440, rtoTargetMinutes: 480 };
       const run = await tx.recoveryRun.create({
         data: {
           ...input,
@@ -608,6 +612,9 @@ export class RecoveryService {
     if (actor.id === run.frozenById || actor.id === run.responsibleId)
       throw api("RECOVERY_SEPARATION_OF_DUTIES_REQUIRED", 403);
     const dependencies = await this.health.dependencies();
+    const deletionReady = this.objectDeletions
+      ? await this.objectDeletions.recoveryReady().catch(() => false)
+      : false;
     const [outboxInFlight, journalUnresolved] = await Promise.all([
       this.prisma.outboxEvent.count({ where: { state: "PROCESSING" } }),
       this.prisma.suppressionJournalEntry.count({
@@ -621,6 +628,13 @@ export class RecoveryService {
         dependencies.database,
       ],
       ["STORAGE", dependencies.storage === "connected", dependencies.storage],
+      [
+        "STORAGE",
+        deletionReady,
+        deletionReady
+          ? "OBJECT_DELETION_INTENTS_RECONCILED"
+          : "OBJECT_DELETION_INTENTS_UNRESOLVED",
+      ],
       [
         "SCANNER",
         dependencies.scanner !== "disconnected",
@@ -691,6 +705,11 @@ export class RecoveryService {
       });
       if (!barrier?.active || barrier.runId !== id)
         throw api("RECOVERY_BARRIER_LOST", 503);
+      if (
+        !this.objectDeletions ||
+        !(await this.objectDeletions.recoveryReady().catch(() => false))
+      )
+        throw api("RECOVERY_OBJECT_DELETION_INTENTS_UNRESOLVED", 409);
       const released = await tx.recoveryWriteBarrier.update({
         where: { id: "global" },
         data: {

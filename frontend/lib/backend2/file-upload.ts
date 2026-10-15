@@ -8,6 +8,7 @@ export type BackendFileStatus =
   | "DISPONIBLE"
   | "RECHAZADO"
   | "ERROR_ANALISIS"
+  | "ELIMINACION_PENDIENTE"
   | "ELIMINADO";
 
 export type FileScanStage =
@@ -35,6 +36,7 @@ const terminalStatuses = new Set<BackendFileStatus>([
   "RECHAZADO",
   "ERROR_ANALISIS",
   "ELIMINADO",
+  "ELIMINACION_PENDIENTE",
 ]);
 
 export function fileScanPresentation(
@@ -42,6 +44,13 @@ export function fileScanPresentation(
 ): Omit<FileUploadProgress, "fileId"> {
   if (status === "DISPONIBLE") {
     return { phase: "ready", stage: "DISPONIBLE", label: "Archivo disponible" };
+  }
+  if (status === "ELIMINACION_PENDIENTE") {
+    return {
+      phase: "rejected",
+      stage: "RECHAZADO",
+      label: "Archivo reservado para eliminación",
+    };
   }
   if (["RECHAZADO", "ERROR_ANALISIS", "ELIMINADO"].includes(status)) {
     return {

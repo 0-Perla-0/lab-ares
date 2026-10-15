@@ -78,7 +78,7 @@ export const recoveryPaths = {
         {
           name: "scope",
           in: "query",
-          schema: { enum: ["IMPORTANTE", "SECUNDARIO"] },
+          schema: { enum: ["CRITICO", "IMPORTANTE", "SECUNDARIO"] },
         },
       ],
       responses: { 200: { description: "Paginated recovery runs" }, ...errors },
@@ -197,7 +197,7 @@ export const recoverySchemas = {
     additionalProperties: false,
     properties: {
       name: { type: "string", minLength: 1, maxLength: 191 },
-      scope: { enum: ["IMPORTANTE", "SECUNDARIO"] },
+      scope: { enum: ["CRITICO", "IMPORTANTE", "SECUNDARIO"] },
       responsibleId: { type: "integer", minimum: 1 },
       isDrill: { type: "boolean", default: false },
     },

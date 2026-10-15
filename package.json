@@ -16,11 +16,15 @@
     "check": "npm run check --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "test:integration": "npm run test:integration --workspace @ares/backend",
-    "quality": "npm run format:check && npm run prisma:validate && npm run prisma:generate && npm test && npm run check && npm run build",
+    "test:e2e": "npm run e2e --workspace @ares/frontend",
+    "test:e2e:fullstack": "npm exec --workspace @ares/frontend -- playwright test --config playwright.fullstack.config.ts",
+    "docs:check": "node --test scripts/docs-policy.test.mjs && node scripts/check-docs.mjs",
+    "prisma:drift:check": "npm run prisma:drift:check --workspace @ares/backend",
+    "quality": "npm run docs:check && npm run format:check && npm run lint:a11y --workspace @ares/frontend && npm run prisma:validate && npm run prisma:generate && npm test && npm run check && npm run build",
     "format": "npm run format:root && npm run format --workspaces --if-present",
-    "format:root": "prettier --write \"package.json\" \"*.md\" \"backend/docs/*.md\" \"compose.yaml\" \".github/**/*.yml\"",
+    "format:root": "prettier --write \"package.json\" \"*.md\" \"docs/**/*.md\" \"frontend/*.md\" \"frontend/e2e/*.md\" \"postman/*.md\" \"scripts/*.mjs\" \"compose*.yaml\" \".github/**/*.yml\"",
     "format:check": "npm run format:check:root && npm run format:check --workspaces --if-present",
-    "format:check:root": "prettier --check \"package.json\" \"*.md\" \"backend/docs/*.md\" \"compose.yaml\" \".github/**/*.yml\"",
+    "format:check:root": "prettier --check \"package.json\" \"*.md\" \"docs/**/*.md\" \"frontend/*.md\" \"frontend/e2e/*.md\" \"postman/*.md\" \"scripts/*.mjs\" \"compose*.yaml\" \".github/**/*.yml\"",
     "prisma:validate": "npm run prisma:validate --workspace @ares/backend",
     "prisma:generate": "npm run prisma:generate --workspace @ares/backend",
     "prisma:migrate": "npm run prisma:migrate --workspace @ares/backend",
@@ -31,10 +35,25 @@
   "devDependencies": {
     "prettier": "^3.9.6"
   },
+  "overrides": {
+    "@prisma/adapter-mariadb": {
+      "mariadb": "3.5.4"
+    },
+    "@prisma/config": {
+      "deepmerge-ts": "8.0.2"
+    },
+    "prisma": {
+      "mysql2": "3.24.5"
+    }
+  },
   "allowScripts": {
     "@prisma/engines@7.9.1": true,
     "esbuild@0.28.2": true,
     "prisma@7.9.1": true,
-    "sharp@0.35.3": true
+    "sharp@0.35.3": true,
+    "sharp@0.35.5": true,
+    "prisma@7.10.0": true,
+    "@prisma/engines@7.10.0": true,
+    "argon2@0.44.0": true
   }
 }

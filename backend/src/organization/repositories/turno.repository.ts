@@ -5,6 +5,7 @@ import type { TurnoCreateInput } from "../../generated/prisma/models";
 
 import { PrismaService } from "../../database/prisma.service";
 import { translateUniqueViolation } from "./prisma-errors";
+import { recordOperationalHistory } from "../../common/domain/operational-history";
 
 type Datos = Pick<TurnoCreateInput, "nombre" | "horaInicio" | "horaFin"> & {
   areaId: number;
@@ -42,9 +43,13 @@ export class TurnoRepository {
 
   create({ dias, ...turno }: Datos) {
     return translateUniqueViolation(() =>
-      this.prisma.turno.create({
-        data: { ...turno, dias: { create: dias.map((dia) => ({ dia })) } },
-        include: conDias,
+      this.prisma.$transaction(async (tx) => {
+        const row = await tx.turno.create({
+          data: { ...turno, dias: { create: dias.map((dia) => ({ dia })) } },
+          include: conDias,
+        });
+        await recordOperationalHistory(tx, "SHIFT", row.id);
+        return row;
       }),
     );
   }
@@ -52,14 +57,17 @@ export class TurnoRepository {
   update(id: number, { dias, ...turno }: UpdateData) {
     return translateUniqueViolation(() =>
       this.prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT id FROM Turno WHERE id = ${id} FOR UPDATE`;
         if (dias !== undefined) {
           await replaceDias(tx, id, dias);
         }
-        return tx.turno.update({
+        const row = await tx.turno.update({
           where: { id },
           data: turno,
           include: conDias,
         });
+        await recordOperationalHistory(tx, "SHIFT", id);
+        return row;
       }),
     );
   }
@@ -67,21 +75,29 @@ export class TurnoRepository {
   reactivate(id: number, { dias, ...turno }: Datos) {
     return translateUniqueViolation(() =>
       this.prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT id FROM Turno WHERE id = ${id} FOR UPDATE`;
         await replaceDias(tx, id, dias);
-        return tx.turno.update({
+        const row = await tx.turno.update({
           where: { id },
           data: { ...turno, activo: true },
           include: conDias,
         });
+        await recordOperationalHistory(tx, "SHIFT", id);
+        return row;
       }),
     );
   }
 
   deactivate(id: number) {
-    return this.prisma.turno.update({
-      where: { id },
-      data: { activo: false },
-      include: conDias,
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM Turno WHERE id = ${id} FOR UPDATE`;
+      const row = await tx.turno.update({
+        where: { id },
+        data: { activo: false },
+        include: conDias,
+      });
+      await recordOperationalHistory(tx, "SHIFT", id);
+      return row;
     });
   }
 }

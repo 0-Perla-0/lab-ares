@@ -161,6 +161,7 @@ describe("OpenAPI document", () => {
     expect(exportOperation.description).toContain("5,000");
     expect(document.components.schemas.ReportExportType.enum).toEqual([
       "ATTENDANCE",
+      "ABSENCES",
       "DOCUMENTS",
       "KAIROS",
     ]);

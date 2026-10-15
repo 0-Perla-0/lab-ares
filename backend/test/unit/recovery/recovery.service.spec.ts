@@ -38,6 +38,8 @@ function serviceFixture(run?: Record<string, unknown>) {
     $transaction: vi.fn(async (callback: any) => callback(tx)),
     recoveryOperation: { findUnique: vi.fn(async () => null) },
     recoveryRun: { findUnique: vi.fn(async () => run ?? null) },
+    outboxEvent: { count: vi.fn(async () => 0) },
+    suppressionJournalEntry: { count: vi.fn(async () => 0) },
     recoveryWriteBarrier: {
       findUnique: vi.fn(async () => ({
         active: true,
@@ -49,13 +51,20 @@ function serviceFixture(run?: Record<string, unknown>) {
     },
   };
   const audit = { append: vi.fn(async () => ({})) };
+  const deletion = { recoveryReady: vi.fn(async () => true) };
   const service = new RecoveryService(
     prisma as any,
     audit as any,
     {} as any,
     {} as any,
     {} as any,
-    {} as any,
+    {
+      dependencies: vi.fn(async () => ({
+        database: "connected",
+        storage: "connected",
+        scanner: "connected",
+      })),
+    } as any,
     {
       get: (key: string) => {
         if (key === "RECOVERY_RECONCILIATION_MAX_ATTEMPTS") return 3;
@@ -65,12 +74,27 @@ function serviceFixture(run?: Record<string, unknown>) {
         return 120_000;
       },
     } as any,
+    deletion as any,
   );
-  return { service, createRun, tx };
+  return { service, createRun, tx, deletion };
 }
 
 describe("RecoveryService state governance", () => {
+  it("cannot approve recovery with unresolved external deletion intents", async () => {
+    const h = serviceFixture({
+      id: "run-1",
+      state: "SUPPRESSIONS_REAPPLIED",
+      frozenById: 99,
+      responsibleId: 98,
+    });
+    h.deletion.recoveryReady.mockResolvedValue(false);
+    await expect(
+      h.service.approve(actor, "run-1", "deletion-readiness-0001"),
+    ).rejects.toMatchObject({ code: "RECOVERY_READINESS_FAILED" });
+    expect(h.tx.recoveryRun.update).not.toHaveBeenCalled();
+  });
   it.each([
+    ["CRITICO", 15, 240],
     ["IMPORTANTE", 60, 480],
     ["SECUNDARIO", 1440, 480],
   ])(

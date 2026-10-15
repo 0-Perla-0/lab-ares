@@ -283,31 +283,31 @@ export function LibraryPage() {
       </Panel>
       <Panel title={`Documentos (${page?.total ?? 0})`}>
         {page?.items.length ? (
-          <div className="grid gap-3 lg:grid-cols-2" role="list">
+          <ul className="grid gap-3 lg:grid-cols-2" role="list">
             {page.items.map((document) => (
-              <button
-                key={document.id}
-                role="listitem"
-                type="button"
-                onClick={() => void detail(document.id)}
-                className="focus-ring min-h-24 rounded-2xl border border-[var(--ares-border)] p-4 text-left hover:border-[#ea580c]"
-              >
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <h2 className="font-black">{document.titulo}</h2>
-                  <StatusBadge
-                    label={label(document.estado)}
-                    tone={tones[document.estado]}
-                  />
-                </div>
-                <p className="mt-2 text-sm text-[var(--ares-muted)]">
-                  {document.descripcion || "Sin descripción"}
-                </p>
-                <p className="mt-3 text-xs font-extrabold uppercase tracking-wide text-[#ea580c]">
-                  {label(document.categoria)} · {label(document.alcance)}
-                </p>
-              </button>
+              <li key={document.id}>
+                <button
+                  type="button"
+                  onClick={() => void detail(document.id)}
+                  className="focus-ring min-h-24 w-full rounded-2xl border border-[var(--ares-border)] p-4 text-left hover:border-[#ea580c]"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <h2 className="font-black">{document.titulo}</h2>
+                    <StatusBadge
+                      label={label(document.estado)}
+                      tone={tones[document.estado]}
+                    />
+                  </div>
+                  <p className="mt-2 text-sm text-[var(--ares-muted)]">
+                    {document.descripcion || "Sin descripción"}
+                  </p>
+                  <p className="mt-3 text-xs font-extrabold uppercase tracking-wide text-[#ea580c]">
+                    {label(document.categoria)} · {label(document.alcance)}
+                  </p>
+                </button>
+              </li>
             ))}
-          </div>
+          </ul>
         ) : (
           <EmptyState
             title="No hay documentos"

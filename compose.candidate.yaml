@@ -1,0 +1,7 @@
+# Use only with a fresh acceptance project and immutable runtime references.
+# Migrations/grants/seed are built from the same approved checkout separately.
+services:
+  backend:
+    image: ${ARES_BACKEND_IMAGE:?Set the approved backend registry reference with @sha256 digest}
+  frontend:
+    image: ${ARES_FRONTEND_IMAGE:?Set the approved frontend registry reference with @sha256 digest}

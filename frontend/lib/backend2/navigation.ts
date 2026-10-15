@@ -71,7 +71,10 @@ export const backend2NavigationGroups: readonly Backend2NavigationGroup[] = [
         label: "Kairós",
         description: "Administra proyectos, actividades y evidencias.",
         icon: "kairos",
-        requiredAny: [permissions.KAIROS_PROJECT_CREATE],
+        requiredAny: [
+          permissions.KAIROS_PROJECT_READ,
+          permissions.KAIROS_PROJECT_CREATE,
+        ],
       },
     ],
   },

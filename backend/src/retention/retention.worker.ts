@@ -4,6 +4,7 @@ import type { Environment } from "../config/environment";
 import { PrismaService } from "../database/prisma.service";
 import { workersMayMutate } from "../recovery/barrier";
 import { RetentionService } from "./retention.service";
+import { observeWorker } from "../common/domain/worker-heartbeat";
 
 @Injectable()
 export class RetentionWorker implements OnModuleInit, OnModuleDestroy {
@@ -19,11 +20,11 @@ export class RetentionWorker implements OnModuleInit, OnModuleDestroy {
   onModuleInit() {
     if (!this.config.get("RETENTION_WORKER_ENABLED")) return;
     this.timer = setInterval(
-      () => void this.process(),
+      () => this.schedule(),
       this.config.get("RETENTION_WORKER_INTERVAL_MS"),
     );
     this.timer.unref();
-    void this.process();
+    this.schedule();
   }
 
   onModuleDestroy() {
@@ -38,10 +39,12 @@ export class RetentionWorker implements OnModuleInit, OnModuleDestroy {
       await this.retention.processAuthorized(
         this.config.get("RETENTION_BATCH_SIZE"),
       );
-    } catch {
-      // Leave failed work queued for the next scheduled pass.
     } finally {
       this.running = false;
     }
+  }
+  private schedule() {
+    if (!this.running && this.prisma)
+      void observeWorker(this.prisma, "retention", () => this.process());
   }
 }

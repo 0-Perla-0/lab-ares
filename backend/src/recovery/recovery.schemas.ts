@@ -39,12 +39,12 @@ export const recoveryListSchema = z.strictObject({
       "CANCELLED",
     ])
     .optional(),
-  scope: z.enum(["IMPORTANTE", "SECUNDARIO"]).optional(),
+  scope: z.enum(["CRITICO", "IMPORTANTE", "SECUNDARIO"]).optional(),
 });
 
 export const createRecoveryRunSchema = z.strictObject({
   name: safeText(191),
-  scope: z.enum(["IMPORTANTE", "SECUNDARIO"]),
+  scope: z.enum(["CRITICO", "IMPORTANTE", "SECUNDARIO"]),
   responsibleId: z.number().int().positive(),
   isDrill: z.boolean().default(false),
 });

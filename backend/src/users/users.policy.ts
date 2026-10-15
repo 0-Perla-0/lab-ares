@@ -49,6 +49,16 @@ export class UsersPolicy {
     this.assertManageableRole(actor, target.rol);
   }
 
+  requireRecovery(
+    actor: AuthUser,
+    target: Placement & { id: number; rol: RolUsuario },
+  ): void {
+    if (actor.id === target.id)
+      throw new ApiException("SELF_RECOVERY_NOT_ALLOWED", 403);
+    this.assertPlacementAccess(actor, Permission.USERS_MANAGE, target);
+    this.assertManageableRole(actor, target.rol);
+  }
+
   async requireRead(actor: AuthUser, id: number): Promise<void> {
     const target = await this.findTarget(id);
     this.assertPlacementAccess(actor, Permission.USERS_READ, target);

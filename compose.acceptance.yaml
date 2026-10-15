@@ -1,0 +1,46 @@
+# Only use with a new project and ARES_DATABASE_NAME ending in _test or _ci.
+# Never overlay an existing development/production project.
+services:
+  backend:
+    ports: !override
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      seed-acceptance:
+        condition: service_completed_successfully
+    environment:
+      NODE_ENV: development
+      VISITS_ENABLED: "true"
+      INVENTORY_ENABLED: "true"
+      VISITS_TOKEN_KEY: acceptance-only-visit-key-DoNotUseInProduction-2026
+      STORAGE_WORKER_ENABLED: "true"
+      SMTP_ENABLED: "true"
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
+      OPERATIONAL_PILOT_SEDE_IDS: ""
+      OPERATIONAL_PILOT_AREA_IDS: ""
+      OUTBOX_WORKER_ENABLED: "true"
+      REPORTS_WORKER_ENABLED: "true"
+      INVENTORY_CHECK_WORKER_ENABLED: "true"
+      # Daily/retention/recovery workers remain off; fixtures control their data.
+      ATTENDANCE_WORKER_ENABLED: "false"
+      ABSENCE_WORKER_ENABLED: "false"
+      RETENTION_WORKER_ENABLED: "false"
+  frontend:
+    ports: !override
+      - "127.0.0.1:4321:4321"
+  mailpit:
+    ports: !override
+      - "127.0.0.1:1025:1025"
+      - "127.0.0.1:8025:8025"
+  seed-acceptance:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: migrate
+    environment:
+      DATABASE_URL: mysql://ares_app:${MARIADB_PASSWORD:-ares-local-password}@database:3306/${ARES_DATABASE_NAME:?Set a dedicated database ending in _test or _ci}
+    command: ["node", "backend/dist/scripts/seed-fullstack-test.js"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: "no"

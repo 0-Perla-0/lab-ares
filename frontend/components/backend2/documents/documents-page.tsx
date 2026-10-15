@@ -28,7 +28,10 @@ import {
   type DocumentRequirement,
   type DocumentsPage as DocumentsResponse,
   type DocumentState,
+  DOCUMENT_MAX_BYTES,
 } from "@/lib/backend2/documents";
+import { ExpedientFormalization } from "./expedient-formalization";
+import { ServicePeriods } from "./service-periods";
 
 const tone: Record<DocumentState, StatusTone> = {
   PENDIENTE_CARGA: "warning",
@@ -36,11 +39,13 @@ const tone: Record<DocumentState, StatusTone> = {
   AUTORIZADO: "success",
   RECHAZADO: "danger",
   REQUIERE_CORRECCION: "warning",
+  VENCIDO: "warning",
+  CANCELADO: "neutral",
 };
 
 export function DocumentsPage() {
   const { user } = useAuth();
-  const reviewer = user.rol === "ADMIN" || user.rol.startsWith("JEFE_");
+  const reviewer = !!user.permissions?.["documents:review"];
   const [ownerId, setOwnerId] = useState(user.id);
   const [page, setPage] = useState<DocumentsResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -136,9 +141,11 @@ export function DocumentsPage() {
         </Panel>
       )}
 
-      {user.rol === "ADMIN" && (
+      {user.permissions?.["documents:review"] === "global" && (
         <RequirementForm defaultUserId={ownerId} onSaved={load} />
       )}
+      <ExpedientFormalization userId={ownerId} />
+      <ServicePeriods key={ownerId} userId={ownerId} />
 
       <Panel
         title={`Requisitos (${page?.total ?? 0})`}
@@ -187,6 +194,10 @@ export function DocumentsPage() {
                       )}
                       <button
                         type="button"
+                        disabled={
+                          version.estado !== "AUTORIZADO" ||
+                          version.archivo.status !== "DISPONIBLE"
+                        }
                         onClick={() => void download(version.id)}
                         className="focus-ring mt-3 inline-flex min-h-11 items-center gap-2 rounded-xl border border-[var(--ares-border-strong)] bg-white px-4 text-sm font-black"
                       >
@@ -208,8 +219,11 @@ export function DocumentsPage() {
                         <FileUploadField
                           label="Nueva versión"
                           accept="application/pdf,image/jpeg,image/png"
-                          maxBytes={25 * 1024 * 1024}
-                          disabled={busy}
+                          maxBytes={DOCUMENT_MAX_BYTES}
+                          disabled={
+                            busy ||
+                            user.capabilities?.["DOCUMENTS.UPLOAD"] === false
+                          }
                           required
                           onFileReady={(fileId) =>
                             void attach(requirement, fileId)

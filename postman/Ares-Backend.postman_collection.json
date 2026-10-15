@@ -16,6 +16,14 @@
         "exec": [
           "if (!pm.collectionVariables.get(\"runSuffix\")) {",
           "    pm.collectionVariables.set(\"runSuffix\", Date.now().toString(36) + Math.random().toString(36).slice(2, 8));",
+          "}",
+          "const path = pm.variables.replaceIn(pm.request.url.toString());",
+          "const critical = /\\/documents\\/(requirements|versions|formalizations)(?:\\/|$)/.test(path) || /\\/kairos\\/projects(?:\\/|$)/.test(path) || /\\/academic\\/(profile|catalogs)(?:\\/|$)/.test(path) || /\\/service-periods(?:\\/|$)/.test(path);",
+          "if (critical && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(pm.request.method) && !pm.request.headers.has('Idempotency-Key')) {",
+          "    const name = 'critical-key:' + pm.info.requestId + ':' + pm.collectionVariables.get('runSuffix');",
+          "    let key = pm.collectionVariables.get(name);",
+          "    if (!key) { key = pm.variables.replaceIn('{{$guid}}'); pm.collectionVariables.set(name, key); }",
+          "    pm.request.headers.upsert({ key: 'Idempotency-Key', value: key });",
           "}"
         ]
       }
@@ -2701,7 +2709,7 @@
     },
     {
       "name": "15 - Contenido público CMS",
-      "description": "CMS versionado de Backend 2: bloques seguros, publicación exclusiva de ADMIN y activos copiados al bucket público aislado.",
+      "description": "Contenido público versionado: bloques seguros, publicación exclusiva de ADMIN y activos copiados al bucket público aislado.",
       "item": [
         {
           "name": "Inicio público",
@@ -3919,7 +3927,7 @@
     },
     {
       "name": "19 - Auditoría y operación",
-      "description": "Rutas privadas del bloque Backend 2. Las vistas operativas, jobs, alertas, incidentes y manifiestos requieren alcance GLOBAL. La verificación de integridad no es una firma legal.",
+      "description": "Operación y auditoría privadas. Las vistas operativas, jobs, alertas, incidentes y manifiestos requieren alcance GLOBAL. La verificación de integridad no es una firma legal.",
       "item": [
         {
           "name": "Mi auditoría limitada",
@@ -4220,7 +4228,7 @@
     },
     {
       "name": "20 - Recuperación y reconciliación",
-      "description": "Plano de control GLOBAL de Backend 2. Registra y gobierna la recuperación; nunca ejecuta PITR ni restauraciones destructivas del proveedor. El orden seguro es crear → congelar → registrar restore externo → preview → reconciliar → verificar auditoría → importar journal HMAC → reaplicar → aprobación independiente → descongelar → completar. El journal requiere sobrescribir recoveryJournalEntries con envelopes exportados del bucket privado posteriores al restore point.",
+      "description": "Plano de control GLOBAL de recuperación. Registra y gobierna la recuperación; nunca ejecuta PITR ni restauraciones destructivas del proveedor. El orden seguro es crear → congelar → registrar restore externo → preview → reconciliar → verificar auditoría → importar journal HMAC → reaplicar → aprobación independiente → descongelar → completar. El journal requiere sobrescribir recoveryJournalEntries con envelopes exportados del bucket privado posteriores al restore point.",
       "item": [
         {
           "name": "Estado de barrera",

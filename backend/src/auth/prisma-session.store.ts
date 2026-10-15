@@ -38,7 +38,13 @@ export class PrismaSessionStore
         }
 
         const now = new Date();
-        if (stored.revokedAt || stored.expiresAt <= now || (stored.absoluteExpiresAt && stored.absoluteExpiresAt <= now) || (stored.lastActivityAt && stored.lastActivityAt.getTime() + IDLE_TTL_MS <= now.getTime())) {
+        if (
+          stored.revokedAt ||
+          stored.expiresAt <= now ||
+          (stored.absoluteExpiresAt && stored.absoluteExpiresAt <= now) ||
+          (stored.lastActivityAt &&
+            stored.lastActivityAt.getTime() + IDLE_TTL_MS <= now.getTime())
+        ) {
           await this.prisma.session.deleteMany({ where: { id: sid } });
           callback(null, null);
           return;
@@ -56,14 +62,28 @@ export class PrismaSessionStore
   ): void {
     const now = new Date();
     const absoluteExpiresAt = new Date(now.getTime() + DEFAULT_TTL_MS);
-    const expiresAt = new Date(Math.min(getExpiration(value).getTime(), absoluteExpiresAt.getTime()));
+    const expiresAt = new Date(
+      Math.min(getExpiration(value).getTime(), absoluteExpiresAt.getTime()),
+    );
     const userId = typeof value.userId === "number" ? value.userId : undefined;
 
     void this.prisma.session
       .upsert({
         where: { id: sid },
-        create: { id: sid, data: cloneJson(value), expiresAt, absoluteExpiresAt, lastActivityAt: now, userId },
-        update: { data: cloneJson(value), expiresAt, lastActivityAt: now, userId },
+        create: {
+          id: sid,
+          data: cloneJson(value),
+          expiresAt,
+          absoluteExpiresAt,
+          lastActivityAt: now,
+          userId,
+        },
+        update: {
+          data: cloneJson(value),
+          expiresAt,
+          lastActivityAt: now,
+          userId,
+        },
       })
       .then(() => callback?.())
       .catch((error: unknown) => callback?.(error));
@@ -81,13 +101,34 @@ export class PrismaSessionStore
     value: session.SessionData,
     callback?: (error?: unknown) => void,
   ): void {
-    void this.prisma.session.findUnique({ where: { id: sid }, select: { lastActivityAt: true, absoluteExpiresAt: true, revokedAt: true } })
+    void this.prisma.session
+      .findUnique({
+        where: { id: sid },
+        select: {
+          lastActivityAt: true,
+          absoluteExpiresAt: true,
+          revokedAt: true,
+        },
+      })
       .then((stored) => {
         if (!stored || stored.revokedAt) return;
         const now = Date.now();
-        if (stored.lastActivityAt && stored.lastActivityAt.getTime() + TOUCH_THROTTLE_MS > now) return;
-        const expiresAt = new Date(Math.min(getExpiration(value).getTime(), now + IDLE_TTL_MS, stored.absoluteExpiresAt?.getTime() ?? Number.POSITIVE_INFINITY));
-        return this.prisma.session.updateMany({ where: { id: sid, revokedAt: null }, data: { expiresAt, lastActivityAt: new Date(now) } });
+        if (
+          stored.lastActivityAt &&
+          stored.lastActivityAt.getTime() + TOUCH_THROTTLE_MS > now
+        )
+          return;
+        const expiresAt = new Date(
+          Math.min(
+            getExpiration(value).getTime(),
+            now + IDLE_TTL_MS,
+            stored.absoluteExpiresAt?.getTime() ?? Number.POSITIVE_INFINITY,
+          ),
+        );
+        return this.prisma.session.updateMany({
+          where: { id: sid, revokedAt: null },
+          data: { expiresAt, lastActivityAt: new Date(now) },
+        });
       })
       .then(() => callback?.())
       .catch((error: unknown) => callback?.(error));

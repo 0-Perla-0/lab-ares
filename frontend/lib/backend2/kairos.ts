@@ -1,5 +1,6 @@
 import { apiRequest } from "@/lib/api";
 import type { ApiEnvelope } from "@/lib/types";
+import { criticalMutation } from "@/lib/service-social";
 
 export type KairosPriority = "BAJA" | "MEDIA" | "ALTA" | "CRITICA";
 export type KairosComplexity = "BAJA" | "MEDIA" | "ALTA";
@@ -154,10 +155,7 @@ export const kairosApi = {
     descripcion?: string | null;
     prioridad?: KairosPriority;
   }) {
-    return apiRequest<ApiEnvelope<KairosProject>>(
-      "/api/kairos/projects",
-      json("POST", body),
-    ).then((x) => x.data);
+    return criticalMutation<KairosProject>("/api/kairos/projects", body);
   },
   updateProject(
     id: string,
@@ -168,53 +166,47 @@ export const kairosApi = {
       estado: ProjectState;
     }>,
   ) {
-    return apiRequest<ApiEnvelope<KairosProject>>(
-      projectPath(id),
-      json("PATCH", body),
-    ).then((x) => x.data);
+    return criticalMutation<KairosProject>(projectPath(id), body, "PATCH");
   },
   archiveProject(id: string) {
-    return apiRequest<ApiEnvelope<KairosProject>>(
-      `${projectPath(id)}/archive`,
-      json("POST"),
-    ).then((x) => x.data);
+    return criticalMutation<KairosProject>(`${projectPath(id)}/archive`, {});
   },
   favoriteProject(id: string, enabled: boolean) {
-    return apiRequest<ApiEnvelope<{ id: string; favorito: boolean }>>(
+    return criticalMutation<{ id: string; favorito: boolean }>(
       `${projectPath(id)}/favorite`,
-      json("PUT", { enabled }),
-    ).then((x) => x.data);
+      { enabled },
+      "PUT",
+    );
   },
   addMember(
     id: string,
     body: { usuarioId: number; rol: Exclude<ProjectRole, "PROPIETARIO"> },
   ) {
-    return apiRequest<ApiEnvelope<unknown>>(
-      `${projectPath(id)}/members`,
-      json("POST", body),
-    ).then((x) => x.data);
+    return criticalMutation(`${projectPath(id)}/members`, body);
   },
   changeMemberRole(
     id: string,
     userId: number,
     rol: Exclude<ProjectRole, "PROPIETARIO">,
   ) {
-    return apiRequest<ApiEnvelope<unknown>>(
+    return criticalMutation(
       `${projectPath(id)}/members/${userId}`,
-      json("PATCH", { rol }),
-    ).then((x) => x.data);
+      { rol },
+      "PATCH",
+    );
   },
   transferOwnership(id: string, userId: number) {
-    return apiRequest<ApiEnvelope<unknown>>(
+    return criticalMutation(
       `${projectPath(id)}/members/${userId}/transfer`,
-      json("POST"),
-    ).then((x) => x.data);
+      {},
+    );
   },
   removeMember(id: string, userId: number) {
-    return apiRequest<ApiEnvelope<unknown>>(
+    return criticalMutation(
       `${projectPath(id)}/members/${userId}`,
-      json("DELETE"),
-    ).then((x) => x.data);
+      {},
+      "DELETE",
+    );
   },
   getKanban(
     projectId: string,
@@ -249,20 +241,18 @@ export const kairosApi = {
       participantIds?: number[];
     },
   ) {
-    return apiRequest<ApiEnvelope<KairosActivity>>(
-      activityPath(projectId),
-      json("POST", body),
-    ).then((x) => x.data);
+    return criticalMutation<KairosActivity>(activityPath(projectId), body);
   },
   updateActivity(
     projectId: string,
     activityId: string,
     body: Record<string, unknown>,
   ) {
-    return apiRequest<ApiEnvelope<KairosActivity>>(
+    return criticalMutation<KairosActivity>(
       activityPath(projectId, activityId),
-      json("PATCH", body),
-    ).then((x) => x.data);
+      body,
+      "PATCH",
+    );
   },
   transition(
     projectId: string,
@@ -270,10 +260,10 @@ export const kairosApi = {
     state: Extract<ActivityState, "EN_PROGRESO" | "BLOQUEADA" | "CANCELADA">,
     comment?: string,
   ) {
-    return apiRequest<ApiEnvelope<KairosActivity>>(
+    return criticalMutation<KairosActivity>(
       `${activityPath(projectId, activityId)}/transition`,
-      json("POST", { state, ...(comment ? { comment } : {}) }),
-    ).then((x) => x.data);
+      { state, ...(comment ? { comment } : {}) },
+    );
   },
   submit(
     projectId: string,
@@ -281,10 +271,10 @@ export const kairosApi = {
     archivoId: string,
     comment?: string,
   ) {
-    return apiRequest<ApiEnvelope<KairosActivity>>(
+    return criticalMutation<KairosActivity>(
       `${activityPath(projectId, activityId)}/submit`,
-      json("POST", { archivoId, ...(comment ? { comment } : {}) }),
-    ).then((x) => x.data);
+      { archivoId, ...(comment ? { comment } : {}) },
+    );
   },
   review(
     projectId: string,
@@ -292,16 +282,16 @@ export const kairosApi = {
     state: "TERMINADA" | "REQUIERE_CORRECCION",
     comment?: string,
   ) {
-    return apiRequest<ApiEnvelope<KairosActivity>>(
+    return criticalMutation<KairosActivity>(
       `${activityPath(projectId, activityId)}/review`,
-      json("POST", { state, ...(comment ? { comment } : {}) }),
-    ).then((x) => x.data);
+      { state, ...(comment ? { comment } : {}) },
+    );
   },
   reopen(projectId: string, activityId: string, reason: string) {
-    return apiRequest<ApiEnvelope<KairosActivity>>(
+    return criticalMutation<KairosActivity>(
       `${activityPath(projectId, activityId)}/reopen`,
-      json("POST", { reason }),
-    ).then((x) => x.data);
+      { reason },
+    );
   },
   history(projectId: string, activityId: string) {
     return apiRequest<ApiEnvelope<Page<ActivityHistory>>>(
@@ -319,10 +309,10 @@ export const kairosApi = {
     ).then((x) => x.data);
   },
   comment(projectId: string, activityId: string, body: string) {
-    return apiRequest<ApiEnvelope<ActivityComment>>(
+    return criticalMutation<ActivityComment>(
       `${activityPath(projectId, activityId)}/comments`,
-      json("POST", { body }),
-    ).then((x) => x.data);
+      { body },
+    );
   },
   downloadEvidence(projectId: string, activityId: string, evidenceId: string) {
     return apiRequest<ApiEnvelope<string>>(

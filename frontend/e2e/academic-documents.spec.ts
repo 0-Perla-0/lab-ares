@@ -12,6 +12,10 @@ test("perfil académico carga catálogos, historial y envía una solicitud", asy
     page.getByRole("heading", { name: "Perfil académico" }),
   ).toBeVisible();
   await expect(page.getByText("Universidad ARES").first()).toBeVisible();
+  await page.getByRole("button", { name: "Pedir cambio", exact: true }).click();
+  await expect(
+    page.getByRole("dialog", { name: "Pedir cambio" }),
+  ).toBeVisible();
   await page.getByRole("button", { name: /Enviar solicitud/i }).click();
   await expect
     .poll(() =>

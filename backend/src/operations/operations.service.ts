@@ -1,5 +1,10 @@
 import { ConfigService } from "@nestjs/config";
-import { Injectable } from "@nestjs/common";
+import { Injectable, Optional } from "@nestjs/common";
+import { DomainTransaction } from "../common/domain/domain-transaction";
+import { queueObservability } from "./queue-observability";
+import { EmailService } from "../auth/email.service";
+import { dateColumn, nextDay } from "../calendar/calendar-time";
+import { localParts } from "../attendance/attendance-risk";
 
 import type { AuthUser } from "../auth/auth-user";
 import { AuditService } from "../auth/audit.service";
@@ -42,10 +47,19 @@ export class OperationsService {
     private readonly audit: AuditService,
     private readonly health: HealthService,
     private readonly config: ConfigService<Environment, true>,
+    @Optional() private readonly transaction?: DomainTransaction,
+    @Optional() private readonly email?: EmailService,
   ) {}
 
   async status() {
-    const [dependencies, jobs, alerts, incidents] = await Promise.all([
+    const [
+      dependencies,
+      jobs,
+      alerts,
+      incidents,
+      smtpConnectivity,
+      heartbeats,
+    ] = await Promise.all([
       this.health.dependencies(),
       this.prisma.operationalJobExecution.groupBy({
         by: ["state"],
@@ -64,6 +78,8 @@ export class OperationsService {
           },
         },
       }),
+      this.email?.connectivity() ?? Promise.resolve("not-probed"),
+      this.prisma.workerHeartbeat.findMany(),
     ]);
     return {
       dependencies,
@@ -72,6 +88,73 @@ export class OperationsService {
       ),
       openAlerts: alerts,
       openIncidents: incidents,
+      smtp: {
+        enabled: this.config.get("SMTP_ENABLED"),
+        connectivity: smtpConnectivity,
+        deliveryVerified: false,
+      },
+      workers: {
+        outbox: this.config.get("OUTBOX_WORKER_ENABLED"),
+        storage: this.config.get("STORAGE_WORKER_ENABLED"),
+        attendance: this.config.get("ATTENDANCE_WORKER_ENABLED"),
+        absences: this.config.get("ABSENCE_WORKER_ENABLED"),
+        reports: this.config.get("REPORTS_WORKER_ENABLED"),
+        retention: this.config.get("RETENTION_WORKER_ENABLED"),
+        suppressionJournal: this.config.get(
+          "SUPPRESSION_JOURNAL_WORKER_ENABLED",
+        ),
+        auditManifest: this.config.get("AUDIT_MANIFEST_WORKER_ENABLED"),
+        inventoryCheck: this.config.get("INVENTORY_CHECK_WORKER_ENABLED"),
+        queueMonitor: this.config.get("OPERATIONS_QUEUE_MONITOR_ENABLED"),
+      },
+      workerHealth: Object.fromEntries(
+        heartbeats.map((row) => {
+          const interval =
+            (
+              {
+                attendance: 30000,
+                absences: 60000,
+                outbox: 5000,
+                storage: this.config.get("STORAGE_WORKER_INTERVAL_MS"),
+                reports: this.config.get("REPORTS_WORKER_INTERVAL_MS"),
+                retention: this.config.get("RETENTION_WORKER_INTERVAL_MS"),
+                suppressionJournal: this.config.get(
+                  "SUPPRESSION_JOURNAL_WORKER_INTERVAL_MS",
+                ),
+                auditManifest: this.config.get(
+                  "AUDIT_MANIFEST_WORKER_INTERVAL_MS",
+                ),
+                inventoryCheck: this.config.get("INVENTORY_CHECK_INTERVAL_MS"),
+                queueMonitor: this.config.get(
+                  "OPERATIONS_QUEUE_MONITOR_INTERVAL_MS",
+                ),
+              } as Record<string, number>
+            )[row.name] ?? 60000;
+          return [
+            row.name,
+            {
+              ...row,
+              cycleLagSeconds: row.lastSucceededAt
+                ? Math.max(
+                    0,
+                    Math.floor(
+                      (Date.now() - row.lastSucceededAt.getTime()) / 1000,
+                    ),
+                  )
+                : null,
+              latestCycleFailed:
+                !!row.lastFailedAt &&
+                (!row.lastSucceededAt ||
+                  row.lastFailedAt > row.lastSucceededAt),
+              stale:
+                !row.lastSucceededAt ||
+                Date.now() - row.lastSucceededAt.getTime() >
+                  Math.max(60000, interval * 3),
+            },
+          ];
+        }),
+      ),
+      absenceEvaluationIssues: await this.prisma.absenceEvaluationIssue.count(),
     };
   }
 
@@ -119,6 +202,128 @@ export class OperationsService {
       this.prisma.operationalJobExecution.count({ where }),
     ]);
     return { items, total, page: query.page, pageSize: query.pageSize };
+  }
+
+  queues() {
+    return queueObservability(this.prisma);
+  }
+
+  async absenceIssues(query: OperationsList) {
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.absenceEvaluationIssue.findMany({
+        orderBy: [{ fecha: "desc" }, { userId: "asc" }],
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize,
+      }),
+      this.prisma.absenceEvaluationIssue.count(),
+    ]);
+    return { items, total, page: query.page, pageSize: query.pageSize };
+  }
+
+  reprocessAbsences(
+    actor: AuthUser,
+    key: string,
+    input: { date: string; reason: string },
+  ) {
+    if (!this.transaction) throw new ApiException("OPERATIONS_NOT_READY", 503);
+    const today = localParts(new Date()).day;
+    if (input.date >= today || input.date < nextDay(today, -31))
+      throw new ApiException("ABSENCE_REPROCESS_RANGE_INVALID", 400);
+    return this.transaction.run(
+      actor,
+      key,
+      { action: "ABSENCE_REPROCESS", ...input },
+      async (tx) => {
+        await tx.$queryRaw`SELECT id FROM CalendarRevision WHERE id = 'global' FOR UPDATE`;
+        const progress = await tx.absenceEvaluationProgress.findUnique({
+          where: { id: "global" },
+        });
+        // Do not advance beyond an older unfinished checkpoint.
+        const date =
+          progress &&
+          !progress.completed &&
+          progress.fecha < dateColumn(input.date)
+            ? progress.fecha
+            : dateColumn(input.date);
+        await tx.absenceEvaluationProgress.upsert({
+          where: { id: "global" },
+          create: {
+            id: "global",
+            fecha: date,
+            afterUserId: 0,
+            completed: false,
+          },
+          update: { fecha: date, afterUserId: 0, completed: false },
+        });
+        await this.audit.append(
+          {
+            actorId: actor.id,
+            action: "ABSENCE_REPROCESS_REQUESTED",
+            resource: "absences",
+            reason: input.reason,
+            metadata: { date: date.toISOString().slice(0, 10) },
+          },
+          tx,
+        );
+        return {
+          scheduled: true,
+          date: date.toISOString().slice(0, 10),
+          historicalInference: false,
+        };
+      },
+    );
+  }
+
+  retryJob(
+    actor: AuthUser,
+    id: string,
+    key: string,
+    input: { attempts: number; reason: string },
+  ) {
+    if (!this.transaction) throw new ApiException("OPERATIONS_NOT_READY", 503);
+    return this.transaction.run(
+      actor,
+      key,
+      { action: "JOB_RETRY_REQUEST", id, ...input },
+      async (tx) => {
+        await tx.$queryRaw`SELECT id FROM OperationalJobExecution WHERE id = ${id} FOR UPDATE`;
+        const job = await tx.operationalJobExecution.findUnique({
+          where: { id },
+        });
+        if (
+          !job ||
+          job.state !== "RETRY_SCHEDULED" ||
+          job.attempts !== input.attempts ||
+          job.attempts >= job.maxAttempts ||
+          job.leaseOwner
+        )
+          throw new ApiException("JOB_NOT_RETRYABLE", 409);
+        await tx.operationalJobExecution.update({
+          where: { id },
+          data: { nextAttemptAt: new Date() },
+        });
+        await this.audit.append(
+          {
+            actorId: actor.id,
+            actorRole: actor.rol,
+            action: "JOB_RETRY_REQUESTED",
+            resource: "operations-job",
+            module: "OPERATIONS",
+            objectId: id,
+            reason: input.reason,
+            metadata: { attempts: job.attempts },
+          },
+          tx,
+        );
+        // Only advances the schedule. Never claims/completes a job or resets its attempt budget.
+        return {
+          id,
+          state: job.state,
+          attempts: job.attempts,
+          retryRequested: true,
+        };
+      },
+    );
   }
 
   createJob(input: CreateJob, actor?: AuthUser) {
@@ -382,16 +587,23 @@ export class OperationsService {
     });
   }
 
-  acknowledgeAlert(actor: AuthUser, id: string) {
-    return this.transitionAlert(actor, id, OperationalAlertState.ACKNOWLEDGED);
+  acknowledgeAlert(actor: AuthUser, id: string, key?: string) {
+    return this.transitionAlert(
+      actor,
+      id,
+      OperationalAlertState.ACKNOWLEDGED,
+      undefined,
+      key,
+    );
   }
 
-  resolveAlert(actor: AuthUser, id: string, resolution: string) {
+  resolveAlert(actor: AuthUser, id: string, resolution: string, key?: string) {
     return this.transitionAlert(
       actor,
       id,
       OperationalAlertState.RESOLVED,
       resolution,
+      key,
     );
   }
 
@@ -400,8 +612,10 @@ export class OperationsService {
     id: string,
     state: OperationalAlertState,
     resolution?: string,
+    key?: string,
   ) {
-    return this.prisma.$transaction(async (tx) => {
+    const apply = async (tx: Prisma.TransactionClient) => {
+      await tx.$queryRaw`SELECT id FROM OperationalAlert WHERE id = ${id} FOR UPDATE`;
       const alert = await tx.operationalAlert.findUnique({ where: { id } });
       if (!alert) throw new ApiException("ALERT_NOT_FOUND", 404);
       if (
@@ -446,7 +660,15 @@ export class OperationsService {
         tx,
       );
       return updated;
-    });
+    };
+    return key && this.transaction
+      ? this.transaction.run(
+          actor,
+          key,
+          { action: "ALERT_TRANSITION", id, state, resolution },
+          apply,
+        )
+      : this.prisma.$transaction(apply);
   }
 
   listIncidents(query: OperationsList) {
@@ -459,11 +681,11 @@ export class OperationsService {
     });
   }
 
-  async createIncident(actor: AuthUser, input: CreateIncident) {
+  async createIncident(actor: AuthUser, input: CreateIncident, key?: string) {
     const postmortemRequired =
       input.severity === "S1" || (input.severity === "S2" && input.repeatedS2);
     const due = postmortemRequired ? addBusinessDays(new Date(), 2) : null;
-    return this.prisma.$transaction(async (tx) => {
+    const apply = async (tx: Prisma.TransactionClient) => {
       const incident = await tx.operationalIncident.create({
         data: {
           externalTicketRef: input.externalTicketRef,
@@ -502,11 +724,25 @@ export class OperationsService {
         tx,
       );
       return incident;
-    });
+    };
+    return key && this.transaction
+      ? this.transaction.run(
+          actor,
+          key,
+          { action: "INCIDENT_CREATE", ...input },
+          apply,
+        )
+      : this.prisma.$transaction(apply);
   }
 
-  async updateIncident(actor: AuthUser, id: string, input: UpdateIncident) {
-    return this.prisma.$transaction(async (tx) => {
+  async updateIncident(
+    actor: AuthUser,
+    id: string,
+    input: UpdateIncident,
+    key?: string,
+  ) {
+    const apply = async (tx: Prisma.TransactionClient) => {
+      await tx.$queryRaw`SELECT id FROM OperationalIncident WHERE id = ${id} FOR UPDATE`;
       const existing = await tx.operationalIncident.findUnique({
         where: { id },
       });
@@ -569,6 +805,14 @@ export class OperationsService {
         tx,
       );
       return incident;
-    });
+    };
+    return key && this.transaction
+      ? this.transaction.run(
+          actor,
+          key,
+          { action: "INCIDENT_UPDATE", id, ...input },
+          apply,
+        )
+      : this.prisma.$transaction(apply);
   }
 }

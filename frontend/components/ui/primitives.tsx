@@ -212,7 +212,7 @@ export function PageHeader({
   return (
     <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
       <div>
-        <p className="text-[11px] font-black uppercase tracking-[0.19em] text-[#ea580c]">
+        <p className="text-[11px] font-black uppercase tracking-[0.19em] text-[var(--ares-accent-text)]">
           {eyebrow}
         </p>
         <h1 className="mt-2 text-3xl font-black tracking-[-0.045em] sm:text-4xl">

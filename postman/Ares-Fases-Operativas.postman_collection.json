@@ -1,0 +1,301 @@
+{
+  "info": {
+    "name": "Ares - Fases operativas 3–7",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Sesión/cookies de la colección principal, sólo cuentas sintéticas y base de pruebas. Visitas/inventario requieren habilitación explícita en ese entorno. Reemplaza operationKey por cada operación distinta; conserva cuerpo y clave para reintentar. No ejecuta restauración ni borrados. IDs/fechas vacíos a propósito para evitar escrituras accidentales. Colección no ensayada contra stack completo."
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000/api" },
+    { "key": "operationKey", "value": "replace-per-operation-0001" },
+    { "key": "attendanceId", "value": "" },
+    { "key": "userId", "value": "" },
+    { "key": "sedeId", "value": "" },
+    { "key": "areaId", "value": "" },
+    { "key": "locationId", "value": "" },
+    { "key": "itemId", "value": "" },
+    { "key": "loanId", "value": "" },
+    { "key": "visitId", "value": "" },
+    { "key": "visitCode", "value": "" },
+    { "key": "version", "value": "1" },
+    { "key": "date", "value": "" },
+    { "key": "from", "value": "" },
+    { "key": "until", "value": "" },
+    { "key": "jobId", "value": "" },
+    { "key": "runId", "value": "" },
+    { "key": "period", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Señales y contingencia",
+      "item": [
+        {
+          "name": "Entrada sin ubicación (fallback válido)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/attendance/check-in",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "{{operationKey}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{}" }
+          }
+        },
+        {
+          "name": "Salida con señal consultiva",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/attendance/check-out",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "{{operationKey}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"attendanceId\": {{attendanceId}}, \"coords\": {\"latitude\": 19.4, \"longitude\": -99.1, \"accuracy\": 5}}"
+            }
+          }
+        },
+        {
+          "name": "Señales privadas (AUDIT_READ)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/attendance/{{attendanceId}}/signals"
+          }
+        },
+        {
+          "name": "Captura pendiente por contingencia",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/attendance/contingency",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "{{operationKey}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"userId\": {{userId}}, \"date\": \"{{date}}\", \"checkInAt\": \"{{from}}\", \"checkOutAt\": \"{{until}}\", \"ticket\": \"SYNTHETIC-123\", \"reason\": \"Caída sintética de red\", \"justification\": \"Captura de ensayo sin conectividad\"}"
+            }
+          }
+        },
+        {
+          "name": "Modo operativo autenticado",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/health/operating-mode"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Visitas privadas",
+      "item": [
+        {
+          "name": "Mis invitaciones",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/visits/invitations?mine=true&limit=20"
+          }
+        },
+        {
+          "name": "Crear invitación sintética",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/visits/invitations",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "{{operationKey}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"sedeId\": {{sedeId}}, \"areaId\": {{areaId}}, \"nombreVisitante\": \"Visitante sintético\", \"motivo\": \"Visita de ensayo\", \"fechaProgramada\": \"{{date}}\", \"validaDesde\": \"{{from}}\", \"validaHasta\": \"{{until}}\"}"
+            }
+          }
+        },
+        {
+          "name": "Consulta staff por código",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/visits/check/{{visitCode}}"
+          }
+        },
+        {
+          "name": "Entrada tras identificación física",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/visits/{{visitId}}/check-in",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "{{operationKey}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"version\": {{version}}, \"identificacionVerificada\": true}"
+            }
+          }
+        },
+        {
+          "name": "Salida de visita",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/visits/{{visitId}}/check-out",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "{{operationKey}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"version\": {{version}}}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Inventario por ledger",
+      "item": [
+        {
+          "name": "Ubicaciones",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/inventory/locations"
+          }
+        },
+        {
+          "name": "Catálogo y saldo",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/inventory/items?limit=20"
+          }
+        },
+        {
+          "name": "Libro mayor",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/inventory/items/{{itemId}}/movements?limit=20"
+          }
+        },
+        {
+          "name": "Entrada de consumible",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/inventory/movements",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "{{operationKey}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"articuloId\": \"{{itemId}}\", \"version\": {{version}}, \"tipo\": \"ENTRADA\", \"cantidad\": 2.25, \"motivo\": \"Recepción sintética\"}"
+            }
+          }
+        },
+        {
+          "name": "Préstamos activos",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/inventory/loans?estado=ACTIVO&limit=20"
+          }
+        },
+        {
+          "name": "Préstamo de activo",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/inventory/loans",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "{{operationKey}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"articuloId\": \"{{itemId}}\", \"version\": {{version}}, \"solicitanteId\": {{userId}}, \"fechaLimite\": \"{{until}}\", \"motivo\": \"Préstamo sintético\"}"
+            }
+          }
+        },
+        {
+          "name": "Devolución revisada",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/inventory/loans/{{loanId}}/return",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "{{operationKey}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"estadoFisico\": \"DISPONIBLE\", \"motivo\": \"Revisión física sintética\"}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Consolas (sin recuperación destructiva)",
+      "item": [
+        {
+          "name": "Auditoría paginada",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/audit/events?page=1&pageSize=25"
+          }
+        },
+        {
+          "name": "Verificación manifiesto",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/audit/manifests/{{period}}/verify"
+          }
+        },
+        {
+          "name": "Salud operativa",
+          "request": { "method": "GET", "url": "{{baseUrl}}/operations/status" }
+        },
+        {
+          "name": "Trabajos pendientes de reintento",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/operations/jobs?state=RETRY_SCHEDULED&page=1&pageSize=25"
+          }
+        },
+        {
+          "name": "Adelantar reintento (no ejecutar)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/operations/jobs/{{jobId}}/retry",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "{{operationKey}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"attempts\": 1, \"reason\": \"Reintento sintético autorizado\"}"
+            }
+          }
+        },
+        {
+          "name": "Incidentes",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/operations/incidents?page=1&pageSize=25"
+          }
+        },
+        {
+          "name": "Barrera de recuperación",
+          "request": { "method": "GET", "url": "{{baseUrl}}/recovery/status" }
+        },
+        {
+          "name": "Historial de simulacros",
+          "request": { "method": "GET", "url": "{{baseUrl}}/recovery/drills" }
+        },
+        {
+          "name": "Vista previa segura (requiere restore registrado)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/recovery/{{runId}}/reconciliation/preview",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "{{operationKey}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\"limit\": 100}" }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -37,12 +37,18 @@ import {
 import { useAuth } from "@/components/auth/auth-provider";
 import { Brand } from "@/components/public/brand";
 import { apiRequest } from "@/lib/api";
+import { DegradationBanner } from "./degradation-banner";
 import {
   visibleBackend2Navigation,
   type Backend2NavigationItem,
 } from "@/lib/backend2/navigation";
 import { initials } from "@/lib/format";
-import { canReadUsers, roleLabels } from "@/lib/permissions";
+import {
+  canReadUsers,
+  hasPermission,
+  permissions,
+  roleLabels,
+} from "@/lib/permissions";
 
 type NavigationIcon = ComponentType<{
   size?: number | string;
@@ -239,6 +245,28 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
       description: "Accede al resumen general y registra tu asistencia.",
       items: [
         {
+          href: "/portal/seguridad",
+          label: "Seguridad",
+          description: "Contraseña, sesiones y segundo factor.",
+          icon: ShieldCheck,
+        },
+        {
+          href: "/portal/notificaciones",
+          label: "Notificaciones",
+          description: "Avisos privados y resoluciones.",
+          icon: BookOpen,
+        },
+        ...(hasPermission(user, permissions.ATTENDANCE_MANAGE)
+          ? [
+              {
+                href: "/portal/validaciones",
+                label: "Validaciones",
+                description: "Revisar, corregir y validar horas.",
+                icon: Clock3,
+              },
+            ]
+          : []),
+        {
           href: "/portal",
           label: "Resumen",
           description:
@@ -253,9 +281,97 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
             "Registra entradas y salidas, y consulta el historial de horas.",
           icon: Clock3,
         },
+        ...(hasPermission(user, permissions.ABSENCES_SELF)
+          ? [
+              {
+                href: "/portal/asistencia/ausencias",
+                label: "Ausencias",
+                description:
+                  "Justificaciones, aclaraciones y apelaciones privadas.",
+                icon: FileText,
+              },
+            ]
+          : []),
+        ...(hasPermission(user, permissions.CALENDAR_READ)
+          ? [
+              {
+                href: "/portal/calendario",
+                label: "Calendario",
+                description: "Turnos y excepciones jerárquicas.",
+                icon: Clock3,
+              },
+            ]
+          : []),
       ],
     },
     ...backend2Groups,
+    {
+      id: "operational",
+      label: "Control operativo",
+      description: "Visitas, inventario y consolas autorizadas.",
+      items: [
+        ...(hasPermission(user, permissions.VISITS_REQUEST)
+          ? [
+              {
+                href: "/portal/visitas",
+                label: "Visitas",
+                description: "Invitaciones privadas de visitantes.",
+                icon: UsersRound,
+              },
+            ]
+          : []),
+        ...(hasPermission(user, permissions.VISITS_CONTROL)
+          ? [
+              {
+                href: "/portal/visitas/control",
+                label: "Control de visitas",
+                description: "Identificación física y entradas/salidas.",
+                icon: ShieldCheck,
+              },
+            ]
+          : []),
+        ...(hasPermission(user, permissions.INVENTORY_READ)
+          ? [
+              {
+                href: "/portal/inventario",
+                label: "Inventario",
+                description: "Libro mayor y préstamos de activos.",
+                icon: Building2,
+              },
+            ]
+          : []),
+        ...(hasPermission(user, permissions.AUDIT_READ)
+          ? [
+              {
+                href: "/portal/admin/auditoria",
+                label: "Auditoría",
+                description: "Eventos e integridad de manifiestos.",
+                icon: ShieldCheck,
+              },
+            ]
+          : []),
+        ...(hasPermission(user, permissions.OPERATIONS_READ)
+          ? [
+              {
+                href: "/portal/admin/operaciones",
+                label: "Operaciones",
+                description: "Salud, trabajos e incidentes.",
+                icon: BarChart3,
+              },
+            ]
+          : []),
+        ...(hasPermission(user, permissions.RECOVERY_READ)
+          ? [
+              {
+                href: "/portal/admin/recuperacion",
+                label: "Recuperación",
+                description: "Barrera, simulacros y vista previa segura.",
+                icon: ShieldCheck,
+              },
+            ]
+          : []),
+      ],
+    },
     {
       id: "organization",
       label: "Organización",
@@ -282,6 +398,12 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
         },
         ...(canReadUsers(user)
           ? [
+              {
+                href: "/portal/invitaciones",
+                label: "Invitaciones",
+                description: "Activa accesos sin contraseñas temporales.",
+                icon: UsersRound,
+              },
               {
                 href: "/portal/usuarios",
                 label: "Usuarios",
@@ -354,98 +476,100 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
         {!collapsed && (
           <div className="safe-area-bottom flex min-h-0 flex-1 flex-col overflow-y-auto px-3 py-5">
             <nav className="space-y-3" aria-label="Navegación del portal">
-              {navigationGroups.map((group) => {
-                const expanded = openGroupId === group.id;
-                const groupHasActiveItem = group.id === activeGroupId;
-                const contentId = `${sidebarId}-${group.id}-navigation`;
+              {navigationGroups
+                .filter((group) => group.items.length > 0)
+                .map((group) => {
+                  const expanded = openGroupId === group.id;
+                  const groupHasActiveItem = group.id === activeGroupId;
+                  const contentId = `${sidebarId}-${group.id}-navigation`;
 
-                return (
-                  <section key={group.id} aria-label={group.label}>
-                    <DelayedTooltip description={group.description}>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setOpenGroupId((current) =>
-                            current === group.id ? null : group.id,
-                          )
-                        }
-                        aria-expanded={expanded}
-                        aria-controls={contentId}
-                        className={`focus-ring flex min-h-11 w-full items-center justify-between gap-3 rounded-xl border px-3 text-left text-sm font-extrabold tracking-normal transition hover:border-[#f97316] hover:bg-[#f97316]/10 hover:text-[#fb923c] ${
+                  return (
+                    <section key={group.id} aria-label={group.label}>
+                      <DelayedTooltip description={group.description}>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setOpenGroupId((current) =>
+                              current === group.id ? null : group.id,
+                            )
+                          }
+                          aria-expanded={expanded}
+                          aria-controls={contentId}
+                          className={`focus-ring flex min-h-11 w-full items-center justify-between gap-3 rounded-xl border px-3 text-left text-sm font-extrabold tracking-normal transition hover:border-[#f97316] hover:bg-[#f97316]/10 hover:text-[#fb923c] ${
+                            expanded
+                              ? "border-white/15 bg-white/10 text-white shadow-sm"
+                              : groupHasActiveItem
+                                ? "border-white/10 bg-white/5 text-white"
+                                : "border-transparent text-white/80"
+                          }`}
+                        >
+                          <span>{group.label}</span>
+                          <ChevronDown
+                            size={17}
+                            strokeWidth={2.5}
+                            aria-hidden="true"
+                            className={`shrink-0 transition-transform duration-200 ${
+                              expanded ? "rotate-180" : ""
+                            }`}
+                          />
+                        </button>
+                      </DelayedTooltip>
+                      <div
+                        id={contentId}
+                        aria-hidden={!expanded}
+                        inert={!expanded}
+                        className={`grid transition-[grid-template-rows,opacity] duration-200 motion-reduce:transition-none ${
                           expanded
-                            ? "border-white/15 bg-white/10 text-white shadow-sm"
-                            : groupHasActiveItem
-                              ? "border-white/10 bg-white/5 text-white"
-                              : "border-transparent text-white/80"
+                            ? "grid-rows-[1fr] opacity-100"
+                            : "grid-rows-[0fr] opacity-0"
                         }`}
                       >
-                        <span>{group.label}</span>
-                        <ChevronDown
-                          size={17}
-                          strokeWidth={2.5}
-                          aria-hidden="true"
-                          className={`shrink-0 transition-transform duration-200 ${
-                            expanded ? "rotate-180" : ""
-                          }`}
-                        />
-                      </button>
-                    </DelayedTooltip>
-                    <div
-                      id={contentId}
-                      aria-hidden={!expanded}
-                      inert={!expanded}
-                      className={`grid transition-[grid-template-rows,opacity] duration-200 motion-reduce:transition-none ${
-                        expanded
-                          ? "grid-rows-[1fr] opacity-100"
-                          : "grid-rows-[0fr] opacity-0"
-                      }`}
-                    >
-                      <div className="overflow-hidden">
-                        <div className="space-y-1.5 pt-2">
-                          {group.items.map(
-                            ({
-                              href,
-                              label,
-                              description,
-                              icon: Icon,
-                              exact,
-                            }) => {
-                              const active = exact
-                                ? pathname === href
-                                : pathname === href ||
-                                  pathname.startsWith(`${href}/`);
-                              return (
-                                <DelayedTooltip
-                                  key={href}
-                                  description={description}
-                                >
-                                  <Link
-                                    href={href}
-                                    aria-current={active ? "page" : undefined}
-                                    onClick={() => setMenuOpen(false)}
-                                    className={`focus-ring flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-extrabold transition ${
-                                      active
-                                        ? "bg-[#f97316] text-[#17174a]"
-                                        : "text-white/70 hover:bg-white/10 hover:text-white"
-                                    }`}
+                        <div className="overflow-hidden">
+                          <div className="space-y-1.5 pt-2">
+                            {group.items.map(
+                              ({
+                                href,
+                                label,
+                                description,
+                                icon: Icon,
+                                exact,
+                              }) => {
+                                const active = exact
+                                  ? pathname === href
+                                  : pathname === href ||
+                                    pathname.startsWith(`${href}/`);
+                                return (
+                                  <DelayedTooltip
+                                    key={href}
+                                    description={description}
                                   >
-                                    <Icon
-                                      size={18}
-                                      strokeWidth={active ? 2.5 : 2}
-                                      aria-hidden={true}
-                                    />
-                                    {label}
-                                  </Link>
-                                </DelayedTooltip>
-                              );
-                            },
-                          )}
+                                    <Link
+                                      href={href}
+                                      aria-current={active ? "page" : undefined}
+                                      onClick={() => setMenuOpen(false)}
+                                      className={`focus-ring flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-extrabold transition ${
+                                        active
+                                          ? "bg-[#f97316] text-[#17174a]"
+                                          : "text-white/70 hover:bg-white/10 hover:text-white"
+                                      }`}
+                                    >
+                                      <Icon
+                                        size={18}
+                                        strokeWidth={active ? 2.5 : 2}
+                                        aria-hidden={true}
+                                      />
+                                      {label}
+                                    </Link>
+                                  </DelayedTooltip>
+                                );
+                              },
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </section>
-                );
-              })}
+                    </section>
+                  );
+                })}
             </nav>
 
             <div className="mt-7 rounded-2xl border border-white/15 bg-white/5 p-3 lg:mt-auto">
@@ -549,6 +673,7 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
           tabIndex={-1}
           className="mx-auto w-full max-w-[92rem] px-4 py-7 sm:px-7 sm:py-9 lg:px-10"
         >
+          <DegradationBanner />
           {children}
         </main>
       </div>

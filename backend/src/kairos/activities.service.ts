@@ -1,4 +1,8 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Optional } from "@nestjs/common";
+import { FeaturePoliciesService } from "../common/domain/feature-policies.service";
+import { randomUUID } from "node:crypto";
+import { DomainTransaction } from "../common/domain/domain-transaction";
+import type { Prisma } from "../generated/prisma/client";
 import { PrismaService } from "../database/prisma.service";
 import { AuditService } from "../auth/audit.service";
 import { StorageService } from "../storage/storage.service";
@@ -41,6 +45,7 @@ export class KairosActivitiesService {
     private readonly audit: AuditService,
     private readonly storage: StorageService,
     private readonly gamification: GamificationService = null as any,
+    @Optional() private readonly features?: FeaturePoliciesService,
   ) {}
   private active(a: AuthUser) {
     if (!a || a.estado !== "ACTIVA")
@@ -50,6 +55,45 @@ export class KairosActivitiesService {
     return (
       role === RolMiembroProyectoKairos.PROPIETARIO ||
       role === RolMiembroProyectoKairos.SUBLIDER
+    );
+  }
+  private mutate<T>(
+    actor: AuthUser,
+    projectId: string,
+    key: string,
+    operation: object,
+    apply: (tx: Prisma.TransactionClient) => Promise<T>,
+  ) {
+    return new DomainTransaction(this.prisma).run(
+      actor,
+      key,
+      { projectId, ...operation },
+      async (tx) => {
+        const intent = operation as { action: string; state?: string };
+        // Cancellation remains available to close existing work; a replay is read
+        // under current membership and never creates work under a paused policy.
+        if (!(
+          intent.action === "ACTIVITY_TRANSITION" &&
+          intent.state === "CANCELADA"
+        ))
+          await this.features?.requireInTransaction(
+            tx,
+            "KAIROS.ACTIVITY",
+            actor,
+          );
+        return apply(tx);
+      },
+      async (tx) => {
+        await tx.$queryRaw`SELECT proyectoId FROM MiembroProyectoKairos WHERE proyectoId = ${projectId} AND usuarioId = ${actor.id} FOR UPDATE`;
+        const member = await tx.miembroProyectoKairos.findFirst({
+          where: {
+            proyectoId: projectId,
+            usuarioId: actor.id,
+            removedAt: null,
+          },
+        });
+        if (!member) throw notFound("KAIROS_PROJECT_NOT_FOUND");
+      },
     );
   }
   private async lock(
@@ -123,43 +167,64 @@ export class KairosActivitiesService {
     );
     return history;
   }
-  async create(actor: AuthUser, pid: string, input: ActivityInput) {
+  async create(
+    actor: AuthUser,
+    pid: string,
+    input: ActivityInput,
+    key: string = randomUUID(),
+  ) {
     this.active(actor);
-    return this.prisma.$transaction(async (tx) => {
-      await tx.$executeRaw`SELECT id FROM ProyectoKairos WHERE id=${pid} FOR UPDATE`;
-      await tx.$executeRaw`SELECT proyectoId FROM MiembroProyectoKairos WHERE proyectoId=${pid} AND usuarioId=${actor.id} FOR UPDATE`;
-      const m = await tx.miembroProyectoKairos.findFirst({
-        where: { proyectoId: pid, usuarioId: actor.id, removedAt: null },
-      });
-      const p = await tx.proyectoKairos.findUnique({
-        where: { id: pid },
-        select: { estado: true },
-      });
-      if (
-        !m ||
-        !p ||
-        p.estado === EstadoProyectoKairos.ARCHIVADO ||
-        !this.manage(m.rol)
-      )
-        throw notFound("KAIROS_PROJECT_NOT_FOUND");
-      const { participantIds = [], ...data } = input;
-      await this.validatePeople(tx, pid, input.responsableId, participantIds);
-      const a = await tx.actividadKairos.create({
-        data: {
-          ...data,
-          proyectoId: pid,
-          participants: {
-            create: participantIds.map((usuarioId) => ({ usuarioId })),
+    return this.mutate(
+      actor,
+      pid,
+      key,
+      { action: "ACTIVITY_CREATE", input },
+      async (tx) => {
+        await tx.$executeRaw`SELECT id FROM ProyectoKairos WHERE id=${pid} FOR UPDATE`;
+        await tx.$executeRaw`SELECT proyectoId FROM MiembroProyectoKairos WHERE proyectoId=${pid} AND usuarioId=${actor.id} FOR UPDATE`;
+        const m = await tx.miembroProyectoKairos.findFirst({
+          where: { proyectoId: pid, usuarioId: actor.id, removedAt: null },
+        });
+        const p = await tx.proyectoKairos.findUnique({
+          where: { id: pid },
+          select: { estado: true },
+        });
+        if (
+          !m ||
+          !p ||
+          p.estado === EstadoProyectoKairos.ARCHIVADO ||
+          !this.manage(m.rol)
+        )
+          throw notFound("KAIROS_PROJECT_NOT_FOUND");
+        const { participantIds = [], ...data } = input;
+        await this.validatePeople(tx, pid, input.responsableId, participantIds);
+        await tx.$queryRaw`SELECT id FROM Usuario WHERE id = ${input.responsableId} LOCK IN SHARE MODE`;
+        const responsible = await tx.usuario.findUnique({
+          where: { id: input.responsableId },
+          select: { estado: true, sedeId: true, areaId: true },
+        });
+        if (!responsible || responsible.estado !== EstadoUsuario.ACTIVA)
+          throw invalidInput("KAIROS_MEMBER_INVALID");
+        const a = await tx.actividadKairos.create({
+          data: {
+            ...data,
+            proyectoId: pid,
+            reportSedeId: responsible.sedeId,
+            reportAreaId: responsible.areaId,
+            reportSnapshotAt: new Date(),
+            participants: {
+              create: participantIds.map((usuarioId) => ({ usuarioId })),
+            },
           },
-        },
-        select: detail,
-      });
-      await this.hist(tx, a.id, actor.id, {
-        type: TipoHistorialActividadKairos.TRANSICION,
-        toState: EstadoActividadKairos.PENDIENTE,
-      });
-      return a;
-    });
+          select: detail,
+        });
+        await this.hist(tx, a.id, actor.id, {
+          type: TipoHistorialActividadKairos.TRANSICION,
+          toState: EstadoActividadKairos.PENDIENTE,
+        });
+        return a;
+      },
+    );
   }
   async list(actor: AuthUser, pid: string, page = 1, pageSize = 50) {
     this.active(actor);
@@ -174,7 +239,13 @@ export class KairosActivitiesService {
       const currentPage = Math.min(Math.max(page, 1), 10000);
       const where = { proyectoId: pid };
       const [items, total] = await Promise.all([
-        tx.actividadKairos.findMany({ where, select: detail, orderBy: { createdAt: "desc" }, skip: (currentPage - 1) * take, take }),
+        tx.actividadKairos.findMany({
+          where,
+          select: detail,
+          orderBy: { createdAt: "desc" },
+          skip: (currentPage - 1) * take,
+          take,
+        }),
         tx.actividadKairos.count({ where }),
       ]);
       return {
@@ -209,46 +280,53 @@ export class KairosActivitiesService {
     projectId: string,
     id: string,
     input: ActivityUpdate,
+    key: string = randomUUID(),
   ) {
     this.active(actor);
-    return this.prisma.$transaction(async (tx) => {
-      const { a, m } = await this.lock(tx, projectId, id, actor);
-      if (!this.manage(m.rol) || a.state !== EstadoActividadKairos.PENDIENTE)
-        throw invalidInput("KAIROS_ACTIVITY_EDIT_FORBIDDEN");
-      const current = await tx.participanteActividadKairos.findMany({
-        where: { actividadId: id },
-        select: { usuarioId: true },
-      });
-      const participantIds =
-        input.participantIds ?? current.map((x) => x.usuarioId);
-      const responsableId = input.responsableId ?? a.responsableId;
-      await this.validatePeople(
-        tx,
-        a.proyectoId,
-        responsableId,
-        participantIds,
-      );
-      const { participantIds: _, ...data } = input;
-      const out = await tx.actividadKairos.update({
-        where: { id },
-        data,
-        select: detail,
-      });
-      if (input.participantIds) {
-        await tx.participanteActividadKairos.deleteMany({
+    return this.mutate(
+      actor,
+      projectId,
+      key,
+      { action: "ACTIVITY_UPDATE", id, input },
+      async (tx) => {
+        const { a, m } = await this.lock(tx, projectId, id, actor);
+        if (!this.manage(m.rol) || a.state !== EstadoActividadKairos.PENDIENTE)
+          throw invalidInput("KAIROS_ACTIVITY_EDIT_FORBIDDEN");
+        const current = await tx.participanteActividadKairos.findMany({
           where: { actividadId: id },
+          select: { usuarioId: true },
         });
-        for (const usuarioId of participantIds)
-          await tx.participanteActividadKairos.create({
-            data: { actividadId: id, usuarioId },
+        const participantIds =
+          input.participantIds ?? current.map((x) => x.usuarioId);
+        const responsableId = input.responsableId ?? a.responsableId;
+        await this.validatePeople(
+          tx,
+          a.proyectoId,
+          responsableId,
+          participantIds,
+        );
+        const { participantIds: _, ...data } = input;
+        const out = await tx.actividadKairos.update({
+          where: { id },
+          data,
+          select: detail,
+        });
+        if (input.participantIds) {
+          await tx.participanteActividadKairos.deleteMany({
+            where: { actividadId: id },
           });
-      }
-      await this.hist(tx, id, actor.id, {
-        type: TipoHistorialActividadKairos.TRANSICION,
-        comment: "updated",
-      });
-      return out;
-    });
+          for (const usuarioId of participantIds)
+            await tx.participanteActividadKairos.create({
+              data: { actividadId: id, usuarioId },
+            });
+        }
+        await this.hist(tx, id, actor.id, {
+          type: TipoHistorialActividadKairos.TRANSICION,
+          comment: "updated",
+        });
+        return out;
+      },
+    );
   }
   private allowed(from: any, to: any) {
     return (
@@ -266,31 +344,40 @@ export class KairosActivitiesService {
     id: string,
     state: any,
     comment?: string,
+    key: string = randomUUID(),
   ) {
-    return this.prisma.$transaction(async (tx) => {
-      const { a, m } = await this.lock(tx, projectId, id, actor);
-      if (
-        !this.allowed(a.state, state) ||
-        (!this.manage(m.rol) && a.responsableId !== actor.id)
-      )
-        throw invalidInput("KAIROS_ACTIVITY_TRANSITION_INVALID");
-      const out = await tx.actividadKairos.update({
-        where: { id },
-        data: {
-          state,
-          closedAt:
-            state === "TERMINADA" || state === "CANCELADA" ? new Date() : null,
-        },
-        select: detail,
-      });
-      await this.hist(tx, id, actor.id, {
-        type: TipoHistorialActividadKairos.TRANSICION,
-        fromState: a.state,
-        toState: state,
-        comment,
-      });
-      return out;
-    });
+    return this.mutate(
+      actor,
+      projectId,
+      key,
+      { action: "ACTIVITY_TRANSITION", id, state, comment },
+      async (tx) => {
+        const { a, m } = await this.lock(tx, projectId, id, actor);
+        if (
+          !this.allowed(a.state, state) ||
+          (!this.manage(m.rol) && a.responsableId !== actor.id)
+        )
+          throw invalidInput("KAIROS_ACTIVITY_TRANSITION_INVALID");
+        const out = await tx.actividadKairos.update({
+          where: { id },
+          data: {
+            state,
+            closedAt:
+              state === "TERMINADA" || state === "CANCELADA"
+                ? new Date()
+                : null,
+          },
+          select: detail,
+        });
+        await this.hist(tx, id, actor.id, {
+          type: TipoHistorialActividadKairos.TRANSICION,
+          fromState: a.state,
+          toState: state,
+          comment,
+        });
+        return out;
+      },
+    );
   }
   async submit(
     actor: AuthUser,
@@ -298,51 +385,58 @@ export class KairosActivitiesService {
     id: string,
     fileId: string,
     comment?: string,
+    key: string = randomUUID(),
   ) {
-    return this.prisma.$transaction(async (tx) => {
-      const { a, m } = await this.lock(tx, projectId, id, actor);
-      if (
-        (a.responsableId !== actor.id && !this.manage(m.rol)) ||
-        !["EN_PROGRESO", "REQUIERE_CORRECCION"].includes(a.state as string)
-      )
-        throw invalidInput("KAIROS_ACTIVITY_SUBMIT_INVALID");
-      await tx.$executeRaw`SELECT id FROM Archivo WHERE id=${fileId} FOR UPDATE`;
-      const f = await tx.archivo.findUnique({
-        where: { id: fileId },
-        select: { id: true, status: true, propietarioId: true },
-      });
-      if (
-        !f ||
-        f.status !== EstadoArchivo.DISPONIBLE ||
-        f.propietarioId !== actor.id
-      )
-        throw invalidInput("KAIROS_EVIDENCE_INVALID");
-      const last = await tx.entregaEvidenciaKairos.aggregate({
-        where: { actividadId: id },
-        _max: { version: true },
-      });
-      const e = await tx.entregaEvidenciaKairos.create({
-        data: {
-          actividadId: id,
-          archivoId: fileId,
-          authorId: actor.id,
-          version: (last._max.version ?? 0) + 1,
+    return this.mutate(
+      actor,
+      projectId,
+      key,
+      { action: "ACTIVITY_SUBMIT", id, fileId, comment },
+      async (tx) => {
+        const { a, m } = await this.lock(tx, projectId, id, actor);
+        if (
+          (a.responsableId !== actor.id && !this.manage(m.rol)) ||
+          !["EN_PROGRESO", "REQUIERE_CORRECCION"].includes(a.state as string)
+        )
+          throw invalidInput("KAIROS_ACTIVITY_SUBMIT_INVALID");
+        await tx.$executeRaw`SELECT id FROM Archivo WHERE id=${fileId} FOR UPDATE`;
+        const f = await tx.archivo.findUnique({
+          where: { id: fileId },
+          select: { id: true, status: true, propietarioId: true },
+        });
+        if (
+          !f ||
+          f.status !== EstadoArchivo.DISPONIBLE ||
+          f.propietarioId !== actor.id
+        )
+          throw invalidInput("KAIROS_EVIDENCE_INVALID");
+        const last = await tx.entregaEvidenciaKairos.aggregate({
+          where: { actividadId: id },
+          _max: { version: true },
+        });
+        const e = await tx.entregaEvidenciaKairos.create({
+          data: {
+            actividadId: id,
+            archivoId: fileId,
+            authorId: actor.id,
+            version: (last._max.version ?? 0) + 1,
+            comment,
+          },
+        });
+        await tx.actividadKairos.update({
+          where: { id },
+          data: { state: EstadoActividadKairos.EN_REVISION },
+        });
+        await this.hist(tx, id, actor.id, {
+          type: TipoHistorialActividadKairos.ENTREGA,
+          fromState: a.state,
+          toState: EstadoActividadKairos.EN_REVISION,
+          evidenceId: e.id,
           comment,
-        },
-      });
-      await tx.actividadKairos.update({
-        where: { id },
-        data: { state: EstadoActividadKairos.EN_REVISION },
-      });
-      await this.hist(tx, id, actor.id, {
-        type: TipoHistorialActividadKairos.ENTREGA,
-        fromState: a.state,
-        toState: EstadoActividadKairos.EN_REVISION,
-        evidenceId: e.id,
-        comment,
-      });
-      return e;
-    });
+        });
+        return e;
+      },
+    );
   }
   async review(
     actor: AuthUser,
@@ -350,97 +444,134 @@ export class KairosActivitiesService {
     id: string,
     state: any,
     comment?: string,
+    key: string = randomUUID(),
   ) {
-    return this.prisma.$transaction(async (tx) => {
-      const { a, m } = await this.lock(tx, projectId, id, actor);
-      if (
-        !this.manage(m.rol) ||
-        a.state !== EstadoActividadKairos.EN_REVISION ||
-        a.responsableId === actor.id
-      )
-        throw invalidInput("KAIROS_ACTIVITY_REVIEW_INVALID");
-      if (state === "REQUIERE_CORRECCION" && !comment)
-        throw invalidInput("KAIROS_REVIEW_COMMENT_REQUIRED");
-      const out = await tx.actividadKairos.update({
-        where: { id },
-        data: { state, closedAt: state === "TERMINADA" ? new Date() : null },
-        select: detail,
-      });
-      const history = await this.hist(tx, id, actor.id, {
-        type: TipoHistorialActividadKairos.REVISION,
-        fromState: a.state,
-        toState: state,
-        comment,
-        reviewerId: actor.id,
-      });
-      if (state === EstadoActividadKairos.TERMINADA)
-        await this.gamification?.awardKairos(tx, {
-          activityId: id,
-          userId: a.responsableId,
-          actorId: actor.id,
-          historyId: history.id,
+    return this.mutate(
+      actor,
+      projectId,
+      key,
+      { action: "ACTIVITY_REVIEW", id, state, comment },
+      async (tx) => {
+        const { a, m } = await this.lock(tx, projectId, id, actor);
+        if (
+          !this.manage(m.rol) ||
+          a.state !== EstadoActividadKairos.EN_REVISION ||
+          a.responsableId === actor.id
+        )
+          throw invalidInput("KAIROS_ACTIVITY_REVIEW_INVALID");
+        if (state === "REQUIERE_CORRECCION" && !comment)
+          throw invalidInput("KAIROS_REVIEW_COMMENT_REQUIRED");
+        const out = await tx.actividadKairos.update({
+          where: { id },
+          data: { state, closedAt: state === "TERMINADA" ? new Date() : null },
+          select: detail,
         });
-      return out;
-    });
-  }
-  async reopen(actor: AuthUser, projectId: string, id: string, reason: string) {
-    return this.prisma.$transaction(async (tx) => {
-      const { a, m } = await this.lock(tx, projectId, id, actor);
-      if (
-        !this.manage(m.rol) ||
-        !["TERMINADA", "CANCELADA"].includes(a.state as string)
-      )
-        throw invalidInput("KAIROS_ACTIVITY_REOPEN_INVALID");
-      const out = await tx.actividadKairos.update({
-        where: { id },
-        data: { state: EstadoActividadKairos.PENDIENTE, closedAt: null },
-        select: detail,
-      });
-      const history = await this.hist(tx, id, actor.id, {
-        type: TipoHistorialActividadKairos.REAPERTURA,
-        fromState: a.state,
-        toState: EstadoActividadKairos.PENDIENTE,
-        comment: reason,
-      });
-      if (a.state === EstadoActividadKairos.TERMINADA)
-        await this.gamification?.reverseKairos(tx, {
-          activityId: id,
-          actorId: actor.id,
-          historyId: history.id,
-          reason,
+        const history = await this.hist(tx, id, actor.id, {
+          type: TipoHistorialActividadKairos.REVISION,
+          fromState: a.state,
+          toState: state,
+          comment,
+          reviewerId: actor.id,
         });
-      return out;
-    });
+        if (state === EstadoActividadKairos.TERMINADA)
+          await this.gamification?.awardKairos(tx, {
+            activityId: id,
+            userId: a.responsableId,
+            actorId: actor.id,
+            historyId: history.id,
+          });
+        return out;
+      },
+    );
   }
-  async comment(actor: AuthUser, projectId: string, id: string, body: string) {
+  async reopen(
+    actor: AuthUser,
+    projectId: string,
+    id: string,
+    reason: string,
+    key: string = randomUUID(),
+  ) {
+    return this.mutate(
+      actor,
+      projectId,
+      key,
+      { action: "ACTIVITY_REOPEN", id, reason },
+      async (tx) => {
+        const { a, m } = await this.lock(tx, projectId, id, actor);
+        if (
+          !this.manage(m.rol) ||
+          !["TERMINADA", "CANCELADA"].includes(a.state as string)
+        )
+          throw invalidInput("KAIROS_ACTIVITY_REOPEN_INVALID");
+        const out = await tx.actividadKairos.update({
+          where: { id },
+          data: { state: EstadoActividadKairos.PENDIENTE, closedAt: null },
+          select: detail,
+        });
+        const history = await this.hist(tx, id, actor.id, {
+          type: TipoHistorialActividadKairos.REAPERTURA,
+          fromState: a.state,
+          toState: EstadoActividadKairos.PENDIENTE,
+          comment: reason,
+        });
+        if (a.state === EstadoActividadKairos.TERMINADA)
+          await this.gamification?.reverseKairos(tx, {
+            activityId: id,
+            actorId: actor.id,
+            historyId: history.id,
+            reason,
+          });
+        return out;
+      },
+    );
+  }
+  async comment(
+    actor: AuthUser,
+    projectId: string,
+    id: string,
+    body: string,
+    key: string = randomUUID(),
+  ) {
     this.active(actor);
-    return this.prisma.$transaction(async (tx) => {
-      const { a, m } = await this.lock(tx, projectId, id, actor, true);
-      if (m.rol === RolMiembroProyectoKairos.OBSERVADOR)
-        throw invalidInput("KAIROS_COMMENT_FORBIDDEN");
-      const out = await tx.comentarioActividadKairos.create({
-        data: { actividadId: a.id, authorId: actor.id, body },
-        select: {
-          id: true,
-          body: true,
-          author: { select: { id: true, codigo: true } },
-          createdAt: true,
-        },
-      });
-      await this.audit.append(
-        {
-          actorId: actor.id,
-          action: "COMMENT_ACTIVITY",
-          resource: "KAIROS_ACTIVITY",
-          correlationId: a.id,
-          metadata: { commentId: out.id },
-        },
-        tx,
-      );
-      return out;
-    });
+    return this.mutate(
+      actor,
+      projectId,
+      key,
+      { action: "ACTIVITY_COMMENT", id, body },
+      async (tx) => {
+        const { a, m } = await this.lock(tx, projectId, id, actor, true);
+        if (m.rol === RolMiembroProyectoKairos.OBSERVADOR)
+          throw invalidInput("KAIROS_COMMENT_FORBIDDEN");
+        const out = await tx.comentarioActividadKairos.create({
+          data: { actividadId: a.id, authorId: actor.id, body },
+          select: {
+            id: true,
+            body: true,
+            author: { select: { id: true, codigo: true } },
+            createdAt: true,
+          },
+        });
+        await this.audit.append(
+          {
+            actorId: actor.id,
+            action: "COMMENT_ACTIVITY",
+            resource: "KAIROS_ACTIVITY",
+            correlationId: a.id,
+            metadata: { commentId: out.id },
+          },
+          tx,
+        );
+        return out;
+      },
+    );
   }
-  async history(actor: AuthUser, projectId: string, id: string, page = 1, pageSize = 50) {
+  async history(
+    actor: AuthUser,
+    projectId: string,
+    id: string,
+    page = 1,
+    pageSize = 50,
+  ) {
     this.active(actor);
     return this.prisma.$transaction(async (tx) => {
       const { a } = await this.lock(tx, projectId, id, actor, false);
@@ -453,34 +584,99 @@ export class KairosActivitiesService {
           orderBy: [{ createdAt: "asc" }, { id: "asc" }],
           skip: (currentPage - 1) * take,
           take,
-          select: { id: true, actividadId: true, actorId: true, reviewerId: true, type: true, fromState: true, toState: true, comment: true, evidenceId: true, createdAt: true },
+          select: {
+            id: true,
+            actividadId: true,
+            actorId: true,
+            reviewerId: true,
+            type: true,
+            fromState: true,
+            toState: true,
+            comment: true,
+            evidenceId: true,
+            createdAt: true,
+          },
         }),
         tx.historialActividadKairos.count({ where }),
       ]);
       return { items, total, page: currentPage, pageSize: take };
     });
   }
-  async evidenceList(actor: AuthUser, projectId: string, id: string, page = 1, pageSize = 50) {
+  async evidenceList(
+    actor: AuthUser,
+    projectId: string,
+    id: string,
+    page = 1,
+    pageSize = 50,
+  ) {
     return this.prisma.$transaction(async (tx) => {
       const { a } = await this.lock(tx, projectId, id, actor, false);
       const take = Math.min(Math.max(pageSize, 1), 100);
       const skip = (Math.max(page, 1) - 1) * take;
       const where = { actividadId: a.id };
       const [items, total] = await Promise.all([
-        tx.entregaEvidenciaKairos.findMany({ where, orderBy: [{ createdAt: "asc" }, { version: "asc" }], skip, take, select: { id: true, version: true, comment: true, createdAt: true, author: { select: { id: true, codigo: true } }, archivo: { select: { id: true, originalName: true, detectedMime: true, sizeBytes: true, status: true, createdAt: true, updatedAt: true } } } }),
+        tx.entregaEvidenciaKairos.findMany({
+          where,
+          orderBy: [{ createdAt: "asc" }, { version: "asc" }],
+          skip,
+          take,
+          select: {
+            id: true,
+            version: true,
+            comment: true,
+            createdAt: true,
+            author: { select: { id: true, codigo: true } },
+            archivo: {
+              select: {
+                id: true,
+                originalName: true,
+                detectedMime: true,
+                sizeBytes: true,
+                status: true,
+                createdAt: true,
+                updatedAt: true,
+              },
+            },
+          },
+        }),
         tx.entregaEvidenciaKairos.count({ where }),
       ]);
-      return { items: items.map((x) => ({ ...x, archivo: { ...x.archivo, sizeBytes: Number(x.archivo.sizeBytes) } })), total, page: Math.max(page, 1), pageSize: take };
+      return {
+        items: items.map((x) => ({
+          ...x,
+          archivo: { ...x.archivo, sizeBytes: Number(x.archivo.sizeBytes) },
+        })),
+        total,
+        page: Math.max(page, 1),
+        pageSize: take,
+      };
     });
   }
-  async comments(actor: AuthUser, projectId: string, id: string, page = 1, pageSize = 50) {
+  async comments(
+    actor: AuthUser,
+    projectId: string,
+    id: string,
+    page = 1,
+    pageSize = 50,
+  ) {
     return this.prisma.$transaction(async (tx) => {
       const { a } = await this.lock(tx, projectId, id, actor, false);
       const take = Math.min(Math.max(pageSize, 1), 100);
       const skip = (Math.max(page, 1) - 1) * take;
       const where = { actividadId: a.id };
       const [items, total] = await Promise.all([
-        tx.comentarioActividadKairos.findMany({ where, orderBy: [{ createdAt: "asc" }, { id: "asc" }], skip, take, select: { id: true, body: true, createdAt: true, author: { select: { id: true, codigo: true } } } }),
+        tx.comentarioActividadKairos.findMany({
+          where,
+          orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+          skip,
+          take,
+          select: {
+            id: true,
+            body: true,
+            createdAt: true,
+            author: { select: { id: true, codigo: true } },
+          },
+        }),
         tx.comentarioActividadKairos.count({ where }),
       ]);
       return { items, total, page: Math.max(page, 1), pageSize: take };

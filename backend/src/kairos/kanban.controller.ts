@@ -15,6 +15,8 @@ export class KairosKanbanController {
     @Query(new ZodValidationPipe(kanbanQuerySchema)) query: any,
     @Req() request: Request,
   ) {
-    return this.service.get(getAuthenticatedUser(request), projectId, query).then((data) => ({ data }));
+    return this.service
+      .get(getAuthenticatedUser(request), projectId, query)
+      .then((data) => ({ data }));
   }
 }

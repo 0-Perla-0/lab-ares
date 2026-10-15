@@ -189,34 +189,34 @@ export function Printing3dPage() {
           </Field>
         </div>
         {page?.items.length ? (
-          <div role="list" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <ul role="list" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {page.items.map((job) => (
-              <button
-                role="listitem"
-                key={job.id}
-                type="button"
-                onClick={() => void refreshDetail(job.id)}
-                className="focus-ring min-h-40 rounded-2xl border border-[var(--ares-border)] p-4 text-left"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <Box className="text-[#ea580c]" />
-                  <StatusBadge
-                    label={job.estado.replaceAll("_", " ")}
-                    tone={tone[job.estado]}
-                  />
-                </div>
-                <h2 className="mt-3 line-clamp-2 font-black">
-                  {job.descripcion}
-                </h2>
-                <p className="mt-2 text-sm text-[var(--ares-muted)]">
-                  {job.archivo.originalName}
-                </p>
-                <p className="mt-1 text-xs font-bold text-[var(--ares-muted)]">
-                  Solicita {job.solicitante.codigo}
-                </p>
-              </button>
+              <li key={job.id}>
+                <button
+                  type="button"
+                  onClick={() => void refreshDetail(job.id)}
+                  className="focus-ring min-h-40 w-full rounded-2xl border border-[var(--ares-border)] p-4 text-left"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <Box className="text-[#ea580c]" />
+                    <StatusBadge
+                      label={job.estado.replaceAll("_", " ")}
+                      tone={tone[job.estado]}
+                    />
+                  </div>
+                  <h2 className="mt-3 line-clamp-2 font-black">
+                    {job.descripcion}
+                  </h2>
+                  <p className="mt-2 text-sm text-[var(--ares-muted)]">
+                    {job.archivo.originalName}
+                  </p>
+                  <p className="mt-1 text-xs font-bold text-[var(--ares-muted)]">
+                    Solicita {job.solicitante.codigo}
+                  </p>
+                </button>
+              </li>
             ))}
-          </div>
+          </ul>
         ) : (
           <EmptyState
             title="Sin trabajos"

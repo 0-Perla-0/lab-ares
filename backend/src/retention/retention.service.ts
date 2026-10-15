@@ -1,10 +1,12 @@
 import { createHash, randomUUID } from "node:crypto";
-import { HttpStatus, Injectable } from "@nestjs/common";
+import { HttpStatus, Injectable, Optional } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import type { AuthUser } from "../auth/auth-user";
 import { AuditService } from "../auth/audit.service";
 import { AccessScope, getAccessScope, Permission } from "../auth/permissions";
 import { ApiException } from "../common/errors/api.exception";
+import { withWorkerWriteBarrier } from "../common/domain/worker-write-barrier";
+import type { Prisma } from "../generated/prisma/client";
 import type { Environment } from "../config/environment";
 import { PrismaService } from "../database/prisma.service";
 import {
@@ -23,8 +25,19 @@ import {
 } from "../generated/prisma/enums";
 import { NotificationsService } from "../notifications/notifications.service";
 import { journalHash } from "../recovery/journal-integrity";
+import {
+  operationalEvidencePolicies,
+  operationalEvidenceExists,
+  suppressOperationalEvidence,
+} from "./operational-evidence";
 import { S3Storage } from "../storage/s3.storage";
 import { StorageService } from "../storage/storage.service";
+import { ObjectDeletionService } from "../storage/object-deletion.service";
+import { DomainTransaction } from "../common/domain/domain-transaction";
+import {
+  retentionAdapters,
+  requireRetentionAdapter,
+} from "./retention-adapters";
 import type {
   LegalHoldCreateInput,
   LegalHoldListInput,
@@ -149,7 +162,93 @@ export class RetentionService {
     private readonly config: ConfigService<Environment, true>,
     private readonly storage: StorageService,
     private readonly objectStorage: S3Storage,
+    @Optional() private readonly objectDeletions?: ObjectDeletionService,
   ) {}
+
+  private get deletions() {
+    return (
+      this.objectDeletions ??
+      new ObjectDeletionService(this.prisma, this.objectStorage, this.config)
+    );
+  }
+  async listObjectDeletions(actor: AuthUser, page = 1, pageSize = 20) {
+    this.require(actor, Permission.RETENTION_READ);
+    const select = {
+      id: true,
+      purpose: true,
+      state: true,
+      attempts: true,
+      lastErrorCode: true,
+      createdAt: true,
+      irreversibleAt: true,
+      verifiedAt: true,
+      completedAt: true,
+    } as const;
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.objectDeletionJob.findMany({
+        select,
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      this.prisma.objectDeletionJob.count(),
+    ]);
+    return {
+      items,
+      total,
+      page,
+      pageSize,
+      semantics:
+        "VERIFIED is physical inventory evidence, not a completed institutional/domain receipt. No object paths or manifests exposed.",
+    };
+  }
+  async reconcileObjectDeletion(actor: AuthUser, id: string, key: string) {
+    this.require(actor, Permission.RETENTION_EXECUTE);
+    this.id(id);
+    const authorize = async (tx: Prisma.TransactionClient) => {
+      await tx.$queryRaw`SELECT id FROM Usuario WHERE id = ${actor.id} LOCK IN SHARE MODE`;
+      const fresh = await tx.usuario.findUnique({ where: { id: actor.id } });
+      if (
+        !fresh ||
+        fresh.estado !== "ACTIVA" ||
+        getAccessScope(fresh, Permission.RETENTION_EXECUTE) !==
+          AccessScope.GLOBAL
+      )
+        throw api("UNAUTHORIZED", 401);
+      if (
+        !(await tx.objectDeletionJob.findUnique({
+          where: { id },
+          select: { id: true },
+        }))
+      )
+        throw api("OBJECT_DELETION_NOT_FOUND", 404);
+    };
+    const accepted = await new DomainTransaction(this.prisma).run(
+      actor,
+      key,
+      { action: "OBJECT_DELETION_RECONCILE", id },
+      async (tx) => {
+        await authorize(tx);
+        await this.audit.append(
+          {
+            actorId: actor.id,
+            action: "OBJECT_DELETION_RECONCILIATION_REQUESTED",
+            resource: "object_deletion",
+            objectId: id,
+          },
+          tx,
+        );
+        return { id, accepted: true };
+      },
+      authorize,
+    );
+    return {
+      ...accepted,
+      state: await this.deletions.reconcile(id, authorize),
+      semantics:
+        "Receipt confirms the reconciliation request only. Read-only S3 inspection; no DELETE, no restored access and no domain finalization. Replay re-queries current evidence.",
+    };
+  }
 
   private active(actor: AuthUser) {
     if (!actor || actor.estado !== EstadoUsuario.ACTIVA)
@@ -256,6 +355,22 @@ export class RetentionService {
     const requestHash = this.fingerprint(type, payload);
     const execute = () =>
       this.prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT id FROM RecoveryWriteBarrier WHERE id = 'global' LOCK IN SHARE MODE`;
+        const barrier = await tx.recoveryWriteBarrier.findUnique({
+          where: { id: "global" },
+        });
+        if (!barrier || barrier.active)
+          throw api("RECOVERY_WRITE_BARRIER_ACTIVE", 503);
+        await tx.$queryRaw`SELECT id FROM Usuario WHERE id = ${actor.id} LOCK IN SHARE MODE`;
+        const fresh = await tx.usuario.findUnique({ where: { id: actor.id } });
+        if (
+          !fresh ||
+          fresh.estado !== EstadoUsuario.ACTIVA ||
+          fresh.rol !== actor.rol ||
+          fresh.sedeId !== actor.sedeId ||
+          fresh.areaId !== actor.areaId
+        )
+          throw api("UNAUTHORIZED", 401);
         const existing = await tx.operacionRetencion.findUnique({
           where: { actorId_key: { actorId: actor.id, key } },
         });
@@ -281,15 +396,9 @@ export class RetentionService {
       return await execute();
     } catch (error) {
       if ((error as { code?: string }).code !== "P2002") throw error;
-      const existing = await this.prisma.operacionRetencion.findUnique({
-        where: { actorId_key: { actorId: actor.id, key } },
-      });
-      if (!existing) throw error;
-      if (existing.tipo !== type || existing.requestHash !== requestHash)
-        throw api("IDEMPOTENCY_KEY_REUSED");
-      if (existing.response == null)
-        throw api("RETENTION_OPERATION_INCOMPLETE");
-      return existing.response as T;
+      // Winner's receipt must be read in a fresh transaction under the same
+      // barrier/account checks, not replayed through an unprotected root query.
+      return execute();
     }
   }
 
@@ -299,6 +408,12 @@ export class RetentionService {
 
   private validateProvisionalRule(input: RetentionRuleCreateInput) {
     if (!input.provisional) return;
+    if (
+      ["ASISTENCIA_HORAS", "AUSENCIAS_JUSTIFICANTES", "VISITAS"].includes(
+        input.categoria,
+      )
+    )
+      throw api("RETENTION_INSTITUTIONAL_APPROVAL_REQUIRED");
     const policy = provisionalPolicies.get(input.categoria);
     if (!policy || policy.action !== input.accionFinal)
       throw api("RETENTION_PROVISIONAL_POLICY_INVALID", HttpStatus.BAD_REQUEST);
@@ -455,10 +570,22 @@ export class RetentionService {
   }
 
   private async resourceExists(client: any, input: RetentionRecordCreateInput) {
+    requireRetentionAdapter(input.categoria, input.resourceType);
+    const category = operationalEvidencePolicies[input.resourceType];
+    if (category) {
+      if (category !== input.categoria)
+        throw api("RETENTION_RESOURCE_TYPE_INVALID", 400);
+      return operationalEvidenceExists(
+        client,
+        input.resourceType,
+        input.resourceId,
+        input.subjectId,
+      );
+    }
     const policy = provisionalPolicies.get(input.categoria);
     if (policy && !policy.resources.includes(input.resourceType))
       throw api("RETENTION_RESOURCE_TYPE_INVALID", HttpStatus.BAD_REQUEST);
-    if (!policy) return true;
+    if (!policy) return false;
     switch (input.resourceType) {
       case "Session":
         return Boolean(
@@ -502,8 +629,6 @@ export class RetentionService {
             select: { id: true },
           }),
         );
-      case "TechnicalLog":
-        return true;
       default:
         return false;
     }
@@ -515,6 +640,9 @@ export class RetentionService {
     key: string,
   ) {
     this.require(actor, Permission.RETENTION_MANAGE);
+    requireRetentionAdapter(input.categoria, input.resourceType);
+    if (input.triggeredAt > new Date())
+      throw api("RETENTION_TRIGGER_IN_FUTURE", 400);
     return this.mutation(
       actor,
       key,
@@ -542,6 +670,11 @@ export class RetentionService {
         if (!rule) throw api("RETENTION_APPROVED_RULE_REQUIRED");
         if (!this.policyExecutable(rule))
           throw api("RETENTION_INSTITUTIONAL_APPROVAL_REQUIRED");
+        requireRetentionAdapter(
+          input.categoria,
+          input.resourceType,
+          rule.accionFinal,
+        );
         if (!(await this.resourceExists(tx, input)))
           throw api("RETENTION_RESOURCE_NOT_FOUND", HttpStatus.NOT_FOUND);
         const archiveDueAt = new Date(
@@ -601,6 +734,16 @@ export class RetentionService {
     return { items, total, page: input.page, pageSize: input.pageSize };
   }
 
+  adapters(actor: AuthUser) {
+    this.require(actor, Permission.RETENTION_READ);
+    return {
+      items: retentionAdapters,
+      institutionalPoliciesApproved: this.institutionalPoliciesApproved(),
+      semantics:
+        "Unsupported categories/resources are not executable; no default institutional retention periods.",
+    };
+  }
+
   async advanceLifecycle(limit = 100) {
     const now = new Date();
     const records = await this.prisma.registroRetencion.findMany({
@@ -614,7 +757,7 @@ export class RetentionService {
     });
     let advanced = 0;
     for (const record of records) {
-      await this.prisma.$transaction(async (tx) => {
+      await withWorkerWriteBarrier(this.prisma, async (tx) => {
         const updated = await tx.registroRetencion.updateMany({
           where: {
             id: record.id,
@@ -673,14 +816,20 @@ export class RetentionService {
           ].includes(record.estado)
         )
           throw api("RETENTION_RECORD_TERMINAL");
-        const processing = await tx.elementoLoteSupresion.findFirst({
+        const irreversible = await tx.objectDeletionJob.findFirst({
           where: {
-            registroId: input.registroId,
-            estado: EstadoElementoSupresion.PROCESANDO,
+            OR: [
+              { fileId: record.resourceId },
+              { resourceId: record.resourceId },
+            ],
+            state: { in: ["DISPATCHED", "UNCERTAIN", "VERIFIED", "COMPLETE"] },
           },
           select: { id: true },
         });
-        if (processing) throw api("RETENTION_SUPPRESSION_IN_PROGRESS");
+        if (irreversible) throw api("OBJECT_DELETION_IRREVERSIBLE", 409);
+        // A claim is not a destructive effect. The effect now holds this same
+        // record lock until commit, so a hold can win before it, or observe the
+        // terminal state afterward; never reject solely for a queued claim.
         const active = await tx.retencionLegal.findFirst({
           where: {
             registroId: input.registroId,
@@ -1267,9 +1416,37 @@ export class RetentionService {
     return accepted;
   }
 
-  private async executeAdapter(record: any) {
+  private async executeAdapter(
+    record: any,
+    client: Prisma.TransactionClient | PrismaService = this.prisma,
+  ) {
+    requireRetentionAdapter(
+      record.categoria,
+      record.resourceType,
+      record.regla.accionFinal,
+    );
     if (!this.policyExecutable(record.regla))
       throw api("RETENTION_INSTITUTIONAL_APPROVAL_REQUIRED");
+    const category = operationalEvidencePolicies[record.resourceType];
+    if (category) {
+      if (
+        category !== record.categoria ||
+        record.regla.provisional ||
+        !this.institutionalPoliciesApproved()
+      )
+        throw api("RETENTION_INSTITUTIONAL_APPROVAL_REQUIRED");
+      if (record.regla.accionFinal !== "ANONIMIZAR")
+        throw api("RETENTION_POLICY_ACTION_MISMATCH");
+      return suppressOperationalEvidence(
+        this.prisma,
+        this.objectStorage,
+        record.resourceType,
+        record.resourceId,
+        client === this.prisma
+          ? undefined
+          : (client as Prisma.TransactionClient),
+      );
+    }
     const provisional = provisionalPolicies.get(record.categoria);
     if (!provisional || !provisional.resources.includes(record.resourceType))
       throw api("RETENTION_ADAPTER_UNAVAILABLE", HttpStatus.NOT_IMPLEMENTED);
@@ -1277,33 +1454,91 @@ export class RetentionService {
       throw api("RETENTION_POLICY_ACTION_MISMATCH");
     switch (record.resourceType) {
       case "Session":
-        await this.prisma.session.deleteMany({
-          where: { id: record.resourceId },
+        await client.session.deleteMany({
+          where: {
+            id: record.resourceId,
+            OR: [
+              { expiresAt: { lte: new Date() } },
+              { revokedAt: { not: null } },
+              { absoluteExpiresAt: { lte: new Date() } },
+            ],
+          },
         });
+        if (
+          await client.session.findUnique({ where: { id: record.resourceId } })
+        )
+          throw api("RETENTION_RESOURCE_NOT_TERMINAL");
         return;
       case "RecoveryToken":
-        await this.prisma.recoveryToken.deleteMany({
-          where: { id: record.resourceId },
+        await client.recoveryToken.deleteMany({
+          where: {
+            id: record.resourceId,
+            OR: [{ expiresAt: { lte: new Date() } }, { usedAt: { not: null } }],
+          },
         });
+        if (
+          await client.recoveryToken.findUnique({
+            where: { id: record.resourceId },
+          })
+        )
+          throw api("RETENTION_RESOURCE_NOT_TERMINAL");
         return;
       case "MfaChallenge":
-        await this.prisma.mfaChallenge.deleteMany({
-          where: { id: record.resourceId },
+        await client.mfaChallenge.deleteMany({
+          where: {
+            id: record.resourceId,
+            OR: [{ expiresAt: { lte: new Date() } }, { usedAt: { not: null } }],
+          },
         });
+        if (
+          await client.mfaChallenge.findUnique({
+            where: { id: record.resourceId },
+          })
+        )
+          throw api("RETENTION_RESOURCE_NOT_TERMINAL");
         return;
       case "Notification":
-        await this.prisma.notification.deleteMany({
+        await client.notification.deleteMany({
           where: { id: record.resourceId },
         });
         return;
       case "ReporteExportacion": {
-        const report = await this.prisma.reporteExportacion.findUnique({
+        await client.$queryRaw`SELECT id FROM ReporteExportacion WHERE id = ${record.resourceId} FOR UPDATE`;
+        const report = await client.reporteExportacion.findUnique({
           where: { id: record.resourceId },
-          select: { archivoId: true },
+          select: {
+            archivoId: true,
+            status: true,
+            expiresAt: true,
+            nextAttemptAt: true,
+          },
         });
-        if (report?.archivoId)
-          await this.storage.removeGenerated(report.archivoId);
-        await this.prisma.reporteExportacion.updateMany({
+        if (
+          report &&
+          !(
+            report.status === EstadoReporteExportacion.EXPIRADO ||
+            (report.status === EstadoReporteExportacion.FALLIDO &&
+              report.nextAttemptAt === null) ||
+            (report.status === EstadoReporteExportacion.COMPLETADO &&
+              report.expiresAt &&
+              report.expiresAt <= new Date())
+          )
+        )
+          throw api("RETENTION_RESOURCE_NOT_TERMINAL");
+        if (report?.archivoId) {
+          await this.assertFileUnshared(
+            client,
+            report.archivoId,
+            record.resourceId,
+          );
+          const pending = await this.storage.removeGenerated(
+            report.archivoId,
+            client,
+            record.resourceId,
+          );
+          if (pending) return pending;
+        }
+        await client.reporteExportacion.updateMany({
           where: { id: record.resourceId },
           data: {
             status: EstadoReporteExportacion.EXPIRADO,
@@ -1314,26 +1549,47 @@ export class RetentionService {
         return;
       }
       case "Archivo": {
-        const file = await this.prisma.archivo.findFirst({
+        if (client === this.prisma)
+          throw api("OBJECT_DELETION_PROTOCOL_REQUIRED");
+        await client.$queryRaw`SELECT id FROM Archivo WHERE id = ${record.resourceId} FOR UPDATE`;
+        const existingJob = await client.objectDeletionJob.findUnique({
+          where: { fileId: record.resourceId },
+        });
+        if (existingJob) {
+          if (existingJob.purpose !== "REJECTED_FILE")
+            throw api("OBJECT_DELETION_PURPOSE_MISMATCH");
+          if (
+            existingJob.state !== "VERIFIED" &&
+            existingJob.state !== "COMPLETE"
+          )
+            return { deletionJobId: existingJob.id };
+          await this.deletions.complete(
+            client as Prisma.TransactionClient,
+            existingJob.id,
+          );
+          return;
+        }
+        const file = await client.archivo.findFirst({
           where: { id: record.resourceId, status: EstadoArchivo.RECHAZADO },
           select: { objectKey: true, quarantineKey: true },
         });
-        if (!file) return;
-        await this.objectStorage.delete("quarantine", file.quarantineKey);
-        await this.objectStorage.delete("available", file.objectKey);
-        await this.prisma.archivo.updateMany({
-          where: { id: record.resourceId, status: EstadoArchivo.RECHAZADO },
-          data: {
-            propietarioId: null,
-            originalName: "[SUPRIMIDO]",
-            detectedMime: null,
-            extension: null,
-            sha256: null,
-            lastError: null,
-            status: EstadoArchivo.ELIMINADO,
-          },
-        });
-        return;
+        if (!file) {
+          const existing = await client.archivo.findUnique({
+            where: { id: record.resourceId },
+            select: { status: true },
+          });
+          if (existing && existing.status !== EstadoArchivo.ELIMINADO)
+            throw api("RETENTION_RESOURCE_NOT_TERMINAL");
+          return;
+        }
+        await this.assertFileUnshared(client, record.resourceId);
+        const job = await this.deletions.prepare(
+          client as Prisma.TransactionClient,
+          record.resourceId,
+          "REJECTED_FILE",
+          record.resourceId,
+        );
+        return { deletionJobId: job.id };
       }
       default:
         throw api("RETENTION_ADAPTER_UNAVAILABLE", HttpStatus.NOT_IMPLEMENTED);
@@ -1349,254 +1605,412 @@ export class RetentionService {
     return value.replace(/[^A-Za-z0-9_.-]/g, "").slice(0, 100);
   }
 
+  private async assertFileUnshared(
+    client: Prisma.TransactionClient | PrismaService,
+    fileId: string,
+    reportId?: string,
+  ) {
+    // Cooperates with hold creation's retention-record lock. The file row lock
+    // also prevents new FK references while deleting a generated/rejected file.
+    const records = await client.registroRetencion.findMany({
+      where: { resourceId: fileId },
+      select: { id: true },
+      orderBy: { id: "asc" },
+    });
+    for (const record of records)
+      await client.$queryRaw`SELECT id FROM RegistroRetencion WHERE id = ${record.id} FOR UPDATE`;
+    if (
+      await client.retencionLegal.count({
+        where: {
+          estado: EstadoRetencionLegal.ACTIVA,
+          registro: { resourceId: fileId },
+        },
+      })
+    )
+      throw api("RETENTION_SHARED_EVIDENCE_OR_HOLD");
+    await client.$queryRaw`SELECT id FROM Archivo WHERE id = ${fileId} FOR UPDATE`;
+    const file = await client.archivo.findUnique({
+      where: { id: fileId },
+      include: {
+        _count: {
+          select: {
+            documentoVersiones: true,
+            kairosEvidence: true,
+            trabajosImpresion3D: true,
+            justificacionesAusencia: true,
+            apelacionesAusencia: true,
+            reportExports: { where: reportId ? { id: { not: reportId } } : {} },
+          },
+        },
+        bibliotecaVersion: true,
+        activoPublico: true,
+      },
+    });
+    if (
+      file &&
+      (Object.values(file._count).some(Boolean) ||
+        file.bibliotecaVersion ||
+        file.activoPublico)
+    )
+      throw api("RETENTION_SHARED_EVIDENCE_OR_HOLD");
+  }
+
   private leaseMs() {
     return Math.max(5_000, this.config.get("RETENTION_LEASE_MS"));
   }
 
-  private async withLeaseHeartbeat<T>(
-    itemId: string,
-    owner: string,
-    run: () => Promise<T>,
-  ) {
-    const leaseMs = this.leaseMs();
-    const intervalMs = Math.max(1_000, Math.floor(leaseMs / 3));
-    let leaseLost = false;
-    let renewal = Promise.resolve();
-    const renew = async () => {
-      const updated = await this.prisma.elementoLoteSupresion.updateMany({
-        where: {
-          id: itemId,
-          estado: EstadoElementoSupresion.PROCESANDO,
-          leaseOwner: owner,
-        },
-        data: { leaseUntil: new Date(Date.now() + leaseMs) },
-      });
-      if (updated.count !== 1) leaseLost = true;
-    };
-    await renew();
-    if (leaseLost) throw api("SUPPRESSION_ITEM_LEASE_LOST");
-    const timer = setInterval(() => {
-      renewal = renewal.then(renew).catch(() => {
-        leaseLost = true;
-      });
-    }, intervalMs);
-    timer.unref?.();
-    try {
-      const result = await run();
-      await renewal;
-      await renew();
-      if (leaseLost) throw api("SUPPRESSION_ITEM_LEASE_LOST");
-      return result;
-    } finally {
-      clearInterval(timer);
-    }
-  }
-
   private async processItem(batch: any, item: any) {
     const owner = randomUUID();
-    const claim = await this.prisma.$transaction(async (tx) => {
-      await tx.$executeRaw`SELECT id FROM LoteSupresion WHERE id=${batch.id} FOR UPDATE`;
-      const liveBatch = await tx.loteSupresion.findUnique({
+    const claim = await withWorkerWriteBarrier(
+      this.prisma,
+      async (tx, version) => {
+        await tx.$executeRaw`SELECT id FROM LoteSupresion WHERE id=${batch.id} FOR UPDATE`;
+        const liveBatch = await tx.loteSupresion.findUnique({
+          where: { id: batch.id },
+        });
+        if (
+          !liveBatch ||
+          (liveBatch.estado !== EstadoLoteSupresion.AUTORIZADO &&
+            liveBatch.estado !== EstadoLoteSupresion.EN_EJECUCION)
+        )
+          return null;
+        await tx.$executeRaw`SELECT id FROM RegistroRetencion WHERE id=${item.registroId} FOR UPDATE`;
+        const record = await tx.registroRetencion.findUnique({
+          where: { id: item.registroId },
+          include: { regla: true },
+        });
+        if (!record) return null;
+        const hold = await tx.retencionLegal.findFirst({
+          where: {
+            registroId: item.registroId,
+            estado: EstadoRetencionLegal.ACTIVA,
+          },
+          select: { id: true },
+        });
+        if (hold) {
+          const updated = await tx.elementoLoteSupresion.updateMany({
+            where: {
+              id: item.id,
+              estado: EstadoElementoSupresion.PENDIENTE,
+            },
+            data: {
+              estado: EstadoElementoSupresion.OMITIDO_RETENCION_LEGAL,
+              processedAt: new Date(),
+              leaseOwner: null,
+              leaseUntil: null,
+              nextAttemptAt: null,
+            },
+          });
+          if (!updated.count) return null;
+          await tx.registroRetencion.updateMany({
+            where: {
+              id: item.registroId,
+              estado: EstadoRegistroRetencion.SUPRESION_PROGRAMADA,
+            },
+            data: {
+              estado: EstadoRegistroRetencion.BLOQUEADO_ARCHIVADO,
+              scheduledAt: null,
+            },
+          });
+          await this.audit.append(
+            {
+              actorId: batch.autorizadoPorId ?? undefined,
+              subjectId: item.registro.subjectId ?? undefined,
+              action: "SUPPRESSION_ITEM_SKIPPED_LEGAL_HOLD",
+              resource: "retention_record",
+              correlationId: item.registroId,
+              metadata: { batchId: batch.id, holdId: hold.id },
+            },
+            tx,
+          );
+          return null;
+        }
+        const now = new Date();
+        if (
+          record.estado !== EstadoRegistroRetencion.SUPRESION_PROGRAMADA ||
+          record.actionDueAt.getTime() > liveBatch.cutoffAt.getTime() ||
+          record.actionDueAt.getTime() > now.getTime() ||
+          !this.policyExecutable(record.regla)
+        ) {
+          await tx.elementoLoteSupresion.updateMany({
+            where: {
+              id: item.id,
+              estado: EstadoElementoSupresion.PENDIENTE,
+            },
+            data: {
+              estado: EstadoElementoSupresion.FALLIDO,
+              errorCode: "SUPPRESSION_BATCH_STALE",
+              processedAt: now,
+              nextAttemptAt: null,
+              leaseOwner: null,
+              leaseUntil: null,
+            },
+          });
+          return null;
+        }
+        const claimed = await tx.elementoLoteSupresion.updateMany({
+          where: {
+            id: item.id,
+            estado: EstadoElementoSupresion.PENDIENTE,
+            OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: now } }],
+          },
+          data: {
+            estado: EstadoElementoSupresion.PROCESANDO,
+            attempts: { increment: 1 },
+            leaseOwner: owner,
+            leaseUntil: new Date(now.getTime() + this.leaseMs()),
+          },
+        });
+        if (!claimed.count) return null;
+        return { batch: liveBatch, record, version };
+      },
+    );
+    if (!claim) return;
+    // The same authorization/lease checks run before reservation, each external
+    // start and final SQL effect. No destructive I/O stays inside that effect.
+    const authorizeDeletion = async (tx: Prisma.TransactionClient) => {
+      await tx.$queryRaw`SELECT id FROM LoteSupresion WHERE id = ${batch.id} FOR UPDATE`;
+      const live = await tx.loteSupresion.findUnique({
         where: { id: batch.id },
       });
       if (
-        !liveBatch ||
-        (liveBatch.estado !== EstadoLoteSupresion.AUTORIZADO &&
-          liveBatch.estado !== EstadoLoteSupresion.EN_EJECUCION)
+        !live ||
+        (live.estado !== EstadoLoteSupresion.AUTORIZADO &&
+          live.estado !== EstadoLoteSupresion.EN_EJECUCION)
       )
-        return null;
-      await tx.$executeRaw`SELECT id FROM RegistroRetencion WHERE id=${item.registroId} FOR UPDATE`;
+        throw api("SUPPRESSION_BATCH_STALE");
+      if (!live.autorizadoPorId) throw api("SUPPRESSION_AUTHORIZATION_REVOKED");
+      await tx.$queryRaw`SELECT id FROM Usuario WHERE id = ${live.autorizadoPorId} LOCK IN SHARE MODE`;
+      const authority = await tx.usuario.findUnique({
+        where: { id: live.autorizadoPorId },
+      });
+      if (
+        !authority ||
+        authority.estado !== EstadoUsuario.ACTIVA ||
+        getAccessScope(authority, Permission.RETENTION_EXECUTE) !==
+          AccessScope.GLOBAL
+      )
+        throw api("SUPPRESSION_AUTHORIZATION_REVOKED");
+      await tx.$queryRaw`SELECT id FROM RegistroRetencion WHERE id = ${item.registroId} FOR UPDATE`;
       const record = await tx.registroRetencion.findUnique({
         where: { id: item.registroId },
         include: { regla: true },
       });
-      if (!record) return null;
-      const hold = await tx.retencionLegal.findFirst({
-        where: {
-          registroId: item.registroId,
-          estado: EstadoRetencionLegal.ACTIVA,
-        },
-        select: { id: true },
-      });
-      if (hold) {
-        const updated = await tx.elementoLoteSupresion.updateMany({
-          where: {
-            id: item.id,
-            estado: EstadoElementoSupresion.PENDIENTE,
-          },
-          data: {
-            estado: EstadoElementoSupresion.OMITIDO_RETENCION_LEGAL,
-            processedAt: new Date(),
-            leaseOwner: null,
-            leaseUntil: null,
-            nextAttemptAt: null,
-          },
-        });
-        if (!updated.count) return null;
-        await tx.registroRetencion.updateMany({
-          where: {
-            id: item.registroId,
-            estado: EstadoRegistroRetencion.SUPRESION_PROGRAMADA,
-          },
-          data: {
-            estado: EstadoRegistroRetencion.BLOQUEADO_ARCHIVADO,
-            scheduledAt: null,
-          },
-        });
-        await this.audit.append(
-          {
-            actorId: batch.autorizadoPorId ?? undefined,
-            subjectId: item.registro.subjectId ?? undefined,
-            action: "SUPPRESSION_ITEM_SKIPPED_LEGAL_HOLD",
-            resource: "retention_record",
-            correlationId: item.registroId,
-            metadata: { batchId: batch.id, holdId: hold.id },
-          },
-          tx,
-        );
-        return null;
-      }
-      const now = new Date();
       if (
+        !record ||
         record.estado !== EstadoRegistroRetencion.SUPRESION_PROGRAMADA ||
-        record.actionDueAt.getTime() > liveBatch.cutoffAt.getTime() ||
-        record.actionDueAt.getTime() > now.getTime() ||
+        record.actionDueAt > live.cutoffAt ||
+        record.actionDueAt > new Date() ||
         !this.policyExecutable(record.regla)
-      ) {
-        await tx.elementoLoteSupresion.updateMany({
+      )
+        throw api("SUPPRESSION_BATCH_STALE");
+      if (
+        await tx.retencionLegal.findFirst({
           where: {
-            id: item.id,
-            estado: EstadoElementoSupresion.PENDIENTE,
+            registroId: item.registroId,
+            estado: EstadoRetencionLegal.ACTIVA,
           },
-          data: {
-            estado: EstadoElementoSupresion.FALLIDO,
-            errorCode: "SUPPRESSION_BATCH_STALE",
-            processedAt: now,
-            nextAttemptAt: null,
-            leaseOwner: null,
-            leaseUntil: null,
-          },
-        });
-        return null;
-      }
-      const claimed = await tx.elementoLoteSupresion.updateMany({
+          select: { id: true },
+        })
+      )
+        throw api("SUPPRESSION_RECORD_LEGAL_HOLD");
+      const renewed = await tx.elementoLoteSupresion.updateMany({
         where: {
           id: item.id,
-          estado: EstadoElementoSupresion.PENDIENTE,
-          OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: now } }],
-        },
-        data: {
           estado: EstadoElementoSupresion.PROCESANDO,
-          attempts: { increment: 1 },
           leaseOwner: owner,
-          leaseUntil: new Date(now.getTime() + this.leaseMs()),
+          leaseUntil: { gt: new Date() },
         },
+        data: { leaseUntil: new Date(Date.now() + this.leaseMs()) },
       });
-      if (!claimed.count) return null;
-      return { batch: liveBatch, record };
-    });
-    if (!claim) return;
+      if (renewed.count !== 1) throw api("SUPPRESSION_ITEM_LEASE_LOST");
+    };
     try {
-      await this.withLeaseHeartbeat(item.id, owner, () =>
-        this.executeAdapter(claim.record),
-      );
       const terminalState =
         claim.record.regla.accionFinal === AccionFinalRetencion.ANONIMIZAR
           ? EstadoRegistroRetencion.ANONIMIZADO
           : EstadoRegistroRetencion.SUPRIMIDO;
-      await this.prisma.$transaction(async (tx) => {
-        await tx.$executeRaw`SELECT id FROM RegistroRetencion WHERE id=${item.registroId} FOR UPDATE`;
-        const updated = await tx.elementoLoteSupresion.updateMany({
-          where: {
-            id: item.id,
-            estado: EstadoElementoSupresion.PROCESANDO,
-            leaseOwner: owner,
+      const finish = () =>
+        withWorkerWriteBarrier(
+          this.prisma,
+          async (tx) => {
+            await tx.$queryRaw`SELECT id FROM LoteSupresion WHERE id = ${batch.id} FOR UPDATE`;
+            const live = await tx.loteSupresion.findUnique({
+              where: { id: batch.id },
+            });
+            if (
+              !live ||
+              (live.estado !== EstadoLoteSupresion.AUTORIZADO &&
+                live.estado !== EstadoLoteSupresion.EN_EJECUCION)
+            )
+              throw api("SUPPRESSION_BATCH_STALE");
+            if (!live.autorizadoPorId)
+              throw api("SUPPRESSION_AUTHORIZATION_REVOKED");
+            await tx.$queryRaw`SELECT id FROM Usuario WHERE id = ${live.autorizadoPorId} LOCK IN SHARE MODE`;
+            const authority = await tx.usuario.findUnique({
+              where: { id: live.autorizadoPorId },
+            });
+            if (
+              !authority ||
+              authority.estado !== EstadoUsuario.ACTIVA ||
+              getAccessScope(authority, Permission.RETENTION_EXECUTE) !==
+                AccessScope.GLOBAL
+            )
+              throw api("SUPPRESSION_AUTHORIZATION_REVOKED");
+            await tx.$executeRaw`SELECT id FROM RegistroRetencion WHERE id=${item.registroId} FOR UPDATE`;
+            const record = await tx.registroRetencion.findUnique({
+              where: { id: item.registroId },
+              include: { regla: true },
+            });
+            if (
+              !record ||
+              record.estado !== EstadoRegistroRetencion.SUPRESION_PROGRAMADA ||
+              record.actionDueAt > live.cutoffAt ||
+              record.actionDueAt > new Date() ||
+              !this.policyExecutable(record.regla)
+            )
+              throw api("SUPPRESSION_BATCH_STALE");
+            if (
+              await tx.retencionLegal.findFirst({
+                where: {
+                  registroId: item.registroId,
+                  estado: EstadoRetencionLegal.ACTIVA,
+                },
+                select: { id: true },
+              })
+            )
+              throw api("SUPPRESSION_RECORD_LEGAL_HOLD");
+            // Only a live owned lease can enter the bounded effect transaction.
+            const renewed = await tx.elementoLoteSupresion.updateMany({
+              where: {
+                id: item.id,
+                estado: EstadoElementoSupresion.PROCESANDO,
+                leaseOwner: owner,
+                leaseUntil: { gt: new Date() },
+              },
+              data: { leaseUntil: new Date(Date.now() + this.leaseMs()) },
+            });
+            if (renewed.count !== 1) throw api("SUPPRESSION_ITEM_LEASE_LOST");
+            const pending = await this.executeAdapter(record, tx);
+            if (pending) return pending;
+            const updated = await tx.elementoLoteSupresion.updateMany({
+              where: {
+                id: item.id,
+                estado: EstadoElementoSupresion.PROCESANDO,
+                leaseOwner: owner,
+                leaseUntil: { gt: new Date() },
+              },
+              data: {
+                estado: EstadoElementoSupresion.EJECUTADO,
+                errorCode: null,
+                processedAt: new Date(),
+                leaseOwner: null,
+                leaseUntil: null,
+                nextAttemptAt: null,
+              },
+            });
+            if (!updated.count) throw api("SUPPRESSION_ITEM_LEASE_LOST");
+            const registry = await tx.registroSupresion.upsert({
+              where: {
+                registroId_accion: {
+                  registroId: item.registroId,
+                  accion: claim.record.regla.accionFinal,
+                },
+              },
+              create: {
+                registroId: item.registroId,
+                categoria: claim.record.categoria,
+                resourceType: claim.record.resourceType,
+                resourceFingerprint: createHash("sha256")
+                  .update(
+                    `${claim.record.categoria}:${claim.record.resourceType}:${claim.record.resourceId}`,
+                  )
+                  .digest("hex"),
+                accion: claim.record.regla.accionFinal,
+                policyVersion: claim.record.regla.version,
+                loteId: batch.id,
+                ejecutadoPorId: claim.batch.autorizadoPorId,
+              },
+              update: {},
+            });
+            await this.enqueueSuppressionJournal(tx, registry);
+            const finalized = await tx.registroRetencion.updateMany({
+              where: {
+                id: item.registroId,
+                estado: EstadoRegistroRetencion.SUPRESION_PROGRAMADA,
+              },
+              data: { estado: terminalState, processedAt: new Date() },
+            });
+            if (finalized.count !== 1) throw api("SUPPRESSION_BATCH_STALE");
+            await this.audit.append(
+              {
+                actorId: claim.batch.autorizadoPorId ?? undefined,
+                subjectId: claim.record.subjectId ?? undefined,
+                action: "SUPPRESSION_ITEM_EXECUTED",
+                resource: "retention_record",
+                correlationId: item.registroId,
+                metadata: {
+                  batchId: batch.id,
+                  category: claim.record.categoria,
+                  resourceType: claim.record.resourceType,
+                  action: claim.record.regla.accionFinal,
+                  policyVersion: claim.record.regla.version,
+                },
+              },
+              tx,
+            );
           },
-          data: {
-            estado: EstadoElementoSupresion.EJECUTADO,
-            errorCode: null,
-            processedAt: new Date(),
-            leaseOwner: null,
-            leaseUntil: null,
-            nextAttemptAt: null,
-          },
-        });
-        if (!updated.count) return;
-        const registry = await tx.registroSupresion.upsert({
-          where: {
-            registroId_accion: {
-              registroId: item.registroId,
-              accion: claim.record.regla.accionFinal,
-            },
-          },
-          create: {
-            registroId: item.registroId,
-            categoria: claim.record.categoria,
-            resourceType: claim.record.resourceType,
-            resourceFingerprint: createHash("sha256")
-              .update(
-                `${claim.record.categoria}:${claim.record.resourceType}:${claim.record.resourceId}`,
-              )
-              .digest("hex"),
-            accion: claim.record.regla.accionFinal,
-            policyVersion: claim.record.regla.version,
-            loteId: batch.id,
-            ejecutadoPorId: claim.batch.autorizadoPorId,
-          },
-          update: {},
-        });
-        await this.enqueueSuppressionJournal(tx, registry);
-        const finalized = await tx.registroRetencion.updateMany({
-          where: {
-            id: item.registroId,
-            estado: EstadoRegistroRetencion.SUPRESION_PROGRAMADA,
-          },
-          data: { estado: terminalState, processedAt: new Date() },
-        });
-        if (finalized.count !== 1) throw api("SUPPRESSION_BATCH_STALE");
-        await this.audit.append(
-          {
-            actorId: claim.batch.autorizadoPorId ?? undefined,
-            subjectId: claim.record.subjectId ?? undefined,
-            action: "SUPPRESSION_ITEM_EXECUTED",
-            resource: "retention_record",
-            correlationId: item.registroId,
-            metadata: {
-              batchId: batch.id,
-              category: claim.record.categoria,
-              resourceType: claim.record.resourceType,
-              action: claim.record.regla.accionFinal,
-              policyVersion: claim.record.regla.version,
-            },
-          },
-          tx,
+          claim.version,
+          Math.min(30000, Math.floor(this.leaseMs() / 2)),
         );
-      });
+      const pending = await finish();
+      if (pending) {
+        await this.deletions.process(
+          pending.deletionJobId,
+          authorizeDeletion,
+          claim.version,
+        );
+        await finish();
+      }
     } catch (error) {
+      if (
+        error instanceof ApiException &&
+        [
+          "RECOVERY_WRITE_BARRIER_ACTIVE",
+          "SUPPRESSION_ITEM_LEASE_LOST",
+        ].includes(error.code)
+      )
+        throw error;
       const attempts = Number(item.attempts ?? 0) + 1;
       const exhausted = attempts >= this.config.get("RETENTION_MAX_ATTEMPTS");
-      await this.prisma.elementoLoteSupresion.updateMany({
-        where: {
-          id: item.id,
-          estado: EstadoElementoSupresion.PROCESANDO,
-          leaseOwner: owner,
-        },
-        data: {
-          estado: exhausted
-            ? EstadoElementoSupresion.FALLIDO
-            : EstadoElementoSupresion.PENDIENTE,
-          errorCode: this.safeError(error),
-          processedAt: exhausted ? new Date() : null,
-          nextAttemptAt: exhausted
-            ? null
-            : new Date(
-                Date.now() +
-                  this.config.get("RETENTION_RETRY_BASE_MS") * attempts,
-              ),
-          leaseOwner: null,
-          leaseUntil: null,
-        },
-      });
+      await withWorkerWriteBarrier(
+        this.prisma,
+        (tx) =>
+          tx.elementoLoteSupresion.updateMany({
+            where: {
+              id: item.id,
+              estado: EstadoElementoSupresion.PROCESANDO,
+              leaseOwner: owner,
+              leaseUntil: { gt: new Date() },
+            },
+            data: {
+              estado: exhausted
+                ? EstadoElementoSupresion.FALLIDO
+                : EstadoElementoSupresion.PENDIENTE,
+              errorCode: this.safeError(error),
+              processedAt: exhausted ? new Date() : null,
+              nextAttemptAt: exhausted
+                ? null
+                : new Date(
+                    Date.now() +
+                      this.config.get("RETENTION_RETRY_BASE_MS") * attempts,
+                  ),
+              leaseOwner: null,
+              leaseUntil: null,
+            },
+          }),
+        claim.version,
+      );
     }
   }
 
@@ -1607,34 +2021,44 @@ export class RetentionService {
     );
     const expiredAt = new Date();
     const maxAttempts = this.config.get("RETENTION_MAX_ATTEMPTS");
-    await this.prisma.elementoLoteSupresion.updateMany({
-      where: {
-        loteId: id,
-        estado: EstadoElementoSupresion.PROCESANDO,
-        leaseUntil: { lte: expiredAt },
-        attempts: { gte: maxAttempts },
-      },
-      data: {
-        estado: EstadoElementoSupresion.FALLIDO,
-        errorCode: "SUPPRESSION_ITEM_LEASE_EXPIRED",
-        processedAt: expiredAt,
-        nextAttemptAt: null,
-        leaseOwner: null,
-        leaseUntil: null,
-      },
-    });
-    await this.prisma.elementoLoteSupresion.updateMany({
-      where: {
-        loteId: id,
-        estado: EstadoElementoSupresion.PROCESANDO,
-        leaseUntil: { lte: expiredAt },
-        attempts: { lt: maxAttempts },
-      },
-      data: {
-        estado: EstadoElementoSupresion.PENDIENTE,
-        leaseOwner: null,
-        leaseUntil: null,
-      },
+    await withWorkerWriteBarrier(this.prisma, async (tx) => {
+      await tx.$queryRaw`SELECT id FROM LoteSupresion WHERE id = ${id} FOR UPDATE`;
+      const live = await tx.loteSupresion.findUnique({ where: { id } });
+      if (
+        !live ||
+        (live.estado !== EstadoLoteSupresion.AUTORIZADO &&
+          live.estado !== EstadoLoteSupresion.EN_EJECUCION)
+      )
+        return;
+      await tx.elementoLoteSupresion.updateMany({
+        where: {
+          loteId: id,
+          estado: EstadoElementoSupresion.PROCESANDO,
+          leaseUntil: { lte: expiredAt },
+          attempts: { gte: maxAttempts },
+        },
+        data: {
+          estado: EstadoElementoSupresion.FALLIDO,
+          errorCode: "SUPPRESSION_ITEM_LEASE_EXPIRED",
+          processedAt: expiredAt,
+          nextAttemptAt: null,
+          leaseOwner: null,
+          leaseUntil: null,
+        },
+      });
+      await tx.elementoLoteSupresion.updateMany({
+        where: {
+          loteId: id,
+          estado: EstadoElementoSupresion.PROCESANDO,
+          leaseUntil: { lte: expiredAt },
+          attempts: { lt: maxAttempts },
+        },
+        data: {
+          estado: EstadoElementoSupresion.PENDIENTE,
+          leaseOwner: null,
+          leaseUntil: null,
+        },
+      });
     });
     const batch = await this.prisma.loteSupresion.findUnique({
       where: { id },
@@ -1664,13 +2088,15 @@ export class RetentionService {
     )
       return batch;
     if (batch.estado === EstadoLoteSupresion.AUTORIZADO)
-      await this.prisma.loteSupresion.updateMany({
-        where: { id, estado: EstadoLoteSupresion.AUTORIZADO },
-        data: {
-          estado: EstadoLoteSupresion.EN_EJECUCION,
-          startedAt: new Date(),
-        },
-      });
+      await withWorkerWriteBarrier(this.prisma, (tx) =>
+        tx.loteSupresion.updateMany({
+          where: { id, estado: EstadoLoteSupresion.AUTORIZADO },
+          data: {
+            estado: EstadoLoteSupresion.EN_EJECUCION,
+            startedAt: new Date(),
+          },
+        }),
+      );
     for (const item of batch.elementos) {
       const current = await this.prisma.loteSupresion.findUnique({
         where: { id },
@@ -1679,36 +2105,46 @@ export class RetentionService {
       if (current?.estado === EstadoLoteSupresion.PAUSADO) break;
       await this.processItem(batch, item);
     }
-    const states = await this.prisma.elementoLoteSupresion.findMany({
-      where: { loteId: id },
-      select: { estado: true },
-    });
-    const count = (state: EstadoElementoSupresion) =>
-      states.filter((item) => item.estado === state).length;
-    const pending =
-      count(EstadoElementoSupresion.PENDIENTE) +
-      count(EstadoElementoSupresion.PROCESANDO);
-    const executed = count(EstadoElementoSupresion.EJECUTADO);
-    const skipped = count(EstadoElementoSupresion.OMITIDO_RETENCION_LEGAL);
-    const failed = count(EstadoElementoSupresion.FALLIDO);
-    const final = pending === 0;
-    return this.prisma.loteSupresion.update({
-      where: { id },
-      data: {
-        ejecutados: executed,
-        omitidos: skipped,
-        fallidos: failed,
-        ...(final
-          ? {
-              estado:
-                failed > 0
-                  ? EstadoLoteSupresion.FALLIDO
-                  : EstadoLoteSupresion.COMPLETADO,
-              finishedAt: new Date(),
-            }
-          : {}),
-      },
-      include: batchInclude,
+    return withWorkerWriteBarrier(this.prisma, async (tx) => {
+      await tx.$queryRaw`SELECT id FROM LoteSupresion WHERE id = ${id} FOR UPDATE`;
+      const live = await tx.loteSupresion.findUnique({ where: { id } });
+      if (
+        !live ||
+        (live.estado !== EstadoLoteSupresion.AUTORIZADO &&
+          live.estado !== EstadoLoteSupresion.EN_EJECUCION)
+      )
+        return live;
+      const states = await tx.elementoLoteSupresion.findMany({
+        where: { loteId: id },
+        select: { estado: true },
+      });
+      const count = (state: EstadoElementoSupresion) =>
+        states.filter((item) => item.estado === state).length;
+      const pending =
+        count(EstadoElementoSupresion.PENDIENTE) +
+        count(EstadoElementoSupresion.PROCESANDO);
+      const executed = count(EstadoElementoSupresion.EJECUTADO);
+      const skipped = count(EstadoElementoSupresion.OMITIDO_RETENCION_LEGAL);
+      const failed = count(EstadoElementoSupresion.FALLIDO);
+      const final = pending === 0;
+      return tx.loteSupresion.update({
+        where: { id },
+        data: {
+          ejecutados: executed,
+          omitidos: skipped,
+          fallidos: failed,
+          ...(final
+            ? {
+                estado:
+                  failed > 0
+                    ? EstadoLoteSupresion.FALLIDO
+                    : EstadoLoteSupresion.COMPLETADO,
+                finishedAt: new Date(),
+              }
+            : {}),
+        },
+        include: batchInclude,
+      });
     });
   }
 

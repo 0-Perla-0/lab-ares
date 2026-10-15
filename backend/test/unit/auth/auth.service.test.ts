@@ -8,7 +8,10 @@ import { verifyPassword } from "../../../src/auth/password";
 import type { UserRepository } from "../../../src/auth/user.repository";
 import { EstadoUsuario, RolUsuario } from "../../../src/generated/prisma/enums";
 
-vi.mock("../../../src/auth/password", () => ({ verifyPassword: vi.fn(), needsArgon2Rehash: vi.fn(() => false) }));
+vi.mock("../../../src/auth/password", () => ({
+  verifyPassword: vi.fn(),
+  needsArgon2Rehash: vi.fn(() => false),
+}));
 
 const findByEmailForAuth = vi.fn();
 const repository = { findByEmailForAuth } as unknown as UserRepository;

@@ -1,0 +1,115 @@
+name: Immutable release candidate
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ares-release-candidate-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  publish-and-verify:
+    if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: release-candidate
+    permissions:
+      contents: read
+      actions: read
+      packages: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ARES_DATABASE_NAME: ares_candidate_ci
+      SESSION_SECRET: candidate-only-session-key-do-not-use-in-production
+      ARES_FULLSTACK_URL: http://localhost:4321
+      ARES_MAILPIT_URL: http://localhost:8025
+      ARES_FULLSTACK_DB_URL: mysql://root:ares-local-root-password@127.0.0.1:3307/ares_candidate_ci
+    steps:
+      - uses: actions/checkout@v6
+      - name: Require protected approval environment and successful CI for this exact commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/environments/release-candidate" > /tmp/ares-environment.json
+          jq -e '[.protection_rules[] | select(.type == "required_reviewers") | .reviewers[]] | length > 0' /tmp/ares-environment.json
+          gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$GITHUB_SHA&status=completed&per_page=100" > /tmp/ares-ci.json
+          jq -e --arg sha "$GITHUB_SHA" --arg repo "$GITHUB_REPOSITORY" '[.workflow_runs[] | select(.head_sha == $sha and .head_repository.full_name == $repo and .event == "push" and (.head_branch == "develop" or .head_branch == "main") and .conclusion == "success")] | length > 0' /tmp/ares-ci.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm audit --omit=dev --audit-level=moderate
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Registry references
+        shell: bash
+        run: |
+          printf 'ARES_REGISTRY=ghcr.io/%s\n' "${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+      - uses: docker/build-push-action@v6
+        id: backend
+        with:
+          context: .
+          file: backend/Dockerfile
+          target: runtime
+          push: true
+          tags: ${{ env.ARES_REGISTRY }}/backend:candidate-${{ github.sha }}
+          labels: org.opencontainers.image.revision=${{ github.sha }}
+      - uses: docker/build-push-action@v6
+        id: frontend
+        with:
+          context: .
+          file: frontend/Dockerfile
+          target: runtime
+          build-args: API_PROXY_TARGET=http://backend:3000
+          push: true
+          tags: ${{ env.ARES_REGISTRY }}/frontend:candidate-${{ github.sha }}
+          labels: org.opencontainers.image.revision=${{ github.sha }}
+      - name: Select the exact published digests (never latest)
+        env:
+          BACKEND_DIGEST: ${{ steps.backend.outputs.digest }}
+          FRONTEND_DIGEST: ${{ steps.frontend.outputs.digest }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$BACKEND_DIGEST" =~ ^sha256:[a-f0-9]{64}$ && "$FRONTEND_DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]
+          printf 'ARES_BACKEND_IMAGE=%s/backend@%s\nARES_FRONTEND_IMAGE=%s/frontend@%s\n' "$ARES_REGISTRY" "$BACKEND_DIGEST" "$ARES_REGISTRY" "$FRONTEND_DIGEST" >> "$GITHUB_ENV"
+      - name: Build only disposable migration/control-plane images from the same commit
+        run: docker compose -p ares-candidate-ci -f compose.yaml -f compose.acceptance.yaml -f compose.candidate.yaml build migrate runtime-grants seed-acceptance
+      - name: Acceptance uses the registry digests, not rebuilt runtime images
+        run: docker compose -p ares-candidate-ci -f compose.yaml -f compose.acceptance.yaml -f compose.candidate.yaml up --no-build --wait --wait-timeout 600
+      - run: npm exec --workspace @ares/frontend -- playwright install --with-deps chromium firefox webkit
+      - run: npm run test:e2e:fullstack
+      - name: Sequential synthetic Postman acceptance
+        run: |
+          npx --yes newman@6.2.1 run postman/Ares-Aceptacion-Integral.postman_collection.json --env-var acceptanceEnabled=true --env-var baseUrl=http://localhost:4321/api --bail
+          npx --yes newman@6.2.1 run postman/Ares-Cierre-Restante.postman_collection.json --env-var acceptanceEnabled=true --env-var baseUrl=http://localhost:4321/api --bail
+      - name: Verified candidate manifest (not production authorization)
+        shell: bash
+        run: |
+          jq -n --arg commit "$GITHUB_SHA" --arg backend "$ARES_BACKEND_IMAGE" --arg frontend "$ARES_FRONTEND_IMAGE" --arg evidence "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" '{version:1, commit:$commit, backend:$backend, frontend:$frontend, acceptanceRun:$evidence, productionAuthorized:false}' > ares-candidate.json
+          sha256sum ares-candidate.json > ares-candidate.json.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: verified-candidate-${{ github.sha }}
+          path: |
+            ares-candidate.json
+            ares-candidate.json.sha256
+            frontend/playwright-fullstack-report/
+          retention-days: 30
+      - name: Preserve failure evidence separately from verified manifests
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: failed-candidate-${{ github.sha }}
+          path: frontend/fullstack-results/
+          retention-days: 7
+      - name: Stop only this disposable candidate project, preserving volumes
+        if: always() && env.ARES_BACKEND_IMAGE != '' && env.ARES_FRONTEND_IMAGE != ''
+        run: docker compose -p ares-candidate-ci -f compose.yaml -f compose.acceptance.yaml -f compose.candidate.yaml down

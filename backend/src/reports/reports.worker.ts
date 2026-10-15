@@ -4,6 +4,7 @@ import type { Environment } from "../config/environment";
 import { PrismaService } from "../database/prisma.service";
 import { workersMayMutate } from "../recovery/barrier";
 import { ReportsService } from "./reports.service";
+import { observeWorker } from "../common/domain/worker-heartbeat";
 
 @Injectable()
 export class ReportsWorker implements OnModuleInit, OnModuleDestroy {
@@ -19,8 +20,12 @@ export class ReportsWorker implements OnModuleInit, OnModuleDestroy {
   onModuleInit() {
     if (!this.config.get("REPORTS_WORKER_ENABLED")) return;
     const interval = this.config.get("REPORTS_WORKER_INTERVAL_MS");
-    this.timer = setInterval(() => void this.tick(), interval);
-    void this.tick();
+    const run = () => {
+      if (!this.inFlight && this.prisma)
+        void observeWorker(this.prisma, "reports", () => this.tick());
+    };
+    this.timer = setInterval(run, interval);
+    run();
   }
 
   private async tick() {

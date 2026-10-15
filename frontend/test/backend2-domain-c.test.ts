@@ -147,8 +147,15 @@ describe("Backend 2 domain C contracts", () => {
     });
   });
 
-  it("keeps all thirteen retention categories and blocks unapproved destructive rules", () => {
-    expect(retentionCategories).toHaveLength(13);
+  it("keeps all fourteen backend retention categories and blocks unapproved destructive rules", () => {
+    expect(retentionCategories).toHaveLength(14);
+    expect(retentionCategories).toEqual(
+      expect.arrayContaining([
+        "PERFIL_ACADEMICO",
+        "AUSENCIAS_JUSTIFICANTES",
+        "VISITAS",
+      ]),
+    );
     expect(
       canAuthorizeRule({ provisional: false, accionFinal: "ELIMINAR" }, false),
     ).toBe(false);

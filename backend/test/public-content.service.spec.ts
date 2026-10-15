@@ -182,7 +182,8 @@ describe("public content contracts", () => {
       },
     ];
     expect(
-      createPublicVersionSchema.parse({ ...versionInput, bloques: blocks }).bloques,
+      createPublicVersionSchema.parse({ ...versionInput, bloques: blocks })
+        .bloques,
     ).toHaveLength(7);
     expect(() =>
       createPublicVersionSchema.parse({
@@ -421,9 +422,9 @@ describe("public content contracts", () => {
         },
       });
       await expect(
-      service.classifyAsset(actor({ rol: RolUsuario.ADMIN }), {
-        archivoId: fileId,
-      }),
+        service.classifyAsset(actor({ rol: RolUsuario.ADMIN }), {
+          archivoId: fileId,
+        }),
       ).rejects.toThrow();
       expect(storage.copy).not.toHaveBeenCalled();
     },

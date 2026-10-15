@@ -6,6 +6,7 @@ import { PrismaService } from "../database/prisma.service";
 import { StorageService } from "./storage.service";
 import type { Environment } from "../config/environment";
 import { workersMayMutate } from "../recovery/barrier";
+import { observeWorker } from "../common/domain/worker-heartbeat";
 
 /** Durable queue drain hook. Invoke from a scheduler/worker process; safe to repeat after crashes. */
 @Injectable()
@@ -23,10 +24,10 @@ export class StorageWorker implements OnModuleInit, OnModuleDestroy {
       this.config.get("STORAGE_WORKER_ENABLED") &&
       this.config.get("STORAGE_SCANNER_ENABLED")
     )
-      this.timer = setInterval(
-        () => void this.processDue(),
-        this.config.get("STORAGE_WORKER_INTERVAL_MS"),
-      );
+      this.timer = setInterval(() => {
+        if (!this.running)
+          void observeWorker(this.prisma, "storage", () => this.processDue());
+      }, this.config.get("STORAGE_WORKER_INTERVAL_MS"));
   }
   onModuleDestroy() {
     if (this.timer) clearInterval(this.timer);

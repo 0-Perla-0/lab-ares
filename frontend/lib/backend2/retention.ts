@@ -7,9 +7,9 @@ import type { ApiEnvelope } from "@/lib/types";
 
 export const retentionCategories = [
   "IDENTIDAD_CUENTA",
-  "ACADEMICO",
+  "PERFIL_ACADEMICO",
   "ASISTENCIA_HORAS",
-  "AUSENCIAS_EVIDENCIAS",
+  "AUSENCIAS_JUSTIFICANTES",
   "EXPEDIENTE",
   "KAIROS_EVIDENCIAS",
   "BIBLIOTECA",
@@ -19,6 +19,7 @@ export const retentionCategories = [
   "LOGS",
   "EXPORTACIONES",
   "ARCHIVOS_RECHAZADOS",
+  "VISITAS",
 ] as const;
 export type RetentionCategory = (typeof retentionCategories)[number];
 export type RetentionAction = "ELIMINAR" | "ANONIMIZAR";

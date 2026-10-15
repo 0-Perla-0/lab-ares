@@ -6,6 +6,7 @@ import type {
 
 import { PrismaService } from "../../database/prisma.service";
 import { translateUniqueViolation } from "./prisma-errors";
+import { recordOperationalHistory } from "../../common/domain/operational-history";
 
 type CreateData = Pick<SedeCreateInput, "nombre" | "direccion">;
 type UpdateData = Pick<SedeUpdateInput, "nombre" | "direccion">;
@@ -35,26 +36,50 @@ export class SedeRepository {
   }
 
   create(data: CreateData) {
-    return translateUniqueViolation(() => this.prisma.sede.create({ data }));
+    return translateUniqueViolation(() =>
+      this.prisma.$transaction(async (tx) => {
+        const row = await tx.sede.create({ data });
+        await recordOperationalHistory(tx, "SEDE", row.id);
+        return row;
+      }),
+    );
   }
 
   update(id: number, data: UpdateData) {
     return translateUniqueViolation(() =>
-      this.prisma.sede.update({ where: { id }, data }),
+      this.prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT id FROM Sede WHERE id = ${id} FOR UPDATE`;
+        const row = await tx.sede.update({ where: { id }, data });
+        return row;
+      }),
     );
   }
 
   reactivate(id: number, data: CreateData) {
     return translateUniqueViolation(() =>
-      this.prisma.sede.update({
-        where: { id },
-        data: { ...data, activa: true },
+      this.prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT id FROM Sede WHERE id = ${id} FOR UPDATE`;
+        const row = await tx.sede.update({
+          where: { id },
+          data: { ...data, activa: true },
+        });
+        await recordOperationalHistory(tx, "SEDE", id);
+        return row;
       }),
     );
   }
 
   deactivateCascade(id: number) {
     return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM Sede WHERE id = ${id} FOR UPDATE`;
+      const shifts = await tx.turno.findMany({
+        where: { area: { sedeId: id } },
+        orderBy: { id: "asc" },
+      });
+      const areas = await tx.area.findMany({
+        where: { sedeId: id },
+        orderBy: { id: "asc" },
+      });
       await tx.turno.updateMany({
         where: { area: { sedeId: id } },
         data: { activo: false },
@@ -63,7 +88,16 @@ export class SedeRepository {
         where: { sedeId: id },
         data: { activa: false },
       });
-      return tx.sede.update({ where: { id }, data: { activa: false } });
+      const row = await tx.sede.update({
+        where: { id },
+        data: { activa: false },
+      });
+      for (const shift of shifts)
+        await recordOperationalHistory(tx, "SHIFT", shift.id);
+      for (const area of areas)
+        await recordOperationalHistory(tx, "AREA", area.id);
+      await recordOperationalHistory(tx, "SEDE", id);
+      return row;
     });
   }
 }

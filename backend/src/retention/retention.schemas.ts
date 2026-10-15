@@ -115,7 +115,7 @@ export const suppressionRequestResolveSchema = z
     resolucion: reason,
     clasificacion: z
       .array(z.nativeEnum(CategoriaRetencion))
-      .max(13)
+      .max(14)
       .default([]),
   })
   .strict();

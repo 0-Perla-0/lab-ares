@@ -192,6 +192,7 @@ describe("operations service", () => {
   it("acknowledges and resolves alerts with the human actor", async () => {
     let alert: any = { id: "alert-1", state: "OPEN" };
     const tx: any = {
+      $queryRaw: vi.fn(),
       operationalAlert: {
         findUnique: vi.fn(async () => alert),
         updateMany: vi.fn(async ({ data }: any) => {
@@ -252,7 +253,9 @@ describe("operations service", () => {
       {} as any,
       config() as any,
     );
-    const incident = await service.createIncident(actor as any, input);
+    const incident = (await service.createIncident(actor as any, input)) as {
+      postmortemDueAt: Date;
+    };
     expect(incident.postmortemDueAt).toBeInstanceOf(Date);
     expect(incident.postmortemDueAt!.getUTCDay()).not.toBe(0);
     expect(incident.postmortemDueAt!.getUTCDay()).not.toBe(6);

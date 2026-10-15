@@ -6,6 +6,7 @@ import { ArrowLeft, LoaderCircle, Save, UserRoundPlus } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { useAuth } from "@/components/auth/auth-provider";
+import { AdministrativeRecovery } from "./administrative-recovery";
 import {
   ErrorBanner,
   Field,
@@ -65,6 +66,7 @@ export function UserEditorPage(props: Props) {
   const [loadError, setLoadError] = useState("");
   const [formError, setFormError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [invitationLink, setInvitationLink] = useState("");
   const [sedeId, setSedeId] = useState<number | null>(null);
   const [areaId, setAreaId] = useState<number | null>(null);
   const [turnoId, setTurnoId] = useState<number | null>(null);
@@ -146,20 +148,10 @@ export function UserEditorPage(props: Props) {
 
   async function save(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (saving || invitationLink) return;
     setSaving(true);
     setFormError("");
     const form = new FormData(event.currentTarget);
-    const password = String(form.get("password") ?? "");
-    if (!isEdit && password.length < 15) {
-      setFormError("La contraseña debe tener al menos 15 caracteres.");
-      setSaving(false);
-      return;
-    }
-    if (password && [...password].length > 128) {
-      setFormError("La contraseña no puede superar 128 caracteres.");
-      setSaving(false);
-      return;
-    }
 
     const payload = {
       codigo: String(form.get("codigo") ?? ""),
@@ -169,14 +161,32 @@ export function UserEditorPage(props: Props) {
       sedeId,
       areaId,
       turnoId,
-      ...(password ? { password } : {}),
     };
 
     try {
-      await apiRequest(isEdit ? `/api/users/${item?.id}` : "/api/users", {
-        method: isEdit ? "PUT" : "POST",
-        body: JSON.stringify(payload),
-      });
+      const result = await apiRequest<ApiEnvelope<{ token?: string }>>(
+        isEdit ? `/api/users/${item?.id}` : "/api/invitations",
+        {
+          method: isEdit ? "PUT" : "POST",
+          body: JSON.stringify(
+            isEdit
+              ? payload
+              : {
+                  targetEmail: payload.email,
+                  role: payload.rol,
+                  sedeId,
+                  areaId,
+                  turnoId,
+                },
+          ),
+        },
+      );
+      if (!isEdit && result.data.token) {
+        setInvitationLink(
+          `${window.location.origin}/invitacion?token=${encodeURIComponent(result.data.token)}`,
+        );
+        return;
+      }
       if (isModal && props.mode === "create") {
         await props.onSaved?.();
       } else {
@@ -199,22 +209,53 @@ export function UserEditorPage(props: Props) {
           : "mt-8 rounded-[1.6rem] border border-[#dde1ea] bg-white p-5 shadow-[0_8px_30px_rgba(23,23,74,0.035)] sm:p-8"
       }
     >
+      {invitationLink && (
+        <section
+          aria-label="Invitación creada"
+          className="mb-6 space-y-3 rounded-xl border p-4"
+        >
+          <p role="status">
+            Invitación creada. Comparte el enlace privado sólo con la persona
+            invitada.
+          </p>
+          <input
+            readOnly
+            value={invitationLink}
+            aria-label="Enlace privado de invitación"
+            className={inputClassName}
+            onFocus={(event) => event.currentTarget.select()}
+          />
+          <button
+            type="button"
+            className="focus-ring min-h-11 underline"
+            onClick={() => {
+              setInvitationLink("");
+              if (isModal && props.mode === "create") void props.onSaved?.();
+              else router.push("/portal/invitaciones");
+            }}
+          >
+            Listo, ocultar y cerrar
+          </button>
+        </section>
+      )}
       <fieldset>
         <legend className="text-base font-black">Identidad y acceso</legend>
         <p className="mt-1 text-xs text-[#667085]">
           Datos utilizados para identificar e iniciar sesión.
         </p>
         <div className="mt-5 grid gap-5 md:grid-cols-2">
-          <Field label="Código" required>
-            <input
-              name="codigo"
-              required
-              maxLength={50}
-              defaultValue={item?.codigo ?? ""}
-              className={inputClassName}
-              placeholder="Ej. INV-001"
-            />
-          </Field>
+          {isEdit && (
+            <Field label="Código" required>
+              <input
+                name="codigo"
+                required
+                maxLength={50}
+                defaultValue={item?.codigo ?? ""}
+                className={inputClassName}
+                placeholder="Ej. INV-001"
+              />
+            </Field>
+          )}
           <Field label="Correo electrónico" required>
             <input
               name="email"
@@ -226,42 +267,27 @@ export function UserEditorPage(props: Props) {
               placeholder="persona@ejemplo.com"
             />
           </Field>
-          <Field
-            label={isEdit ? "Nueva contraseña" : "Contraseña"}
-            required={!isEdit}
-            hint={
-              isEdit
-                ? "Déjala vacía para conservar la actual."
-                : "Mínimo 15 y máximo 128 caracteres."
-            }
-          >
-            <input
-              name="password"
-              type="password"
-              required={!isEdit}
-              minLength={isEdit ? undefined : 15}
-              maxLength={128}
-              autoComplete="new-password"
-              className={inputClassName}
-              placeholder={
-                isEdit ? "Sin cambios" : "Contraseña temporal segura"
-              }
-            />
-          </Field>
-          <Field label="Estado" required>
-            <select
-              name="estado"
-              required
-              defaultValue={item?.estado ?? "INVITADA"}
-              className={inputClassName}
-            >
-              {(isEdit ? editableStates : creatableStates).map((state) => (
-                <option key={state} value={state}>
-                  {stateLabels[state]}
-                </option>
-              ))}
-            </select>
-          </Field>
+          <p className="text-sm">
+            {isEdit
+              ? "Las contraseñas se cambian mediante recuperación de acceso."
+              : "Se enviará una invitación privada. El invitado elegirá su código y contraseña; no se crean contraseñas temporales."}
+          </p>
+          {isEdit && (
+            <Field label="Estado" required>
+              <select
+                name="estado"
+                required
+                defaultValue={item?.estado ?? "INVITADA"}
+                className={inputClassName}
+              >
+                {(isEdit ? editableStates : creatableStates).map((state) => (
+                  <option key={state} value={state}>
+                    {stateLabels[state]}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
         </div>
       </fieldset>
 
@@ -368,7 +394,7 @@ export function UserEditorPage(props: Props) {
         )}
         <button
           type="submit"
-          disabled={saving}
+          disabled={saving || !!invitationLink}
           className="focus-ring inline-flex items-center justify-center gap-2 rounded-xl bg-[#17174a] px-5 py-2.5 text-sm font-black text-white hover:bg-[#25256d] disabled:cursor-wait disabled:opacity-65"
         >
           {saving ? (
@@ -417,6 +443,9 @@ export function UserEditorPage(props: Props) {
       </div>
 
       {form}
+      {isEdit && item?.estado === "ACTIVA" && (
+        <AdministrativeRecovery userId={item.id} />
+      )}
     </div>
   );
 }

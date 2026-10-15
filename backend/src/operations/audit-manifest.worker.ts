@@ -8,6 +8,7 @@ import { workersMayMutate } from "../recovery/barrier";
 import { AuditQueryService } from "./audit-query.service";
 import { OperationsService } from "./operations.service";
 import { TechnicalLogger } from "./technical-logger.service";
+import { observeWorker } from "../common/domain/worker-heartbeat";
 
 @Injectable()
 export class AuditManifestWorker implements OnModuleInit, OnModuleDestroy {
@@ -25,15 +26,19 @@ export class AuditManifestWorker implements OnModuleInit, OnModuleDestroy {
   onModuleInit() {
     if (!this.config.get("AUDIT_MANIFEST_WORKER_ENABLED")) return;
     this.timer = setInterval(
-      () => void this.tick(),
+      () => this.schedule(),
       this.config.get("AUDIT_MANIFEST_WORKER_INTERVAL_MS"),
     );
     this.timer.unref();
-    void this.tick();
+    this.schedule();
   }
 
   onModuleDestroy() {
     if (this.timer) clearInterval(this.timer);
+  }
+  private schedule() {
+    if (!this.running && this.prisma)
+      void observeWorker(this.prisma, "auditManifest", () => this.tick());
   }
 
   async tick(now = new Date()) {
@@ -92,6 +97,7 @@ export class AuditManifestWorker implements OnModuleInit, OnModuleDestroy {
                   : "unknown",
             });
           }
+        throw error;
       }
     } finally {
       this.running = false;

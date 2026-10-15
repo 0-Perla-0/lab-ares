@@ -2,6 +2,21 @@ import { attendancePaths, attendanceSchemas } from "./attendance.openapi";
 import { identityPaths, identitySchemas } from "./identity.openapi";
 import { operationsPaths, operationsSchemas } from "./operations.openapi";
 import { recoveryPaths, recoverySchemas } from "./recovery.openapi";
+import { fullClosurePaths } from "./full-closure.openapi";
+import {
+  criticalWriteContracts,
+  expedientPaths,
+  criticalIdempotencyParameter,
+} from "./expedient.openapi";
+import { remainingClosurePaths } from "./remaining-closure.openapi";
+import {
+  operationalPhasePaths,
+  operationalPhaseSchemas,
+} from "./operational-phases.openapi";
+import {
+  absenceCalendarPaths,
+  absenceCalendarSchemas,
+} from "./absence-calendar.openapi";
 
 const cookieSecurity = [{ cookieAuth: [] }];
 
@@ -15,11 +30,11 @@ const userRoles = [
 ] as const;
 
 const userStates = [
-  "ACTIVO",
+  "ACTIVA",
   "INVITADA",
-  "INACTIVO",
-  "LIBERADO",
-  "BAJA",
+  "SUSPENDIDA",
+  "DESACTIVADA",
+  "BLOQUEADA",
 ] as const;
 
 const errorResponses: Record<string, any> = {
@@ -407,7 +422,7 @@ const reportsPaths = {
 const reportsSchemas = {
   ReportExportType: {
     type: "string",
-    enum: ["ATTENDANCE", "DOCUMENTS", "KAIROS"],
+    enum: ["ATTENDANCE", "ABSENCES", "DOCUMENTS", "KAIROS"],
   },
   ReportExportInput: {
     type: "object",
@@ -2711,6 +2726,7 @@ const retentionSchemas = {
       "LOGS",
       "EXPORTACIONES",
       "ARCHIVOS_RECHAZADOS",
+      "VISITAS",
     ],
   },
   RetentionFinalAction: { type: "string", enum: ["ELIMINAR", "ANONIMIZAR"] },
@@ -5137,10 +5153,13 @@ function userPaths() {
       },
       post: {
         tags: ["Users"],
+        deprecated: true,
+        description:
+          "Password-based administrative creation is retired. Use POST /api/invitations.",
         security: cookieSecurity,
         requestBody: jsonBody({ $ref: "#/components/schemas/UserInput" }),
         responses: {
-          201: { description: "User created" },
+          410: { description: "USER_INVITATION_REQUIRED" },
           409: { description: "Code or email already exists" },
           ...errorResponses,
         },
@@ -5321,8 +5340,12 @@ export function createOpenApiDocument() {
       ...userPaths(),
       ...identityPaths,
       ...attendancePaths,
-      ...documentPaths,
-      ...kairosPaths,
+      ...absenceCalendarPaths,
+      ...operationalPhasePaths,
+      ...criticalWriteContracts(documentPaths),
+      ...criticalWriteContracts(kairosPaths),
+      ...expedientPaths,
+      ...remainingClosurePaths,
       ...storagePaths,
       ...directoryPaths,
       ...reportsPaths,
@@ -5332,6 +5355,7 @@ export function createOpenApiDocument() {
       ...printing3dPaths,
       ...retentionPaths,
       ...operationsPaths,
+      ...fullClosurePaths,
       ...recoveryPaths,
       "/api/academic/catalogs": {
         get: {
@@ -5386,6 +5410,9 @@ export function createOpenApiDocument() {
         put: {
           tags: ["Academic"],
           security: cookieSecurity,
+          parameters: [criticalIdempotencyParameter],
+          description:
+            "Durable idempotency, transactional audit/notice and authorized replay. Retry unchanged after an uncertain result.",
           requestBody: jsonBody({
             $ref: "#/components/schemas/AcademicProfileInput",
           }),
@@ -5468,6 +5495,7 @@ export function createOpenApiDocument() {
           tags: ["Academic"],
           security: cookieSecurity,
           parameters: [
+            criticalIdempotencyParameter,
             {
               name: "kind",
               in: "path",
@@ -5500,7 +5528,7 @@ export function createOpenApiDocument() {
         post: {
           tags: ["Academic"],
           security: cookieSecurity,
-          parameters: idParameter(),
+          parameters: [...idParameter(), criticalIdempotencyParameter],
           requestBody: jsonBody({
             $ref: "#/components/schemas/AcademicConfirmationInput",
           }),
@@ -5705,14 +5733,15 @@ export function createOpenApiDocument() {
             email: { type: "string", format: "email", maxLength: 191 },
             password: {
               type: "string",
-              minLength: 12,
+              minLength: 15,
               maxLength: 128,
               writeOnly: true,
-              description: "Must also fit bcrypt's 72-byte UTF-8 limit",
+              description:
+                "Argon2id, 15–128 characters, Unicode and spaces permitted",
             },
             rol: { enum: userRoles, default: "PRESTADOR" },
             estado: {
-              enum: userStates.filter((state) => state !== "BAJA"),
+              enum: ["ACTIVA", "INVITADA"],
               default: "INVITADA",
             },
             sedeId: nullableIdSchema(true),
@@ -5729,10 +5758,11 @@ export function createOpenApiDocument() {
             email: { type: "string", format: "email", maxLength: 191 },
             password: {
               type: "string",
-              minLength: 12,
+              minLength: 15,
               maxLength: 128,
               writeOnly: true,
-              description: "Must also fit bcrypt's 72-byte UTF-8 limit",
+              description:
+                "Argon2id; Unicode and spaces allowed, 15–128 characters",
             },
             rol: { enum: userRoles },
             estado: { enum: userStates },
@@ -5853,6 +5883,8 @@ export function createOpenApiDocument() {
         ...retentionSchemas,
         ...operationsSchemas,
         ...recoverySchemas,
+        ...absenceCalendarSchemas,
+        ...operationalPhaseSchemas,
       },
     },
   } as const;

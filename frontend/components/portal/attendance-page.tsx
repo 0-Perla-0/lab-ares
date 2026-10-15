@@ -13,6 +13,9 @@ import {
 import { useAuth } from "@/components/auth/auth-provider";
 import { LoadError, LoadingTable } from "@/components/ui/primitives";
 import { ApiError, apiRequest, getApiErrorMessage } from "@/lib/api";
+import { hasPermission, permissions } from "@/lib/permissions";
+import { advisoryCoordinates } from "@/lib/geolocation";
+import { socialMutation } from "@/lib/service-social";
 import {
   formatDate,
   formatDuration,
@@ -24,10 +27,11 @@ import {
 } from "@/lib/attendance";
 
 type Envelope = { data: AttendanceResponse };
-const canReview = (role: string) => role !== "PRESTADOR";
 
 export function AttendancePage() {
   const { user } = useAuth();
+  const pendingSignal = useRef<{ target: string; body: object } | null>(null);
+  const canReview = hasPermission(user, permissions.ATTENDANCE_MANAGE);
   const [mine, setMine] = useState<AttendanceResponse | null>(null);
   const [review, setReview] = useState<AttendanceResponse | null>(null);
   const [cursor, setCursor] = useState<number | null>(null);
@@ -62,7 +66,7 @@ export function AttendancePage() {
           server: new Date(own.data.serverTime).getTime(),
           mono: performance.now(),
         });
-        if (canReview(user.rol)) {
+        if (canReview) {
           try {
             const queue = await apiRequest<Envelope>(
               `/api/attendance/open?limit=20${nextReviewCursor ? `&cursor=${nextReviewCursor}` : ""}`,
@@ -83,7 +87,7 @@ export function AttendancePage() {
         if (sequence === loadSequence.current) setLoading(false);
       }
     },
-    [user.id, user.rol],
+    [user.id, canReview],
   );
 
   useEffect(() => {
@@ -105,20 +109,28 @@ export function AttendancePage() {
     busyRef.current = true;
     setBusy(operation);
     try {
-      const payload = JSON.stringify(
-        operation === "check-out" ? { attendanceId: Number(target) } : {},
+      const identity = `${operation}:${target}`;
+      if (pendingSignal.current?.target !== identity) {
+        const coords = await advisoryCoordinates();
+        pendingSignal.current = {
+          target: identity,
+          body: {
+            ...(operation === "check-out"
+              ? { attendanceId: Number(target) }
+              : {}),
+            ...(coords ? { coords } : {}),
+          },
+        };
+      }
+      await socialMutation(
+        user.id,
+        `/api/attendance/${operation}`,
+        pendingSignal.current.body,
       );
-      const key = idempotencyKey(user.id, operation, target, payload);
-      await apiRequest(`/api/attendance/${operation}`, {
-        method: "POST",
-        headers: { "Idempotency-Key": key },
-        body: payload,
-      });
-      clearIdempotencyKey(user.id, operation, target);
+      pendingSignal.current = null;
       await load(null, reviewCursor);
     } catch (e) {
-      if (isDefinitiveFailure(e))
-        clearIdempotencyKey(user.id, operation, target);
+      if (isDefinitiveFailure(e)) pendingSignal.current = null;
       setError(getApiErrorMessage(e, "save"));
     } finally {
       busyRef.current = false;
@@ -177,7 +189,7 @@ export function AttendancePage() {
     <div className="animate-fade-up">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-[11px] font-black uppercase tracking-[.19em] text-[#ea580c]">
+          <p className="text-[11px] font-black uppercase tracking-[.19em] text-[var(--ares-accent-text)]">
             Control de jornada
           </p>
           <h1 className="mt-2 text-3xl font-black tracking-[-.045em] sm:text-4xl">
@@ -211,7 +223,7 @@ export function AttendancePage() {
               <Clock3 size={21} />
             </span>
             <div>
-              <p className="text-xs font-bold text-white/45">Estado actual</p>
+              <p className="text-xs font-bold text-white/65">Estado actual</p>
               <h2 className="text-xl font-black">
                 {open ? "Sesión abierta" : "Sin sesión abierta"}
               </h2>
@@ -258,7 +270,7 @@ export function AttendancePage() {
           )}
         </div>
         <div className="rounded-[1.6rem] border border-[#dde1ea] bg-white p-6 sm:p-8">
-          <p className="text-[10px] font-black uppercase tracking-[.17em] text-[#ea580c]">
+          <p className="text-[10px] font-black uppercase tracking-[.17em] text-[var(--ares-accent-text)]">
             Bolsa de horas
           </p>
           <div className="mt-6 grid gap-4 sm:grid-cols-3 lg:grid-cols-1">
@@ -291,7 +303,7 @@ export function AttendancePage() {
           </button>
         )}
       </div>
-      {canReview(user.rol) && (
+      {canReview && (
         <Review
           items={review?.items ?? []}
           error={reviewError}
@@ -363,6 +375,17 @@ function History({
                     : "Sesión abierta"}
                   {item.closeReason ? ` · ${item.closeReason}` : ""}
                 </p>
+                {item.risk && (
+                  <p className="text-xs font-semibold">
+                    Riesgo {item.risk.color} · reglas v{item.risk.policyVersion}
+                    {item.risk.reasons.length
+                      ? ` · ${item.risk.reasons.join(", ")}`
+                      : " · Sin incidencias"}
+                    {item.requiresReview
+                      ? " · REQUIERE_REVISION: estas horas no suman en la bolsa"
+                      : ""}
+                  </p>
+                )}
               </div>
               <span className="text-sm font-black">
                 {item.durationSeconds === null

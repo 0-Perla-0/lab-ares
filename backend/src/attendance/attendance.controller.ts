@@ -24,11 +24,32 @@ import {
   type AttendanceQuery,
 } from "./attendance.schemas";
 import { AttendanceService } from "./attendance.service";
+import { ConfigService } from "@nestjs/config";
+import { clientIp, type SignalInput } from "./attendance-signals";
 const keyPipe = new ZodValidationPipe(idempotencyKeySchema);
 
 @Controller("attendance")
 export class AttendanceController {
-  constructor(private readonly attendance: AttendanceService) {}
+  constructor(
+    private readonly attendance: AttendanceService,
+    private readonly config: ConfigService,
+  ) {}
+
+  private signals(request: Request, coords?: unknown): SignalInput {
+    const trusted = this.config
+      .get<string>("TRUSTED_PROXY_CIDRS", "")
+      .split(",")
+      .map((v) => v.trim())
+      .filter(Boolean);
+    return {
+      coords,
+      clientIp: clientIp(
+        request.socket.remoteAddress,
+        request.headers["x-forwarded-for"],
+        trusted,
+      ),
+    };
+  }
 
   @Get("me")
   @RequirePermissions(Permission.ATTENDANCE_SELF_READ)
@@ -58,12 +79,13 @@ export class AttendanceController {
   async checkIn(
     @Req() request: Request,
     @Headers("idempotency-key") key: string,
-    @Body(new ZodValidationPipe(checkInSchema)) _body: Record<string, never>,
+    @Body(new ZodValidationPipe(checkInSchema)) body: { coords?: unknown },
   ) {
     return {
       data: await this.attendance.checkIn(
         getAuthenticatedUser(request),
         keyPipe.transform(key),
+        this.signals(request, body.coords),
       ),
     };
   }
@@ -74,13 +96,15 @@ export class AttendanceController {
   async checkOut(
     @Req() request: Request,
     @Headers("idempotency-key") key: string,
-    @Body(new ZodValidationPipe(checkOutSchema)) body: { attendanceId: number },
+    @Body(new ZodValidationPipe(checkOutSchema))
+    body: { attendanceId: number; coords?: unknown },
   ) {
     return {
       data: await this.attendance.checkOut(
         getAuthenticatedUser(request),
         keyPipe.transform(key),
         body.attendanceId,
+        this.signals(request, body.coords),
       ),
     };
   }

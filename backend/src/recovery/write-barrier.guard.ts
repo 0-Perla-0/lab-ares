@@ -9,6 +9,7 @@ const MUTABLE = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const ALLOWED_AUTH_MUTATIONS = new Set([
   "/api/auth/login",
   "/api/auth/logout",
+  "/api/auth/reauthenticate",
   "/api/auth/mfa/verify",
   "/api/auth/mfa/recovery",
   "/api/auth/recovery/request",

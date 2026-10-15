@@ -224,6 +224,29 @@ export function ReportsPage() {
             }
           />
           <Metric
+            label="Ausencias"
+            value={
+              metrics.absences?.reduce(
+                (sum, row) => sum + row._count._all,
+                0,
+              ) ?? 0
+            }
+            detail={
+              metrics.absences
+                ?.map((row) => `${row.estado}: ${row._count._all}`)
+                .join(" · ") || "Sin registros"
+            }
+          />
+          <Metric
+            label="Asistencias que requieren revisión"
+            value={
+              metrics.attendanceReview
+                ?.filter((row) => row.requiresReview)
+                .reduce((sum, row) => sum + row._count._all, 0) ?? 0
+            }
+            detail="Incluye el estado de revisión, no implica horas aprobadas."
+          />
+          <Metric
             label="Actividades Kairos"
             value={totals.kairos}
             detail={
@@ -257,6 +280,7 @@ export function ReportsPage() {
               onChange={(event) => setType(event.target.value as ReportType)}
             >
               <option value="ATTENDANCE">Asistencia</option>
+              <option value="ABSENCES">Ausencias</option>
               <option value="DOCUMENTS">Documentos</option>
               <option value="KAIROS">Kairos</option>
             </select>
