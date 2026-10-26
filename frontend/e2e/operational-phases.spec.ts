@@ -485,14 +485,24 @@ test("operaciones programa reintento sin fingir ejecución ni salud SMTP", async
   ).toBeVisible();
   expect(retried).toBe(true);
   await expect(page.getByText(/ASSIGNMENT_HISTORY_UNKNOWN/)).toBeVisible();
-  await page.getByLabel("Fecha inicial de reevaluación").fill("2026-10-09");
-  await page
-    .getByLabel("Motivo de reevaluación")
-    .fill("Reevaluación sintética autorizada");
-  await page.getByLabel(/Confirmo que sólo se programa el worker/).check();
-  await page
-    .getByRole("button", { name: "Programar reevaluación", exact: true })
-    .click();
+  const reprocessButton = page.getByRole("button", {
+    name: "Programar reevaluación",
+    exact: true,
+  });
+  // La acción previa mantiene el formulario ocupado hasta terminar sus recargas.
+  await expect(reprocessButton).toBeEnabled();
+  const dateInput = page.getByLabel("Fecha inicial de reevaluación");
+  const reasonInput = page.getByLabel("Motivo de reevaluación");
+  const confirmation = page.getByLabel(
+    /Confirmo que sólo se programa el worker/,
+  );
+  await dateInput.fill("2026-10-09");
+  await reasonInput.fill("Reevaluación sintética autorizada");
+  await confirmation.check();
+  await expect(dateInput).toHaveValue("2026-10-09");
+  await expect(reasonInput).toHaveValue("Reevaluación sintética autorizada");
+  await expect(confirmation).toBeChecked();
+  await reprocessButton.click();
   await expect.poll(() => reprocessed).toBe(true);
 });
 test("recuperación ofrece sólo preparación y vista previa, sin acciones destructivas", async ({
