@@ -138,7 +138,10 @@ export function RecoveryConsole() {
       {runs.data && !runs.data.items.length && <p>No hay planes.</p>}
       <ul className="space-y-3">
         {runs.data?.items.map((run) => (
-          <li key={run.id} className="rounded-xl border bg-white p-4">
+          <li
+            key={run.id}
+            className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4"
+          >
             <h3 className="font-bold">
               {run.name} · {run.state} · {run.scope}
             </h3>

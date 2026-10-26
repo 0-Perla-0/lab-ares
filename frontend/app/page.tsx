@@ -30,45 +30,58 @@ const capabilities = [
   },
 ];
 
+const steps = [
+  "Tu perfil muestra tu lugar en el equipo.",
+  "El catálogo mantiene clara la organización.",
+  "Cada rol ve y gestiona exactamente lo necesario.",
+];
+
+const eyebrow =
+  "text-xs font-medium uppercase tracking-[var(--tracking-eyebrow)] text-[var(--color-accent-text)]";
+
 export default function HomePage() {
   return (
     <>
       <PublicHeader />
       <main>
-        <section className="grid-texture relative overflow-hidden border-b border-[#dde1ea] bg-[#f6f7fb]">
-          <div className="absolute -right-28 top-20 h-80 w-80 rounded-full bg-[#f97316]/55 blur-3xl" />
-          <div className="relative mx-auto grid min-h-[680px] max-w-7xl items-center gap-14 px-5 py-20 sm:px-8 lg:grid-cols-[1.2fr_0.8fr] lg:px-10">
+        <section className="relative overflow-hidden">
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-x-0 top-0 h-[34rem] bg-[radial-gradient(circle_at_85%_35%,color-mix(in_srgb,var(--color-accent)_12%,transparent),transparent_26rem)]"
+          />
+          <div className="relative mx-auto grid max-w-6xl items-center gap-14 px-5 py-20 sm:px-8 lg:grid-cols-[1.2fr_0.8fr] lg:py-28">
             <div className="max-w-3xl animate-fade-up">
-              <div className="inline-flex items-center gap-2 rounded-full border border-[#dde1ea] bg-white/60 px-4 py-2 text-xs font-black uppercase tracking-[0.17em] text-[#667085]">
-                <span className="h-2 w-2 rounded-full bg-[#fb923c]" />
+              <p className="inline-flex items-center gap-2 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2 text-xs font-medium uppercase tracking-[var(--tracking-eyebrow)] text-[var(--color-muted)]">
+                <span
+                  className="h-2 w-2 rounded-full bg-[var(--color-accent)]"
+                  aria-hidden="true"
+                />
                 Operación con propósito
-              </div>
-              <h1 className="mt-7 text-balance text-5xl font-black leading-[0.98] tracking-[-0.065em] text-[#17174a] sm:text-7xl lg:text-[5.6rem]">
-                Donde las ideas encuentran
-                <span className="relative ml-[0.18em] inline-block">
-                  orden.
-                  <span className="absolute -bottom-2 left-0 -z-10 h-5 w-full -rotate-1 rounded-sm bg-[#f97316]" />
-                </span>
+              </p>
+              <h1 className="mt-7 text-balance text-4xl font-bold leading-[1.08] tracking-[-0.03em] sm:text-5xl lg:text-[3.25rem]">
+                Donde las ideas encuentran{" "}
+                <span className="text-[var(--color-accent-text)]">orden.</span>
               </h1>
-              <p className="mt-8 max-w-2xl text-lg leading-8 text-[#667085] sm:text-xl">
+              <p className="mt-6 max-w-xl text-base leading-[1.63] text-[var(--color-muted)] sm:text-lg">
                 Ares conecta personas, espacios y horarios para que el
                 Laboratorio de Inventores dedique menos tiempo a coordinar y más
                 tiempo a crear.
               </p>
-              <div className="mt-10 flex flex-wrap items-center gap-4">
+              <div className="mt-9 flex flex-wrap items-center gap-3">
                 <Link
                   href="/login"
-                  className="focus-ring group inline-flex items-center gap-3 rounded-full bg-[#17174a] px-7 py-4 text-sm font-black text-white transition hover:-translate-y-0.5 hover:bg-[#25256d]"
+                  className="focus-ring group inline-flex min-h-11 items-center gap-2 rounded-full bg-[var(--color-primary)] px-6 text-sm font-bold text-[var(--color-on-primary)] shadow-[var(--shadow-button)] transition hover:bg-[var(--color-primary-hover)]"
                 >
                   Acceder a Ares
                   <ArrowRight
                     size={17}
-                    className="transition group-hover:translate-x-1"
+                    aria-hidden="true"
+                    className="transition group-hover:translate-x-1 motion-reduce:transition-none"
                   />
                 </Link>
                 <Link
                   href="/#plataforma"
-                  className="focus-ring rounded-full border border-[#dde1ea] px-7 py-4 text-sm font-black transition hover:bg-white/60"
+                  className="focus-ring inline-flex min-h-11 items-center rounded-full border border-[var(--color-border)] px-6 text-sm font-medium transition hover:bg-[var(--color-surface-inset)]"
                 >
                   Conocer la plataforma
                 </Link>
@@ -76,46 +89,61 @@ export default function HomePage() {
             </div>
 
             <div className="relative mx-auto w-full max-w-md lg:max-w-none">
-              <div className="relative rotate-2 rounded-[2rem] bg-[#17174a] p-5 shadow-[0_32px_80px_rgba(23,23,74,0.22)]">
-                <div className="rounded-[1.4rem] border border-white/10 bg-[#25256d] p-6 text-white">
+              <div
+                aria-hidden="true"
+                className="overflow-hidden rounded-[var(--radius-card-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-float)]"
+              >
+                <div className="flex items-center gap-1.5 border-b border-[var(--color-border)] px-4 py-3">
+                  <span className="h-2.5 w-2.5 rounded-full bg-[var(--color-border-strong)]" />
+                  <span className="h-2.5 w-2.5 rounded-full bg-[var(--color-border-strong)]" />
+                  <span className="h-2.5 w-2.5 rounded-full bg-[var(--color-border-strong)]" />
+                </div>
+                <div className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/45">
-                        Espacio de trabajo
-                      </p>
-                      <p className="mt-2 text-xl font-black">Todo en orden</p>
+                      <p className={eyebrow}>Espacio de trabajo</p>
+                      <p className="mt-2 text-xl font-bold">Todo en orden</p>
                     </div>
-                    <span className="grid h-11 w-11 place-items-center rounded-2xl bg-[#f97316] font-black text-[#17174a]">
+                    <span className="grid h-11 w-11 place-items-center rounded-full bg-[var(--color-primary)] font-bold text-[var(--color-on-primary)]">
                       A
                     </span>
                   </div>
                   <div className="mt-8 grid grid-cols-2 gap-3">
-                    <div className="rounded-2xl bg-white/7 p-4">
-                      <p className="text-xs text-white/45">Equipo</p>
-                      <p className="mt-2 text-3xl font-black">Conectado</p>
+                    <div className="rounded-[var(--radius-card)] bg-[var(--color-surface-inset)] p-4">
+                      <p className="text-xs text-[var(--color-muted)]">
+                        Equipo
+                      </p>
+                      <p className="mt-2 text-2xl font-bold">Conectado</p>
                     </div>
-                    <div className="rounded-2xl bg-[#f97316] p-4 text-[#17174a]">
-                      <p className="text-xs font-bold opacity-60">Operación</p>
-                      <p className="mt-2 text-3xl font-black">Activa</p>
+                    <div className="rounded-[var(--radius-card)] bg-[var(--color-accent-soft)] p-4">
+                      <p className="text-xs text-[var(--color-muted)]">
+                        Operación
+                      </p>
+                      <p className="mt-2 text-2xl font-bold text-[var(--color-accent-text)]">
+                        Activa
+                      </p>
                     </div>
                   </div>
-                  <div className="mt-3 rounded-2xl bg-white/7 p-4">
-                    <div className="flex items-center justify-between text-xs text-white/50">
+                  <div className="mt-3 rounded-[var(--radius-card)] bg-[var(--color-surface-inset)] p-4">
+                    <div className="flex items-center justify-between text-xs text-[var(--color-muted)]">
                       <span>Organización</span>
                       <span>100%</span>
                     </div>
-                    <div className="mt-3 h-2 rounded-full bg-white/10">
-                      <div className="h-full w-full rounded-full bg-[#fb923c]" />
+                    <div className="mt-3 h-2 rounded-full bg-[var(--color-border)]">
+                      <div className="h-full w-full rounded-full bg-[var(--color-accent)]" />
                     </div>
                   </div>
                 </div>
               </div>
-              <div className="absolute -bottom-7 -left-6 -rotate-3 rounded-2xl border border-[#dde1ea] bg-white p-4 shadow-xl">
-                <p className="text-[10px] font-black uppercase tracking-[0.17em] text-[#667085]">
+              <div className="absolute -bottom-6 -left-4 rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-[var(--shadow-float)] sm:-left-8">
+                <p className="text-xs font-medium uppercase tracking-[var(--tracking-eyebrow)] text-[var(--color-muted)]">
                   Estado
                 </p>
-                <p className="mt-1 flex items-center gap-2 text-sm font-black">
-                  <span className="h-2.5 w-2.5 rounded-full bg-[#fb923c]" />
+                <p className="mt-1 flex items-center gap-2 text-sm font-bold">
+                  <span
+                    className="h-2.5 w-2.5 rounded-full bg-[var(--color-accent)]"
+                    aria-hidden="true"
+                  />
                   Equipo sincronizado
                 </p>
               </div>
@@ -123,41 +151,39 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section id="plataforma" className="bg-[#ffffff] py-24 sm:py-32">
-          <div className="mx-auto max-w-7xl px-5 sm:px-8 lg:px-10">
+        <section id="plataforma" className="py-20 sm:py-24">
+          <div className="mx-auto max-w-6xl px-5 sm:px-8">
             <div className="grid gap-8 lg:grid-cols-[0.75fr_1.25fr]">
               <div>
-                <p className="text-xs font-black uppercase tracking-[0.2em] text-[#ea580c]">
-                  La plataforma
-                </p>
-                <h2 className="mt-4 text-4xl font-black leading-tight tracking-[-0.05em] sm:text-5xl">
+                <p className={eyebrow}>La plataforma</p>
+                <h2 className="mt-4 text-3xl font-bold leading-tight tracking-[-0.025em] sm:text-4xl">
                   Lo complejo se vuelve visible.
                 </h2>
               </div>
-              <p className="max-w-2xl text-lg leading-8 text-[#667085] lg:justify-self-end">
+              <p className="max-w-2xl text-base leading-[1.63] text-[var(--color-muted)] sm:text-lg lg:justify-self-end">
                 Diseñamos una experiencia directa: información útil, acciones
                 precisas y permisos que respetan la estructura del equipo.
               </p>
             </div>
 
-            <div className="mt-16 grid gap-5 md:grid-cols-3">
+            <div className="mt-14 grid gap-5 md:grid-cols-3">
               {capabilities.map(({ icon: Icon, number, title, body }) => (
                 <article
                   key={number}
-                  className="group rounded-[1.7rem] border border-[#dde1ea] bg-white p-7 transition hover:-translate-y-1 hover:shadow-[0_18px_50px_rgba(23,23,74,0.09)]"
+                  className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-6"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="grid h-12 w-12 place-items-center rounded-2xl bg-[#fff1e8] text-[#c2410c]">
-                      <Icon size={23} strokeWidth={2.2} />
+                    <span className="grid h-12 w-12 place-items-center rounded-full bg-[var(--color-accent-soft)] text-[var(--color-accent-text)]">
+                      <Icon size={22} strokeWidth={2} aria-hidden={true} />
                     </span>
-                    <span className="text-xs font-black text-[#98a2b3]">
+                    <span className="text-xs font-medium text-[var(--color-muted)]">
                       {number}
                     </span>
                   </div>
-                  <h3 className="mt-8 text-xl font-black tracking-[-0.025em]">
+                  <h3 className="mt-8 text-xl font-bold tracking-[-0.015em]">
                     {title}
                   </h3>
-                  <p className="mt-3 text-sm leading-7 text-[#667085]">
+                  <p className="mt-3 text-sm leading-[1.63] text-[var(--color-muted)]">
                     {body}
                   </p>
                 </article>
@@ -166,45 +192,46 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section id="como-funciona" className="bg-[#f97316] py-24 sm:py-28">
-          <div className="mx-auto grid max-w-7xl items-center gap-12 px-5 sm:px-8 lg:grid-cols-2 lg:px-10">
+        <section
+          id="como-funciona"
+          className="border-t border-[var(--color-border)] py-20 sm:py-24"
+        >
+          <div className="mx-auto grid max-w-6xl items-center gap-12 px-5 sm:px-8 lg:grid-cols-2">
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.2em] text-[#c2410c]">
-                Así de simple
-              </p>
-              <h2 className="mt-4 text-4xl font-black leading-tight tracking-[-0.055em] sm:text-6xl">
+              <p className={eyebrow}>Así de simple</p>
+              <h2 className="mt-4 text-3xl font-bold leading-tight tracking-[-0.025em] sm:text-4xl">
                 Entra. Ubícate. Avanza.
               </h2>
             </div>
-            <div className="space-y-4">
-              {[
-                "Tu perfil muestra tu lugar en el equipo.",
-                "El catálogo mantiene clara la organización.",
-                "Cada rol ve y gestiona exactamente lo necesario.",
-              ].map((item, index) => (
-                <div
+            <ol className="space-y-3">
+              {steps.map((item, index) => (
+                <li
                   key={item}
-                  className="flex items-center gap-4 rounded-2xl border border-white/10 bg-[#17174a] p-5 text-white"
+                  className="flex items-center gap-4 rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5"
                 >
-                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white/10 text-xs font-black text-[#f97316]">
+                  <span
+                    aria-hidden="true"
+                    className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[var(--color-primary)] text-xs font-bold text-[var(--color-on-primary)]"
+                  >
                     {index + 1}
                   </span>
-                  <p className="text-sm font-bold sm:text-base">{item}</p>
-                </div>
+                  <p className="text-sm font-medium sm:text-base">{item}</p>
+                </li>
               ))}
-            </div>
+            </ol>
           </div>
         </section>
 
-        <section id="nosotros" className="bg-[#f6f7fb] py-24 sm:py-32">
+        <section
+          id="nosotros"
+          className="border-t border-[var(--color-border)] py-20 sm:py-24"
+        >
           <div className="mx-auto max-w-4xl px-5 text-center sm:px-8">
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-[#ea580c]">
-              Laboratorio de Inventores
-            </p>
-            <h2 className="mt-5 text-4xl font-black tracking-[-0.055em] sm:text-6xl">
+            <p className={eyebrow}>Laboratorio de Inventores</p>
+            <h2 className="mt-5 text-3xl font-bold tracking-[-0.03em] sm:text-5xl">
               La organización también es una forma de inventar.
             </h2>
-            <p className="mx-auto mt-7 max-w-2xl text-lg leading-8 text-[#667085]">
+            <p className="mx-auto mt-6 max-w-2xl text-base leading-[1.63] text-[var(--color-muted)] sm:text-lg">
               Ares nace para sostener el trabajo de quienes imaginan, coordinan
               y construyen. Una base común para que las buenas ideas tengan
               espacio para crecer.

@@ -11,8 +11,8 @@ export function Brand({
   return (
     <Link
       href="/"
-      className={`focus-ring inline-flex items-center gap-2 rounded-xl ${
-        inverse ? "text-white" : "text-[#17174a]"
+      className={`focus-ring inline-flex items-center gap-2 rounded-lg ${
+        inverse ? "text-white" : "text-[var(--color-ink)]"
       }`}
       aria-label="Ares, ir al inicio"
     >
@@ -31,12 +31,12 @@ export function Brand({
       </span>
       {!compact && (
         <span className="leading-none">
-          <span className="block text-lg font-black tracking-[-0.04em]">
+          <span className="block text-lg font-bold tracking-[-0.03em]">
             ARES
           </span>
           <span
-            className={`mt-1 block text-[9px] font-bold uppercase tracking-[0.2em] ${
-              inverse ? "text-white/55" : "text-[#667085]"
+            className={`mt-1 block max-[420px]:hidden text-[11px] font-medium uppercase tracking-[var(--tracking-eyebrow)] ${
+              inverse ? "text-white/55" : "text-[var(--color-muted)]"
             }`}
           >
             Laboratorio de Inventores

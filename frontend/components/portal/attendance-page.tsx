@@ -189,13 +189,13 @@ export function AttendancePage() {
     <div className="animate-fade-up">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-[11px] font-black uppercase tracking-[.19em] text-[var(--ares-accent-text)]">
+          <p className="text-xs font-bold uppercase tracking-[var(--tracking-eyebrow)] text-[var(--ares-accent-text)]">
             Control de jornada
           </p>
-          <h1 className="mt-2 text-3xl font-black tracking-[-.045em] sm:text-4xl">
+          <h1 className="mt-2 text-3xl font-bold tracking-[-.045em] sm:text-4xl">
             Asistencia
           </h1>
-          <p className="mt-2 text-sm text-[#667085]">
+          <p className="mt-2 text-sm text-[var(--color-muted)]">
             Registra tus entradas y salidas con la hora oficial del servidor.
           </p>
         </div>
@@ -203,7 +203,7 @@ export function AttendancePage() {
           type="button"
           disabled={busy !== "" || loading}
           onClick={() => void load(cursor, reviewCursor)}
-          className="focus-ring inline-flex w-fit items-center gap-2 rounded-xl border border-[#dde1ea] bg-white px-4 py-2 text-sm font-extrabold"
+          className="focus-ring inline-flex w-fit items-center gap-2 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2 text-sm font-bold"
         >
           <RefreshCw size={16} /> Actualizar
         </button>
@@ -211,36 +211,38 @@ export function AttendancePage() {
       {error && (
         <div
           role="alert"
-          className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-800"
+          className="mt-5 rounded-[var(--radius-card)] border border-[var(--color-danger-border)] bg-[var(--color-danger-soft)] p-4 text-sm font-bold text-[var(--color-danger)]"
         >
           {error}
         </div>
       )}
       <section className="mt-8 grid gap-4 lg:grid-cols-[1.2fr_.8fr]">
-        <div className="rounded-[1.6rem] bg-[#17174a] p-6 text-white sm:p-8">
+        <div className="rounded-[var(--radius-card-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-6 sm:p-8">
           <div className="flex items-center gap-3">
-            <span className="grid h-11 w-11 place-items-center rounded-xl bg-[#f97316] text-[#17174a]">
+            <span className="grid h-11 w-11 place-items-center rounded-full bg-[var(--color-primary)] text-[var(--color-on-primary)]">
               <Clock3 size={21} />
             </span>
             <div>
-              <p className="text-xs font-bold text-white/65">Estado actual</p>
-              <h2 className="text-xl font-black">
+              <p className="text-xs font-medium text-[var(--color-muted)]">
+                Estado actual
+              </p>
+              <h2 className="text-xl font-bold">
                 {open ? "Sesión abierta" : "Sin sesión abierta"}
               </h2>
             </div>
           </div>
           {open ? (
             <>
-              <p className="mt-8 font-mono text-4xl font-black tracking-tight">
+              <p className="mt-8 font-mono text-4xl font-bold tracking-tight">
                 {formatDuration(elapsed)}
               </p>
-              <p className="mt-2 text-sm text-white/55">
+              <p className="mt-2 text-sm text-[var(--color-muted)]">
                 Desde {formatDate(open.checkInAt, mine.timeZone)}
               </p>
               {elapsed >= mine.abnormalAfterSeconds && (
                 <p
                   role="status"
-                  className="mt-3 text-sm font-bold text-amber-200"
+                  className="mt-3 text-sm font-bold text-[var(--color-warning-text)]"
                 >
                   Esta sesión lleva más de{" "}
                   {formatDuration(mine.abnormalAfterSeconds)} abierta. Revisa si
@@ -251,7 +253,7 @@ export function AttendancePage() {
                 type="button"
                 disabled={busy !== "" || loading}
                 onClick={() => void mutate("check-out", String(open.id))}
-                className="focus-ring mt-7 inline-flex items-center gap-2 rounded-xl bg-[#fb923c] px-5 py-3 text-sm font-black text-[#17174a] disabled:opacity-50"
+                className="focus-ring mt-7 inline-flex items-center gap-2 rounded-full bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] px-5 py-3 text-sm font-bold text-[var(--color-on-primary)] disabled:opacity-50"
               >
                 <LogOut size={17} />{" "}
                 {busy === "check-out" ? "Registrando…" : "Registrar salida"}
@@ -262,15 +264,15 @@ export function AttendancePage() {
               type="button"
               disabled={busy !== "" || loading}
               onClick={() => void mutate("check-in")}
-              className="focus-ring mt-8 inline-flex items-center gap-2 rounded-xl bg-[#f97316] px-5 py-3 text-sm font-black text-[#17174a] disabled:opacity-50"
+              className="focus-ring mt-8 inline-flex items-center gap-2 rounded-full bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] px-5 py-3 text-sm font-bold text-[var(--color-on-primary)] disabled:opacity-50"
             >
               <LogIn size={17} />{" "}
               {busy === "check-in" ? "Registrando…" : "Registrar entrada"}
             </button>
           )}
         </div>
-        <div className="rounded-[1.6rem] border border-[#dde1ea] bg-white p-6 sm:p-8">
-          <p className="text-[10px] font-black uppercase tracking-[.17em] text-[var(--ares-accent-text)]">
+        <div className="rounded-[var(--radius-card-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-6 sm:p-8">
+          <p className="text-xs font-bold uppercase tracking-[var(--tracking-eyebrow)] text-[var(--ares-accent-text)]">
             Bolsa de horas
           </p>
           <div className="mt-6 grid gap-4 sm:grid-cols-3 lg:grid-cols-1">
@@ -287,7 +289,7 @@ export function AttendancePage() {
             disabled={busy !== "" || loading}
             type="button"
             onClick={() => void load(mine.nextCursor, reviewCursor)}
-            className="focus-ring rounded-xl border border-[#dde1ea] bg-white px-4 py-2 text-sm font-extrabold disabled:opacity-50"
+            className="focus-ring rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2 text-sm font-bold disabled:opacity-50"
           >
             Página siguiente del historial
           </button>
@@ -297,7 +299,7 @@ export function AttendancePage() {
             disabled={busy !== "" || loading}
             type="button"
             onClick={() => void load(null, reviewCursor)}
-            className="focus-ring rounded-xl border border-[#dde1ea] bg-white px-4 py-2 text-sm font-extrabold disabled:opacity-50"
+            className="focus-ring rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2 text-sm font-bold disabled:opacity-50"
           >
             Historial reciente
           </button>
@@ -329,8 +331,8 @@ export function AttendancePage() {
 function Stat({ label, value }: { label: string; value: number }) {
   return (
     <div>
-      <p className="text-xs font-bold text-[#667085]">{label}</p>
-      <p className="mt-1 text-xl font-black">{formatDuration(value)}</p>
+      <p className="text-xs font-bold text-[var(--color-muted)]">{label}</p>
+      <p className="mt-1 text-xl font-bold">{formatDuration(value)}</p>
     </div>
   );
 }
@@ -353,23 +355,23 @@ function History({
 }) {
   return (
     <section className="mt-8">
-      <h2 className="text-xl font-black">Tu historial</h2>
-      <div className="mt-4 overflow-hidden rounded-2xl border border-[#dde1ea] bg-white">
+      <h2 className="text-xl font-bold">Tu historial</h2>
+      <div className="mt-4 overflow-hidden rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)]">
         {items.length === 0 ? (
-          <p className="p-6 text-sm text-[#667085]">
+          <p className="p-6 text-sm text-[var(--color-muted)]">
             Aún no hay registros de asistencia.
           </p>
         ) : (
           items.map((item) => (
             <div
               key={item.id}
-              className="flex flex-col gap-2 border-b border-[#dde1ea] p-4 last:border-0 sm:flex-row sm:items-center sm:justify-between"
+              className="flex flex-col gap-2 border-b border-[var(--color-border)] p-4 last:border-0 sm:flex-row sm:items-center sm:justify-between"
             >
               <div>
-                <p className="text-sm font-black">
+                <p className="text-sm font-bold">
                   {formatDate(item.checkInAt, timeZone)} · {item.status}
                 </p>
-                <p className="text-xs text-[#667085]">
+                <p className="text-xs text-[var(--color-muted)]">
                   {item.checkOutAt
                     ? `Salida ${formatDate(item.checkOutAt, timeZone)}`
                     : "Sesión abierta"}
@@ -387,7 +389,7 @@ function History({
                   </p>
                 )}
               </div>
-              <span className="text-sm font-black">
+              <span className="text-sm font-bold">
                 {item.durationSeconds === null
                   ? "En curso"
                   : formatDuration(item.durationSeconds)}
@@ -430,7 +432,7 @@ function Review({
 }) {
   return (
     <section className="mt-8">
-      <h2 className="text-xl font-black">Sesiones abiertas en tu ámbito</h2>
+      <h2 className="text-xl font-bold">Sesiones abiertas en tu ámbito</h2>
       {loading ? (
         <p role="status" className="mt-4 text-sm">
           Cargando sesiones…
@@ -438,31 +440,31 @@ function Review({
       ) : error ? (
         <p
           role="alert"
-          className="mt-4 rounded-xl bg-amber-50 p-4 text-sm font-bold text-amber-800"
+          className="mt-4 rounded-[var(--radius-card)] bg-[var(--color-warning-soft)] p-4 text-sm font-bold text-[var(--color-warning-text)]"
         >
           {error}
         </p>
       ) : (
-        <div className="mt-4 overflow-hidden rounded-2xl border border-[#dde1ea] bg-white">
+        <div className="mt-4 overflow-hidden rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)]">
           {items.length === 0 ? (
-            <p className="p-6 text-sm text-[#667085]">
+            <p className="p-6 text-sm text-[var(--color-muted)]">
               No hay sesiones pendientes de cierre.
             </p>
           ) : (
             items.map((item) => (
               <div
                 key={item.id}
-                className="border-b border-[#dde1ea] p-4 last:border-0"
+                className="border-b border-[var(--color-border)] p-4 last:border-0"
               >
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <p className="text-sm font-black">
+                    <p className="text-sm font-bold">
                       {item.user.codigo} ·{" "}
                       {formatDate(item.checkInAt, timeZone)}
                     </p>
-                    <p className="text-xs text-[#667085]">
+                    <p className="text-xs text-[var(--color-muted)]">
                       {item.abnormal && (
-                        <span className="mr-2 inline-flex items-center gap-1 font-black text-amber-700">
+                        <span className="mr-2 inline-flex items-center gap-1 font-bold text-[var(--color-warning-text)]">
                           <AlertTriangle size={13} /> Tiempo fuera de rango
                         </span>
                       )}
@@ -476,21 +478,21 @@ function Review({
                       setReasonFor(reasonFor === item.id ? null : item.id);
                       setReason("");
                     }}
-                    className="focus-ring inline-flex items-center gap-2 rounded-xl border border-[#dde1ea] px-3 py-2 text-xs font-black disabled:opacity-50"
+                    className="focus-ring inline-flex items-center gap-2 rounded-full border border-[var(--color-border)] px-3 py-2 text-xs font-bold disabled:opacity-50"
                   >
                     <X size={14} /> Cerrar sesión
                   </button>
                 </div>
                 {reasonFor === item.id && (
                   <form
-                    className="mt-4 rounded-xl bg-[#f6f7fb] p-4"
+                    className="mt-4 rounded-[var(--radius-card)] bg-[var(--color-surface-inset)] p-4"
                     onSubmit={(event) => {
                       event.preventDefault();
                       void onClose(item);
                     }}
                   >
                     <label
-                      className="text-xs font-black"
+                      className="text-xs font-bold"
                       htmlFor={`reason-${item.id}`}
                     >
                       Motivo del cierre
@@ -503,7 +505,7 @@ function Review({
                       maxLength={500}
                       value={reason}
                       onChange={(event) => setReason(event.target.value)}
-                      className="focus-ring mt-2 min-h-20 w-full rounded-xl border border-[#dde1ea] bg-white p-3 text-sm"
+                      className="focus-ring mt-2 min-h-20 w-full rounded-[var(--radius-input)] border border-[var(--color-border)] bg-[var(--color-surface)] p-3 text-sm"
                       placeholder="Describe por qué se cierra esta sesión"
                     />
                     <div className="mt-3 flex items-center justify-end gap-2">
@@ -511,14 +513,14 @@ function Review({
                         type="button"
                         disabled={busy !== ""}
                         onClick={() => setReasonFor(null)}
-                        className="focus-ring rounded-xl px-3 py-2 text-xs font-black"
+                        className="focus-ring rounded-full px-3 py-2 text-xs font-bold"
                       >
                         Cancelar
                       </button>
                       <button
                         type="submit"
                         disabled={reason.trim().length < 5 || busy !== ""}
-                        className="focus-ring inline-flex items-center gap-2 rounded-xl bg-[#17174a] px-4 py-2 text-xs font-black text-white disabled:opacity-50"
+                        className="focus-ring inline-flex items-center gap-2 rounded-full bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] px-4 py-2 text-xs font-bold text-[var(--color-on-primary)] disabled:opacity-50"
                       >
                         <Check size={14} /> Confirmar cierre
                       </button>
@@ -535,7 +537,7 @@ function Review({
           disabled={busy !== ""}
           type="button"
           onClick={onNext}
-          className="focus-ring mt-4 rounded-xl border border-[#dde1ea] bg-white px-4 py-2 text-sm font-extrabold disabled:opacity-50"
+          className="focus-ring mt-4 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2 text-sm font-bold disabled:opacity-50"
         >
           Página siguiente de sesiones
         </button>
@@ -545,7 +547,7 @@ function Review({
           type="button"
           disabled={busy !== ""}
           onClick={onFirst}
-          className="focus-ring ml-3 mt-4 rounded-xl border border-[#dde1ea] bg-white px-4 py-2 text-sm font-extrabold disabled:opacity-50"
+          className="focus-ring ml-3 mt-4 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2 text-sm font-bold disabled:opacity-50"
         >
           Primeras sesiones
         </button>

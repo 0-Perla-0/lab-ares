@@ -295,7 +295,7 @@ export function InventoryPage() {
         {items.data?.items.map((item) => (
           <li
             key={item.id}
-            className="space-y-3 rounded-xl border bg-white p-5"
+            className="space-y-3 rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5"
           >
             <h2 className="font-bold">
               {item.codigo} · {item.nombre}
@@ -405,7 +405,10 @@ export function InventoryPage() {
       )}
       <ul className="space-y-3">
         {loans.data?.items.map((loan) => (
-          <li key={loan.id} className="rounded-xl border bg-white p-4">
+          <li
+            key={loan.id}
+            className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4"
+          >
             <p>
               {loan.articulo.nombre} · {loan.solicitante.codigo} · límite{" "}
               {new Date(loan.fechaLimite).toLocaleString()}

@@ -40,7 +40,7 @@ export function DegradationBanner() {
   return (
     <section
       role="alert"
-      className="border-b border-amber-300 bg-amber-50 p-4 text-amber-950"
+      className="border-b border-[var(--color-warning-border)] bg-[var(--color-warning-soft)] p-4 text-[var(--color-warning-text)]"
     >
       <h2 className="font-bold">Modo Lectura / Mantenimiento Operativo</h2>
       <p>

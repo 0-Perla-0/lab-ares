@@ -28,7 +28,7 @@ import {
   textareaClassName,
 } from "@/components/ui/primitives";
 const button =
-  "focus-ring min-h-11 rounded-xl border border-[#dde1ea] px-4 py-2 text-sm font-bold disabled:opacity-50";
+  "focus-ring min-h-11 rounded-full border border-[var(--color-border)] px-4 py-2 text-sm font-bold disabled:opacity-50";
 const weekDays = [
   "DOMINGO",
   "LUNES",
@@ -313,7 +313,7 @@ export function CalendarPage() {
         )}
       </div>
       {!creating && !revoke && error && (
-        <p role="alert" className="text-red-800">
+        <p role="alert" className="text-[var(--color-danger)]">
           {error}
         </p>
       )}
@@ -347,7 +347,7 @@ export function CalendarPage() {
           return (
             <button
               key={day}
-              className={`${button} text-left ${work ? "bg-white" : "bg-slate-100"}`}
+              className={`${button} text-left ${work ? "bg-[var(--color-surface)]" : "bg-[var(--color-surface-inset)]"}`}
               aria-pressed={selected === day}
               onClick={() => setSelected(day)}
             >
@@ -380,7 +380,10 @@ export function CalendarPage() {
                   row.fechaFin.slice(0, 10) >= selected),
             )
             .map((row) => (
-              <li key={row.id} className="rounded-xl border p-4">
+              <li
+                key={row.id}
+                className="rounded-[var(--radius-card)] border p-4"
+              >
                 <h3 className="font-bold">
                   {row.titulo} · {row.alcance}
                 </h3>
@@ -414,7 +417,7 @@ export function CalendarPage() {
           onChange={() => setPreview(null)}
         >
           {error && (
-            <p role="alert" className="text-red-800">
+            <p role="alert" className="text-[var(--color-danger)]">
               {error}
             </p>
           )}
@@ -566,7 +569,7 @@ export function CalendarPage() {
       </Modal>
       <Modal open={!!revoke} title="Revocar excepción" onClose={close}>
         {error && (
-          <p role="alert" className="text-red-800">
+          <p role="alert" className="text-[var(--color-danger)]">
             {error}
           </p>
         )}
@@ -609,7 +612,10 @@ export function CalendarPage() {
 }
 function PreviewSummary({ preview }: { preview: Preview }) {
   return (
-    <div role="status" className="rounded-xl border bg-slate-50 p-4">
+    <div
+      role="status"
+      className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface-inset)] p-4"
+    >
       <p>
         Impacto: {preview.users} usuarios, {preview.attendances} asistencias,{" "}
         {preview.absences} ausencias ({preview.definitive} definitivas).

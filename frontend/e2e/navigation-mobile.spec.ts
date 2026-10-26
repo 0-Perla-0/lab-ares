@@ -68,8 +68,7 @@ test("muestra la descripción tras mantener el cursor un segundo", async ({
   });
   const services = navigation.getByRole("button", { name: "Servicios" });
   await services.hover();
-  await expect(services).toHaveCSS("border-color", "rgb(249, 115, 22)");
-  await expect(services).toHaveCSS("color", "rgb(251, 146, 60)");
+  await expect(services).toHaveCSS("background-color", "rgb(240, 240, 240)");
 
   const summary = navigation.getByRole("link", {
     name: "Resumen",

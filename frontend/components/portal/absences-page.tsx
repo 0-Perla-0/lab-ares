@@ -27,7 +27,7 @@ import {
   textareaClassName,
 } from "@/components/ui/primitives";
 const button =
-  "focus-ring min-h-11 rounded-xl border border-[#dde1ea] px-4 py-2 text-sm font-bold disabled:opacity-50";
+  "focus-ring min-h-11 rounded-full border border-[var(--color-border)] px-4 py-2 text-sm font-bold disabled:opacity-50";
 const titles = {
   justify: "Enviar justificación",
   appeal: "Presentar apelación",
@@ -232,7 +232,7 @@ export function AbsencesPage() {
         </button>
       </nav>
       {!active && error && (
-        <p role="alert" className="text-red-800">
+        <p role="alert" className="text-[var(--color-danger)]">
           {error}
         </p>
       )}
@@ -377,7 +377,7 @@ export function AbsencesPage() {
         {active && (
           <form onSubmit={(event) => void submit(event)} className="space-y-4">
             {error && (
-              <p role="alert" className="text-red-800">
+              <p role="alert" className="text-[var(--color-danger)]">
                 {error}
               </p>
             )}

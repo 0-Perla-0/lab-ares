@@ -201,7 +201,7 @@ export function AcademicPage() {
       {notice && (
         <div
           role="status"
-          className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-900"
+          className="rounded-[var(--radius-card)] border border-[var(--color-success-border)] bg-[var(--color-success-soft)] p-4 text-sm font-bold text-[var(--color-success-text)]"
         >
           {notice}
         </div>
@@ -241,9 +241,13 @@ export function AcademicPage() {
             title="Solicitar cambio"
             description="Actualiza tu adscripción mediante una solicitud trazable."
           >
-            <div className="rounded-2xl bg-[#fff1e8] p-4">
-              <Send size={21} className="text-[#ea580c]" aria-hidden="true" />
-              <p className="mt-3 text-sm leading-6 text-[#667085]">
+            <div className="rounded-[var(--radius-card)] bg-[var(--color-accent-soft)] p-4">
+              <Send
+                size={21}
+                className="text-[var(--color-accent-text)]"
+                aria-hidden="true"
+              />
+              <p className="mt-3 text-sm leading-6 text-[var(--color-muted)]">
                 Completa la institución, el programa y las fechas desde una
                 ventana dedicada.
               </p>
@@ -253,7 +257,7 @@ export function AcademicPage() {
                   setRequestError("");
                   setRequestOpen(true);
                 }}
-                className="focus-ring mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-[#f97316] px-4 text-sm font-black text-[#17174a] transition hover:bg-[#ea580c] hover:text-white"
+                className="focus-ring mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-full bg-[var(--color-primary)] px-4 text-sm font-bold text-[var(--color-on-primary)] transition hover:bg-[var(--color-primary)]"
               >
                 Pedir cambio
               </button>
@@ -404,7 +408,7 @@ export function AcademicPage() {
             </Field>
             <button
               disabled={saving}
-              className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#f97316] px-5 text-sm font-black text-[#17174a] transition hover:bg-[#ea580c] hover:text-white disabled:opacity-50 md:col-span-2 xl:col-span-3"
+              className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-[var(--color-primary)] px-5 text-sm font-bold text-[var(--color-on-primary)] transition hover:bg-[var(--color-primary)] disabled:opacity-50 md:col-span-2 xl:col-span-3"
             >
               <Send size={17} aria-hidden="true" />
               {saving ? "Enviando…" : "Enviar solicitud"}
@@ -474,7 +478,7 @@ function ExpandButton({
     <button
       type="button"
       onClick={onClick}
-      className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#dde1ea] px-3 text-xs font-black text-[#17174a] transition hover:border-[#f97316] hover:bg-[#fff1e8]"
+      className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-[var(--color-border)] px-3 text-xs font-bold text-[var(--color-ink)] transition hover:border-[var(--color-accent)] hover:bg-[var(--color-accent-soft)]"
     >
       <Maximize2 size={15} aria-hidden="true" /> {buttonLabel}
     </button>
@@ -483,9 +487,13 @@ function ExpandButton({
 
 function AcademicProfilePreview({ item }: { item: AcademicProfile }) {
   return (
-    <article className="rounded-2xl border border-[var(--ares-border)] p-4">
-      <GraduationCap size={22} className="text-[#ea580c]" aria-hidden="true" />
-      <h3 className="mt-3 font-black">{label(item.programaAcademico)}</h3>
+    <article className="rounded-[var(--radius-card)] border border-[var(--ares-border)] p-4">
+      <GraduationCap
+        size={22}
+        className="text-[var(--color-accent-text)]"
+        aria-hidden="true"
+      />
+      <h3 className="mt-3 font-bold">{label(item.programaAcademico)}</h3>
       <p className="mt-1 text-sm text-[var(--ares-muted)]">
         {label(item.institucion)}
       </p>
@@ -505,7 +513,7 @@ function AcademicProfileDetails({ item }: { item: AcademicProfile }) {
         <Info label="Programa" value={label(item.programaAcademico)} />
         <Info label="Cohorte" value={label(item.cohorte)} />
       </dl>
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--ares-border)] p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-card)] border border-[var(--ares-border)] p-4">
         <p className="text-sm font-bold text-[var(--ares-muted)]">
           {item.inicio.slice(0, 10)}
           {item.fin ? ` a ${item.fin.slice(0, 10)}` : " · vigente"}
@@ -521,8 +529,8 @@ function AcademicProfileDetails({ item }: { item: AcademicProfile }) {
 
 function PendingRequestPreview({ item }: { item: AcademicProfile }) {
   return (
-    <article className="rounded-2xl border border-[var(--ares-border)] p-4">
-      <p className="font-black">{label(item.programaAcademico)}</p>
+    <article className="rounded-[var(--radius-card)] border border-[var(--ares-border)] p-4">
+      <p className="font-bold">{label(item.programaAcademico)}</p>
       <p className="mt-1 text-sm text-[var(--ares-muted)]">
         Usuario #{item.usuarioId} · {label(item.institucion)}
       </p>
@@ -543,9 +551,9 @@ function PendingRequestItem({
   onResolve: (id: number, accept: boolean) => Promise<void>;
 }) {
   return (
-    <article className="flex flex-col gap-4 rounded-2xl border border-[var(--ares-border)] p-4 lg:flex-row lg:items-center lg:justify-between">
+    <article className="flex flex-col gap-4 rounded-[var(--radius-card)] border border-[var(--ares-border)] p-4 lg:flex-row lg:items-center lg:justify-between">
       <div>
-        <p className="font-black">
+        <p className="font-bold">
           Usuario #{item.usuarioId} · {label(item.programaAcademico)}
         </p>
         <p className="mt-1 text-sm text-[var(--ares-muted)]">
@@ -557,7 +565,7 @@ function PendingRequestItem({
           type="button"
           disabled={saving}
           onClick={() => void onResolve(item.id, true)}
-          className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-xl bg-emerald-700 px-4 text-sm font-black text-white disabled:opacity-50"
+          className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-full bg-emerald-700 px-4 text-sm font-bold text-white disabled:opacity-50"
         >
           <Check size={16} aria-hidden="true" /> Aprobar
         </button>
@@ -565,7 +573,7 @@ function PendingRequestItem({
           type="button"
           disabled={saving}
           onClick={() => void onResolve(item.id, false)}
-          className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-xl bg-red-700 px-4 text-sm font-black text-white disabled:opacity-50"
+          className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-[var(--radius-card)] bg-[var(--color-danger-solid)] px-4 text-sm font-bold text-white disabled:opacity-50"
         >
           <X size={16} aria-hidden="true" /> Rechazar
         </button>
@@ -576,9 +584,9 @@ function PendingRequestItem({
 
 function AcademicHistoryItem({ item }: { item: AcademicProfile }) {
   return (
-    <article className="rounded-2xl border border-[var(--ares-border)] p-4">
+    <article className="rounded-[var(--radius-card)] border border-[var(--ares-border)] p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="inline-flex items-center gap-2 font-black">
+        <p className="inline-flex items-center gap-2 font-bold">
           <History size={17} aria-hidden="true" />
           {label(item.programaAcademico)}
         </p>
@@ -609,20 +617,22 @@ function CompactEmpty({
   description: string;
 }) {
   return (
-    <div className="rounded-2xl border border-dashed border-[#dde1ea] bg-[#f6f7fb] p-5 text-center">
-      <p className="font-black">{title}</p>
-      <p className="mt-1 text-sm leading-6 text-[#667085]">{description}</p>
+    <div className="rounded-[var(--radius-card)] border border-dashed border-[var(--color-border)] bg-[var(--color-surface-inset)] p-5 text-center">
+      <p className="font-bold">{title}</p>
+      <p className="mt-1 text-sm leading-6 text-[var(--color-muted)]">
+        {description}
+      </p>
     </div>
   );
 }
 
 function Info({ label: title, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl bg-[#f6f7fb] p-4">
-      <dt className="text-xs font-black uppercase tracking-wide text-[var(--ares-muted)]">
+    <div className="rounded-[var(--radius-card)] bg-[var(--color-surface-inset)] p-4">
+      <dt className="text-xs font-bold uppercase tracking-wide text-[var(--ares-muted)]">
         {title}
       </dt>
-      <dd className="mt-1 font-black">{value}</dd>
+      <dd className="mt-1 font-bold">{value}</dd>
     </div>
   );
 }
@@ -739,7 +749,7 @@ function CatalogManager({
         )}
         <button
           disabled={busy}
-          className="focus-ring min-h-11 rounded-xl bg-[#17174a] px-5 text-sm font-black text-white md:col-span-3"
+          className="focus-ring min-h-11 rounded-full bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] px-5 text-sm font-bold text-[var(--color-on-primary)] md:col-span-3"
         >
           {busy ? "Guardando…" : "Crear elemento"}
         </button>

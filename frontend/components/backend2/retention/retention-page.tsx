@@ -183,7 +183,7 @@ export function RetentionPage() {
             : undefined
         }
       />
-      <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
+      <div className="flex items-start gap-3 rounded-[var(--radius-card)] border border-[var(--color-warning-border)] bg-[var(--color-warning-soft)] p-4 text-sm leading-6 text-[var(--color-warning-text)]">
         <ShieldAlert className="mt-0.5 shrink-0" />
         <p>
           <strong>No hay borrado inmediato.</strong> Una solicitud abre un
@@ -195,7 +195,7 @@ export function RetentionPage() {
       {notice && (
         <p
           role="status"
-          className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-900"
+          className="rounded-[var(--radius-card)] border border-[var(--color-success-border)] bg-[var(--color-success-soft)] p-4 text-sm font-bold text-[var(--color-success-text)]"
         >
           {notice}
         </p>
@@ -219,7 +219,7 @@ export function RetentionPage() {
             </Field>
             <button
               disabled={busy}
-              className="focus-ring min-h-11 rounded-xl bg-[#17174a] px-5 text-sm font-black text-white"
+              className="focus-ring min-h-11 rounded-full bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] px-5 text-sm font-bold text-[var(--color-on-primary)]"
             >
               Enviar solicitud
             </button>
@@ -228,10 +228,10 @@ export function RetentionPage() {
             {mine.map((item) => (
               <article
                 key={item.id}
-                className="rounded-xl border border-[var(--ares-border)] p-3"
+                className="rounded-[var(--radius-card)] border border-[var(--ares-border)] p-3"
               >
                 <div className="flex flex-wrap justify-between gap-2">
-                  <p className="font-black">
+                  <p className="font-bold">
                     {new Date(item.createdAt).toLocaleDateString("es-MX")}
                   </p>
                   <StatusBadge
@@ -756,7 +756,7 @@ export function RetentionPage() {
           </label>
           <button
             disabled={busy}
-            className="focus-ring min-h-11 rounded-xl bg-[#17174a] px-5 text-sm font-black text-white sm:col-span-2"
+            className="focus-ring min-h-11 rounded-full bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] px-5 text-sm font-bold text-[var(--color-on-primary)] sm:col-span-2"
           >
             Crear borrador
           </button>
@@ -787,9 +787,9 @@ function Card({
   children: ReactNode;
 }) {
   return (
-    <article className="rounded-2xl border border-[var(--ares-border)] p-4">
+    <article className="rounded-[var(--radius-card)] border border-[var(--ares-border)] p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <h3 className="font-black">{title}</h3>
+        <h3 className="font-bold">{title}</h3>
         <StatusBadge
           label={status.replaceAll("_", " ")}
           tone={stateTone(status)}
@@ -815,7 +815,7 @@ function SmallAction({
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className="focus-ring mt-3 inline-flex min-h-11 items-center gap-2 rounded-xl border border-[var(--ares-border-strong)] bg-white px-3 text-sm font-black disabled:opacity-50"
+      className="focus-ring mt-3 inline-flex min-h-11 items-center gap-2 rounded-full border border-[var(--ares-border-strong)] bg-[var(--color-surface)] px-3 text-sm font-bold disabled:opacity-50"
     >
       {icon}
       {label}

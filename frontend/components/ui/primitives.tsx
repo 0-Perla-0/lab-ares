@@ -20,21 +20,25 @@ import {
 } from "lucide-react";
 
 export const inputClassName =
-  "mt-2 h-11 w-full rounded-xl border border-[#dde1ea] bg-white px-3.5 text-sm text-[#17174a] outline-none transition placeholder:text-[#98a2b3] focus:border-[#ea580c] focus:ring-4 focus:ring-[#f97316]/20 disabled:cursor-not-allowed disabled:bg-[#eef0f6] disabled:text-[#98a2b3]";
+  "mt-2 h-11 w-full rounded-[var(--radius-input)] border border-[var(--color-control-border)] bg-[var(--color-surface)] px-3.5 text-sm text-[var(--color-ink)] outline-none transition placeholder:text-[var(--color-muted)] focus:border-[var(--color-focus)] focus:ring-4 focus:ring-[var(--color-accent-soft)] disabled:cursor-not-allowed disabled:bg-[var(--color-surface-inset)] disabled:text-[var(--color-muted)]";
 
 export const textareaClassName =
-  "mt-2 min-h-24 w-full resize-y rounded-xl border border-[#dde1ea] bg-white px-3.5 py-3 text-sm text-[#17174a] outline-none transition placeholder:text-[#98a2b3] focus:border-[#ea580c] focus:ring-4 focus:ring-[#f97316]/20";
+  "mt-2 min-h-24 w-full resize-y rounded-[var(--radius-input)] border border-[var(--color-control-border)] bg-[var(--color-surface)] px-3.5 py-3 text-sm text-[var(--color-ink)] outline-none transition placeholder:text-[var(--color-muted)] focus:border-[var(--color-focus)] focus:ring-4 focus:ring-[var(--color-accent-soft)]";
 
 const touchButtonClassName = "min-h-11";
 
 export type StatusTone = "neutral" | "info" | "warning" | "success" | "danger";
 
 const statusToneClass: Record<StatusTone, string> = {
-  neutral: "border-[#dde1ea] bg-[#eef0f6] text-[#25256d]",
-  info: "border-sky-200 bg-sky-50 text-sky-900",
-  warning: "border-amber-200 bg-amber-50 text-amber-900",
-  success: "border-emerald-200 bg-emerald-50 text-emerald-900",
-  danger: "border-red-200 bg-red-50 text-red-800",
+  neutral:
+    "border-[var(--color-border)] bg-[var(--color-surface-inset)] text-[var(--color-ink)]",
+  info: "border-[var(--color-info-border)] bg-[var(--color-info-soft)] text-[var(--color-info-text)]",
+  warning:
+    "border-[var(--color-warning-border)] bg-[var(--color-warning-soft)] text-[var(--color-warning-text)]",
+  success:
+    "border-[var(--color-success-border)] bg-[var(--color-success-soft)] text-[var(--color-success-text)]",
+  danger:
+    "border-[var(--color-danger-border)] bg-[var(--color-danger-soft)] text-[var(--color-danger)]",
 };
 
 export function StatusBadge({
@@ -46,7 +50,7 @@ export function StatusBadge({
 }) {
   return (
     <span
-      className={`inline-flex min-h-7 items-center rounded-full border px-2.5 py-1 text-xs font-extrabold ${statusToneClass[tone]}`}
+      className={`inline-flex min-h-7 items-center rounded-full border px-2.5 py-1 text-xs font-bold ${statusToneClass[tone]}`}
     >
       <span
         className="mr-1.5 h-1.5 w-1.5 rounded-full bg-current"
@@ -69,7 +73,7 @@ export function FilterActionBar({
   return (
     <section
       aria-label={label}
-      className="flex flex-col gap-4 rounded-2xl border border-[var(--ares-border)] bg-[var(--ares-surface)] p-4 shadow-sm lg:flex-row lg:items-end lg:justify-between"
+      className="flex flex-col gap-4 rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 lg:flex-row lg:items-end lg:justify-between"
     >
       <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {children}
@@ -98,12 +102,12 @@ export function Panel({
 }) {
   return (
     <section
-      className={`min-w-0 rounded-2xl border border-[var(--ares-border)] bg-[var(--ares-surface)] shadow-sm ${className}`}
+      className={`min-w-0 rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] ${className}`}
     >
       {(title || description || action) && (
         <header className="flex flex-col gap-3 border-b border-[var(--ares-border)] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            {title && <h2 className="text-lg font-black">{title}</h2>}
+            {title && <h2 className="text-lg font-bold">{title}</h2>}
             {description && (
               <p className="mt-1 text-sm leading-6 text-[var(--ares-muted)]">
                 {description}
@@ -140,7 +144,7 @@ export function ResponsiveListItem({ children }: { children: ReactNode }) {
   return (
     <article
       role="listitem"
-      className="min-w-0 rounded-2xl border border-[var(--ares-border)] bg-[var(--ares-surface)] p-4 shadow-sm"
+      className="min-w-0 rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4"
     >
       {children}
     </article>
@@ -179,7 +183,7 @@ export function Pagination({
           type="button"
           onClick={() => onPageChange(safePage - 1)}
           disabled={disabled || safePage <= 1}
-          className={`focus-ring ${touchButtonClassName} rounded-xl border border-[var(--ares-border-strong)] px-4 text-sm font-extrabold disabled:cursor-not-allowed disabled:opacity-45`}
+          className={`focus-ring ${touchButtonClassName} rounded-full border border-[var(--color-border)] px-4 text-sm font-medium hover:bg-[var(--color-surface-inset)] disabled:cursor-not-allowed disabled:opacity-45`}
         >
           Anterior
         </button>
@@ -187,7 +191,7 @@ export function Pagination({
           type="button"
           onClick={() => onPageChange(safePage + 1)}
           disabled={disabled || safePage >= totalPages}
-          className={`focus-ring ${touchButtonClassName} rounded-xl border border-[var(--ares-border-strong)] px-4 text-sm font-extrabold disabled:cursor-not-allowed disabled:opacity-45`}
+          className={`focus-ring ${touchButtonClassName} rounded-full border border-[var(--color-border)] px-4 text-sm font-medium hover:bg-[var(--color-surface-inset)] disabled:cursor-not-allowed disabled:opacity-45`}
         >
           Siguiente
         </button>
@@ -212,13 +216,13 @@ export function PageHeader({
   return (
     <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
       <div>
-        <p className="text-[11px] font-black uppercase tracking-[0.19em] text-[var(--ares-accent-text)]">
+        <p className="text-xs font-medium uppercase tracking-[var(--tracking-eyebrow)] text-[var(--ares-accent-text)]">
           {eyebrow}
         </p>
-        <h1 className="mt-2 text-3xl font-black tracking-[-0.045em] sm:text-4xl">
+        <h1 className="mt-2 text-3xl font-bold tracking-[-0.03em] sm:text-4xl">
           {title}
         </h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-[#667085]">
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--color-muted)]">
           {description}
         </p>
       </div>
@@ -226,7 +230,7 @@ export function PageHeader({
         (action.href !== undefined ? (
           <Link
             href={action.href}
-            className="focus-ring inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-[#17174a] px-4 py-3 text-sm font-black text-white transition hover:bg-[#25256d]"
+            className="focus-ring inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-[var(--color-primary)] px-5 py-2.5 text-sm font-bold text-[var(--color-on-primary)] shadow-[var(--shadow-button)] transition hover:bg-[var(--color-primary-hover)]"
           >
             <Plus size={17} /> {action.label}
           </Link>
@@ -234,7 +238,7 @@ export function PageHeader({
           <button
             type="button"
             onClick={action.onClick}
-            className="focus-ring inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-[#17174a] px-4 py-3 text-sm font-black text-white transition hover:bg-[#25256d]"
+            className="focus-ring inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-[var(--color-primary)] px-5 py-2.5 text-sm font-bold text-[var(--color-on-primary)] shadow-[var(--shadow-button)] transition hover:bg-[var(--color-primary-hover)]"
           >
             <Plus size={17} /> {action.label}
           </button>
@@ -268,11 +272,11 @@ export function Field({
   const errorId = error ? `${fieldId}-error` : undefined;
   const describedBy = [hintId, errorId].filter(Boolean).join(" ") || undefined;
   return (
-    <div className="block text-sm font-extrabold text-[#25256d]">
+    <div className="block text-sm font-medium text-[var(--color-ink)]">
       <label htmlFor={fieldId}>
         {label}
         {required && (
-          <span className="ml-1 text-[#ea580c]" aria-hidden="true">
+          <span className="ml-1 text-[var(--color-primary)]" aria-hidden="true">
             *
           </span>
         )}
@@ -286,7 +290,7 @@ export function Field({
       {hint && (
         <span
           id={hintId}
-          className="mt-1.5 block text-xs font-medium text-[#667085]"
+          className="mt-1.5 block text-xs font-medium text-[var(--color-muted)]"
         >
           {hint}
         </span>
@@ -294,7 +298,7 @@ export function Field({
       {error && (
         <span
           id={errorId}
-          className="mt-1.5 block text-xs font-bold text-red-700"
+          className="mt-1.5 block text-xs font-bold text-[var(--color-danger)]"
         >
           {error}
         </span>
@@ -364,7 +368,7 @@ export function Modal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] grid items-end overflow-y-auto overscroll-contain bg-[#0b0b2e]/55 px-0 pb-0 pt-4 backdrop-blur-sm sm:place-items-center sm:p-5"
+      className="fixed inset-0 z-[100] grid items-end overflow-y-auto overscroll-contain bg-[var(--color-scrim)] px-0 pb-0 pt-4 backdrop-blur-sm sm:place-items-center sm:p-5"
       role="presentation"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
@@ -376,19 +380,19 @@ export function Modal({
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={description ? descriptionId : undefined}
-        className={`max-h-[calc(100dvh-1rem)] w-full overflow-y-auto overscroll-contain rounded-t-[1.7rem] bg-[#ffffff] shadow-2xl sm:max-h-[calc(100dvh-2.5rem)] sm:rounded-[1.7rem] ${
+        className={`max-h-[calc(100dvh-1rem)] w-full overflow-y-auto overscroll-contain rounded-t-[var(--radius-card-lg)] bg-[var(--color-surface)] shadow-[var(--shadow-float)] sm:max-h-[calc(100dvh-2.5rem)] sm:rounded-[var(--radius-card-lg)] ${
           size === "wide" ? "sm:max-w-6xl" : "sm:max-w-2xl"
         }`}
       >
-        <header className="sticky top-0 z-10 flex items-start justify-between border-b border-[#dde1ea] bg-[#ffffff]/95 px-5 py-5 backdrop-blur sm:px-7">
+        <header className="sticky top-0 z-10 flex items-start justify-between border-b border-[var(--color-border)] bg-[var(--color-surface)] px-5 py-5 backdrop-blur sm:px-7">
           <div>
-            <h2 id={titleId} className="text-xl font-black tracking-[-0.03em]">
+            <h2 id={titleId} className="text-xl font-bold tracking-[-0.02em]">
               {title}
             </h2>
             {description && (
               <p
                 id={descriptionId}
-                className="mt-1 text-sm leading-6 text-[#667085]"
+                className="mt-1 text-sm leading-6 text-[var(--color-muted)]"
               >
                 {description}
               </p>
@@ -397,7 +401,7 @@ export function Modal({
           <button
             type="button"
             onClick={onClose}
-            className="focus-ring grid min-h-11 min-w-11 place-items-center rounded-xl text-[#667085] hover:bg-[#eef0f6]"
+            className="focus-ring grid min-h-11 min-w-11 place-items-center rounded-full text-[var(--color-muted)] hover:bg-[var(--color-surface-inset)]"
             aria-label="Cerrar"
           >
             <X size={20} />
@@ -420,19 +424,19 @@ export function FormActions({
   onCancel: () => void;
 }) {
   return (
-    <div className="mt-7 flex flex-col-reverse gap-3 border-t border-[#dde1ea] pt-5 sm:flex-row sm:justify-end">
+    <div className="mt-7 flex flex-col-reverse gap-3 border-t border-[var(--color-border)] pt-5 sm:flex-row sm:justify-end">
       <button
         type="button"
         onClick={onCancel}
         disabled={saving}
-        className="focus-ring min-h-11 rounded-xl border border-[#dde1ea] px-5 text-sm font-extrabold hover:bg-[#eef0f6]"
+        className="focus-ring min-h-11 rounded-full border border-[var(--color-border)] px-5 text-sm font-medium hover:bg-[var(--color-surface-inset)]"
       >
         Cancelar
       </button>
       <button
         type="submit"
         disabled={saving}
-        className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#17174a] px-5 text-sm font-black text-white hover:bg-[#25256d] disabled:cursor-wait disabled:opacity-65"
+        className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-[var(--color-primary)] px-5 text-sm font-bold text-[var(--color-on-primary)] shadow-[var(--shadow-button)] hover:bg-[var(--color-primary-hover)] disabled:cursor-wait disabled:opacity-65"
       >
         {saving && <LoaderCircle size={16} className="animate-spin" />}
         {saving ? "Guardando…" : submitLabel}
@@ -467,7 +471,7 @@ export function ConfirmDialog({
       title={title}
       description={description}
     >
-      <div className="flex items-start gap-3 rounded-2xl bg-amber-50 p-4 text-amber-900">
+      <div className="flex items-start gap-3 rounded-[var(--radius-card)] bg-[var(--color-warning-soft)] p-4 text-[var(--color-warning-text)]">
         <AlertTriangle size={20} className="mt-0.5 shrink-0" />
         <p className="text-sm leading-6">{notice}</p>
       </div>
@@ -476,7 +480,7 @@ export function ConfirmDialog({
           type="button"
           onClick={onClose}
           disabled={busy}
-          className="focus-ring min-h-11 rounded-xl border border-[#dde1ea] px-5 text-sm font-extrabold"
+          className="focus-ring min-h-11 rounded-full border border-[var(--color-border)] px-5 text-sm font-medium"
         >
           Cancelar
         </button>
@@ -484,7 +488,7 @@ export function ConfirmDialog({
           type="button"
           onClick={onConfirm}
           disabled={busy}
-          className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-red-700 px-5 text-sm font-black text-white hover:bg-red-800 disabled:cursor-wait disabled:opacity-65"
+          className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-[var(--color-danger-solid)] px-5 text-sm font-bold text-white hover:bg-[var(--color-danger-solid-hover)] disabled:cursor-wait disabled:opacity-65"
         >
           {busy && <LoaderCircle size={16} className="animate-spin" />}
           {busy ? "Procesando…" : confirmLabel}
@@ -499,7 +503,7 @@ export function ErrorBanner({ message }: { message: string }) {
   return (
     <div
       role="alert"
-      className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700"
+      className="rounded-[var(--radius-card)] border border-[var(--color-danger-border)] bg-[var(--color-danger-soft)] px-4 py-3 text-sm font-semibold text-[var(--color-danger)]"
     >
       {message}
     </div>
@@ -512,12 +516,12 @@ export function LoadingTable() {
       role="status"
       aria-live="polite"
       aria-busy="true"
-      className="grid min-h-56 place-items-center rounded-2xl border border-[#dde1ea] bg-white"
+      className="grid min-h-56 place-items-center rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)]"
     >
-      <div className="text-center text-[#667085]">
+      <div className="text-center text-[var(--color-muted)]">
         <LoaderCircle
           size={25}
-          className="mx-auto animate-spin text-[#ea580c]"
+          className="mx-auto animate-spin text-[var(--color-primary)]"
         />
         <p className="mt-3 text-sm font-bold">Cargando información…</p>
       </div>
@@ -533,11 +537,11 @@ export function EmptyState({
   description: string;
 }) {
   return (
-    <div className="grid min-h-56 place-items-center rounded-2xl border border-dashed border-[#dde1ea] bg-white px-6 text-center">
+    <div className="grid min-h-56 place-items-center rounded-[var(--radius-card)] border border-dashed border-[var(--color-border-strong)] bg-[var(--color-surface)] px-6 text-center">
       <div>
-        <Inbox size={28} className="mx-auto text-[#98a2b3]" />
-        <p className="mt-3 font-black">{title}</p>
-        <p className="mt-1 text-sm text-[#667085]">{description}</p>
+        <Inbox size={28} className="mx-auto text-[var(--color-muted)]" />
+        <p className="mt-3 font-bold">{title}</p>
+        <p className="mt-1 text-sm text-[var(--color-muted)]">{description}</p>
       </div>
     </div>
   );
@@ -551,17 +555,20 @@ export function LoadError({
   onRetry: () => void;
 }) {
   return (
-    <div className="grid min-h-56 place-items-center rounded-2xl border border-red-200 bg-red-50 px-6 text-center">
+    <div className="grid min-h-56 place-items-center rounded-[var(--radius-card)] border border-[var(--color-danger-border)] bg-[var(--color-danger-soft)] px-6 text-center">
       <div>
-        <AlertTriangle size={28} className="mx-auto text-red-600" />
-        <p className="mt-3 font-black text-red-900">
+        <AlertTriangle
+          size={28}
+          className="mx-auto text-[var(--color-danger)]"
+        />
+        <p className="mt-3 font-bold text-[var(--color-danger)]">
           No pudimos cargar esta sección
         </p>
-        <p className="mt-1 text-sm text-red-700">{message}</p>
+        <p className="mt-1 text-sm text-[var(--color-danger)]">{message}</p>
         <button
           type="button"
           onClick={onRetry}
-          className="focus-ring mt-4 inline-flex min-h-11 items-center gap-2 rounded-xl bg-red-700 px-4 text-sm font-black text-white"
+          className="focus-ring mt-4 inline-flex min-h-11 items-center gap-2 rounded-full bg-[var(--color-danger-solid)] px-4 text-sm font-bold text-white"
         >
           <RefreshCw size={15} /> Reintentar
         </button>
@@ -574,11 +581,14 @@ export function ForbiddenState() {
   return (
     <div className="grid min-h-[55vh] place-items-center text-center">
       <div className="max-w-md">
-        <AlertTriangle size={34} className="mx-auto text-amber-600" />
-        <h1 className="mt-4 text-3xl font-black tracking-[-0.04em]">
+        <AlertTriangle
+          size={34}
+          className="mx-auto text-[var(--color-warning-text)]"
+        />
+        <h1 className="mt-4 text-3xl font-bold tracking-[-0.04em]">
           Acceso restringido
         </h1>
-        <p className="mt-3 text-sm leading-6 text-[#667085]">
+        <p className="mt-3 text-sm leading-6 text-[var(--color-muted)]">
           Tu cuenta no cuenta con permisos para consultar esta sección.
         </p>
       </div>

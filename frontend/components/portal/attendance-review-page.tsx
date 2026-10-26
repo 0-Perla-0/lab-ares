@@ -149,7 +149,7 @@ export function AttendanceReviewPage() {
         description="Coordinación corrige; las jefaturas autorizan. No hay autovalidación ni validación por quien corrigió."
       />
       {error && (
-        <p role="alert" className="text-red-700">
+        <p role="alert" className="text-[var(--color-danger)]">
           {error}
         </p>
       )}
@@ -183,7 +183,7 @@ export function AttendanceReviewPage() {
         {rows.map((row) => (
           <li
             key={`${row.id}-${row.version}`}
-            className="space-y-4 rounded-2xl border bg-white p-5"
+            className="space-y-4 rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5"
           >
             <h2 className="font-bold">
               {row.user.codigo} · #{row.id} · versión {row.version}
@@ -232,7 +232,7 @@ export function AttendanceReviewPage() {
                     <ReasonField />
                     <button
                       disabled={busy}
-                      className="focus-ring min-h-11 rounded-xl border px-4"
+                      className="focus-ring min-h-11 rounded-full border px-4"
                     >
                       Confirmar decisión individual
                     </button>
@@ -273,7 +273,7 @@ export function AttendanceReviewPage() {
                     <ReasonField />
                     <button
                       disabled={busy}
-                      className="focus-ring min-h-11 rounded-xl border px-4"
+                      className="focus-ring min-h-11 rounded-full border px-4"
                     >
                       Registrar corrección
                     </button>
@@ -322,7 +322,7 @@ export function AttendanceReviewPage() {
                 },
               );
           }}
-          className="space-y-4 rounded-xl border p-4"
+          className="space-y-4 rounded-[var(--radius-card)] border p-4"
         >
           <p>
             Aprobación masiva: sólo verde, máximo 100, atómica. Cualquier cambio
@@ -331,7 +331,7 @@ export function AttendanceReviewPage() {
           <ReasonField />
           <button
             disabled={busy || !selected.length}
-            className="focus-ring min-h-11 rounded-xl border px-4"
+            className="focus-ring min-h-11 rounded-full border px-4"
           >
             Autorizar seleccionadas ({selected.length})
           </button>
@@ -348,7 +348,7 @@ export function AttendanceReviewPage() {
       {history && (
         <section
           aria-label="Historial de asistencia"
-          className="rounded-xl border p-5"
+          className="rounded-[var(--radius-card)] border p-5"
         >
           <h2 className="font-bold">Historial #{history.id}</h2>
           <ul>

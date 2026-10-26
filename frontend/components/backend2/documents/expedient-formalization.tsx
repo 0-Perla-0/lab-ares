@@ -46,7 +46,7 @@ export function ExpedientFormalization({ userId }: { userId: number }) {
       )}
       <ul aria-label="Formalizaciones registradas" className="space-y-2">
         {(data ?? []).map((row) => (
-          <li key={row.id} className="rounded-xl border p-3">
+          <li key={row.id} className="rounded-[var(--radius-card)] border p-3">
             <strong>{row.inicio.slice(0, 10)}</strong> ·{" "}
             {row.academicSnapshot.institucion} · {row.academicSnapshot.programa}
           </li>
@@ -72,7 +72,7 @@ export function ExpedientFormalization({ userId }: { userId: number }) {
               />
             </Field>
             <button
-              className="focus-ring min-h-11 rounded-xl border px-4"
+              className="focus-ring min-h-11 rounded-full border px-4"
               disabled={!inicio}
             >
               Formalizar expediente

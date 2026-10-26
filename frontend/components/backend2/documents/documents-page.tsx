@@ -107,7 +107,7 @@ export function DocumentsPage() {
       {notice && (
         <div
           role="status"
-          className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-900"
+          className="rounded-[var(--radius-card)] border border-[var(--color-success-border)] bg-[var(--color-success-soft)] p-4 text-sm font-bold text-[var(--color-success-text)]"
         >
           {notice}
         </div>
@@ -134,7 +134,7 @@ export function DocumentsPage() {
                 onChange={(event) => setOwnerId(Number(event.target.value))}
               />
             </Field>
-            <button className="focus-ring min-h-11 rounded-xl bg-[#17174a] px-5 text-sm font-black text-white">
+            <button className="focus-ring min-h-11 rounded-full bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] px-5 text-sm font-bold text-[var(--color-on-primary)]">
               Consultar
             </button>
           </form>
@@ -163,14 +163,14 @@ export function DocumentsPage() {
                 <article
                   role="listitem"
                   key={requirement.id}
-                  className="rounded-2xl border border-[var(--ares-border)] p-4"
+                  className="rounded-[var(--radius-card)] border border-[var(--ares-border)] p-4"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <p className="text-xs font-black uppercase tracking-wide text-[var(--ares-muted)]">
+                      <p className="text-xs font-bold uppercase tracking-wide text-[var(--ares-muted)]">
                         {requirement.codigo}
                       </p>
-                      <h3 className="mt-1 font-black">{requirement.nombre}</h3>
+                      <h3 className="mt-1 font-bold">{requirement.nombre}</h3>
                     </div>
                     <StatusBadge
                       label={
@@ -182,7 +182,7 @@ export function DocumentsPage() {
                     />
                   </div>
                   {version ? (
-                    <div className="mt-4 rounded-xl bg-[#f6f7fb] p-3 text-sm">
+                    <div className="mt-4 rounded-[var(--radius-card)] bg-[var(--color-surface-inset)] p-3 text-sm">
                       <p className="font-bold">
                         Versión {version.version} ·{" "}
                         {version.archivo.originalName}
@@ -199,7 +199,7 @@ export function DocumentsPage() {
                           version.archivo.status !== "DISPONIBLE"
                         }
                         onClick={() => void download(version.id)}
-                        className="focus-ring mt-3 inline-flex min-h-11 items-center gap-2 rounded-xl border border-[var(--ares-border-strong)] bg-white px-4 text-sm font-black"
+                        className="focus-ring mt-3 inline-flex min-h-11 items-center gap-2 rounded-full border border-[var(--ares-border-strong)] bg-[var(--color-surface)] px-4 text-sm font-bold"
                       >
                         <Download size={16} /> Descargar
                       </button>
@@ -332,7 +332,7 @@ function RequirementForm({
         </label>
         <button
           disabled={busy}
-          className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#17174a] px-5 text-sm font-black text-white"
+          className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] px-5 text-sm font-bold text-[var(--color-on-primary)]"
         >
           <PlusCircle size={16} /> {busy ? "Creando…" : "Crear requisito"}
         </button>
@@ -376,7 +376,7 @@ function ReviewForm({
       onSubmit={submit}
       className="mt-4 space-y-3 border-t border-[var(--ares-border)] pt-4"
     >
-      <h4 className="inline-flex items-center gap-2 font-black">
+      <h4 className="inline-flex items-center gap-2 font-bold">
         <FileCheck2 size={17} /> Revisión
       </h4>
       <ErrorBanner message={error} />
@@ -401,7 +401,7 @@ function ReviewForm({
       </Field>
       <button
         disabled={busy}
-        className="focus-ring min-h-11 w-full rounded-xl bg-[#17174a] px-4 text-sm font-black text-white"
+        className="focus-ring min-h-11 w-full rounded-full bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] px-4 text-sm font-bold text-[var(--color-on-primary)]"
       >
         {busy ? "Guardando…" : "Registrar resolución"}
       </button>

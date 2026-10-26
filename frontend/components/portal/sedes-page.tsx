@@ -129,7 +129,7 @@ export function SedesPage() {
       />
 
       {success && (
-        <div className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
+        <div className="mt-6 rounded-full border border-[var(--color-success-border)] bg-[var(--color-success-soft)] px-4 py-3 text-sm font-semibold text-[var(--color-success-text)]">
           {success}
         </div>
       )}
@@ -150,9 +150,9 @@ export function SedesPage() {
             description="Cuando se registre la primera sede aparecerá aquí."
           />
         ) : (
-          <div className="table-scroll overflow-x-auto rounded-2xl border border-[#dde1ea] bg-white shadow-[0_8px_30px_rgba(23,23,74,0.035)]">
+          <div className="table-scroll overflow-x-auto rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)]">
             <table className="w-full min-w-[680px] text-left">
-              <thead className="border-b border-[#dde1ea] bg-[#f0f1f7] text-[10px] font-black uppercase tracking-[0.16em] text-[#667085]">
+              <thead className="border-b border-[var(--color-border)] bg-[var(--color-surface-inset)] text-xs font-bold uppercase tracking-[var(--tracking-eyebrow)] text-[var(--color-muted)]">
                 <tr>
                   <th className="px-5 py-4">Sede</th>
                   <th className="px-5 py-4">Dirección</th>
@@ -162,29 +162,32 @@ export function SedesPage() {
                   )}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#dde1ea]">
+              <tbody className="divide-y divide-[var(--color-border)]">
                 {items.map((item) => {
                   const manageable = canManageSede(user, item.id);
                   return (
-                    <tr key={item.id} className="transition hover:bg-[#fafaff]">
+                    <tr
+                      key={item.id}
+                      className="transition hover:bg-[var(--color-surface-inset)]"
+                    >
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-3">
-                          <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#fff1e8] text-[#c2410c]">
+                          <span className="grid h-10 w-10 place-items-center rounded-full bg-[var(--color-accent-soft)] text-[var(--color-accent-text)]">
                             <MapPin size={18} />
                           </span>
                           <div>
-                            <p className="text-sm font-black">{item.nombre}</p>
-                            <p className="mt-0.5 text-[11px] text-[#858ca0]">
+                            <p className="text-sm font-bold">{item.nombre}</p>
+                            <p className="mt-0.5 text-xs text-[var(--color-muted)]">
                               ID {item.id}
                             </p>
                           </div>
                         </div>
                       </td>
-                      <td className="max-w-md px-5 py-4 text-sm text-[#667085]">
+                      <td className="max-w-md px-5 py-4 text-sm text-[var(--color-muted)]">
                         {item.direccion || "Sin dirección registrada"}
                       </td>
                       <td className="px-5 py-4">
-                        <span className="inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-black text-emerald-700">
+                        <span className="inline-flex rounded-full bg-[var(--color-success-soft)] px-2.5 py-1 text-xs font-bold text-[var(--color-success-text)]">
                           Activa
                         </span>
                       </td>
@@ -199,7 +202,7 @@ export function SedesPage() {
                                 setSuccess("");
                                 setEditor({ mode: "edit", item });
                               }}
-                              className="focus-ring rounded-lg p-2 text-[#667085] hover:bg-[#fff1e8] hover:text-[#c2410c] disabled:cursor-not-allowed disabled:opacity-25"
+                              className="focus-ring rounded-lg p-2 text-[var(--color-muted)] hover:bg-[var(--color-accent-soft)] hover:text-[var(--color-accent-text)] disabled:cursor-not-allowed disabled:opacity-25"
                               aria-label={`Editar ${item.nombre}`}
                             >
                               <Pencil size={17} />
@@ -208,7 +211,7 @@ export function SedesPage() {
                               type="button"
                               disabled={!manageable}
                               onClick={() => setDeleteTarget(item)}
-                              className="focus-ring rounded-lg p-2 text-[#667085] hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-25"
+                              className="focus-ring rounded-lg p-2 text-[var(--color-muted)] hover:bg-[var(--color-danger-soft)] hover:text-[var(--color-danger)] disabled:cursor-not-allowed disabled:opacity-25"
                               aria-label={`Dar de baja ${item.nombre}`}
                             >
                               <Trash2 size={17} />

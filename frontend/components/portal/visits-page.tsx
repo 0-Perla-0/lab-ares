@@ -131,7 +131,7 @@ export function VisitsPage({ control = false }: { control?: boolean }) {
           {loading && <p role="status">Buscando…</p>}
           {lookupError && <p role="alert">{lookupError}</p>}
           {visit && (
-            <article className="rounded-xl border bg-white p-5 space-y-3">
+            <article className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5 space-y-3">
               <h2 className="font-bold">{visit.nombreVisitante}</h2>
               <p>
                 {visit.institucionProcedencia} · {visit.motivo}
@@ -291,7 +291,7 @@ export function VisitsPage({ control = false }: { control?: boolean }) {
             {list.data?.items.map((v) => (
               <li
                 key={`${v.id}-${v.version}`}
-                className="space-y-3 rounded-xl border bg-white p-5"
+                className="space-y-3 rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5"
               >
                 <h2 className="font-bold">{v.nombreVisitante}</h2>
                 <p>

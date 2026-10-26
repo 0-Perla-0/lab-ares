@@ -117,7 +117,7 @@ export function InvitationsPage() {
         </p>
         <button
           disabled={busy}
-          className="focus-ring min-h-11 rounded-xl bg-[#17174a] px-5 text-white"
+          className="focus-ring min-h-11 rounded-full bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] px-5 text-[var(--color-on-primary)]"
         >
           Enviar invitación
         </button>
@@ -145,7 +145,7 @@ export function InvitationsPage() {
       )}
       <ul className="space-y-3">
         {items.map((item) => (
-          <li key={item.id} className="rounded-xl border p-4">
+          <li key={item.id} className="rounded-[var(--radius-card)] border p-4">
             <p>
               {item.targetEmail} — {item.role}
             </p>

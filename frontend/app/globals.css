@@ -1,34 +1,179 @@
 @import "tailwindcss";
 
 :root {
-  /* Paleta Ares: azul tinta, índigo profundo y mandarina. */
-  --ares-ink-blue: #17174a;
-  --ares-indigo-deep: #25256d;
-  --ares-gray-blue: #667085;
-  --ares-mandarin: #f97316;
-  --ares-mandarin-hover: #ea580c;
-  --ares-peach: #fff1e8;
-  --ares-accent: #f97316;
-  --ares-accent-strong: #ea580c;
-  --ares-accent-text: #c2410c;
-  --ares-accent-soft: #fff1e8;
-  --ares-canvas: #f6f7fb;
-  --ares-ink: var(--ares-ink-blue);
-  --ares-ink-soft: var(--ares-indigo-deep);
-  --ares-paper: #ffffff;
-  --ares-muted: #667085;
-  --ares-surface: #ffffff;
-  --ares-surface-subtle: #f6f7fb;
-  --ares-surface-soft: #f0f1f7;
-  --ares-border: #dde1ea;
-  --ares-border-strong: #cbd1de;
-  --ares-focus: #ea580c;
-  --ares-danger: #b91c1c;
-  --ares-warning: #92400e;
-  --ares-success: #10b981;
-  --ares-info: #075985;
-  --ares-motion-fast: 150ms;
-  --ares-motion-standard: 250ms;
+  /* Tokens semánticos (referencia Cap adaptada: lienzo claro y acento naranja). */
+  --color-primary: #c2410c;
+  --color-primary-hover: #9a3412;
+  --color-on-primary: #fcfcfc;
+  --color-accent: #f97316;
+  --color-accent-text: #c2410c;
+  --color-accent-soft: #fff1e8;
+  --color-ink: #202020;
+  --color-muted: #646464;
+  --color-canvas: #fcfcfc;
+  --color-surface: #fcfcfc;
+  --color-surface-inset: #f0f0f0;
+  --color-surface-wash: #e5e7eb;
+  --color-border: #e0e0e0;
+  --color-border-strong: #c2c2c2;
+  --color-control-border: #8f8f8f;
+  --color-focus: #c2410c;
+  --color-danger: #b91c1c;
+  --color-warning: #92400e;
+  --color-success: #047857;
+  --color-info: #075985;
+  --color-scrim: rgba(32, 32, 32, 0.55);
+
+  --color-danger-soft: #fef2f2;
+  --color-danger-border: #fecaca;
+  --color-danger-solid: #b91c1c;
+  --color-danger-solid-hover: #991b1b;
+  --color-success-soft: #ecfdf5;
+  --color-success-border: #a7f3d0;
+  --color-success-text: #065f46;
+  --color-warning-soft: #fffbeb;
+  --color-warning-border: #fde68a;
+  --color-warning-text: #92400e;
+  --color-info-soft: #f0f9ff;
+  --color-info-border: #bae6fd;
+  --color-info-text: #075985;
+
+  --radius-input: 6px;
+  --radius-card: 12px;
+  --radius-card-lg: 16px;
+  --radius-pill: 9999px;
+
+  --shadow-button: 0 4px 10px 0 rgba(0, 0, 0, 0.05);
+  --shadow-float:
+    0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+  --shadow-inset-highlight: inset 0 1.5px 0 0 rgba(255, 255, 255, 0.4);
+
+  --font-sans: Inter, "Segoe UI", system-ui, -apple-system, sans-serif;
+  --text-caption: 0.75rem;
+  --text-body-sm: 0.875rem;
+  --text-body: 1rem;
+  --text-subheading: 1.125rem;
+  --text-heading-sm: 1.25rem;
+  --text-heading: 1.875rem;
+  --text-heading-lg: 2.25rem;
+  --text-display: 3.25rem;
+  --tracking-eyebrow: 0.2em;
+
+  --motion-fast: 150ms;
+  --motion-standard: 250ms;
+  --motion-exit: 160ms;
+
+  /* Alias heredados --ares-*: se retiran cuando todas las pantallas usen tokens. */
+  --ares-ink-blue: var(--color-ink);
+  --ares-indigo-deep: var(--color-ink);
+  --ares-gray-blue: var(--color-muted);
+  --ares-mandarin: var(--color-accent);
+  --ares-mandarin-hover: var(--color-primary);
+  --ares-peach: var(--color-accent-soft);
+  --ares-accent: var(--color-accent);
+  --ares-accent-strong: var(--color-primary);
+  --ares-accent-text: var(--color-accent-text);
+  --ares-accent-soft: var(--color-accent-soft);
+  --ares-canvas: var(--color-canvas);
+  --ares-ink: var(--color-ink);
+  --ares-ink-soft: var(--color-ink);
+  --ares-paper: var(--color-canvas);
+  --ares-muted: var(--color-muted);
+  --ares-surface: var(--color-surface);
+  --ares-surface-subtle: var(--color-surface-inset);
+  --ares-surface-soft: var(--color-surface-inset);
+  --ares-border: var(--color-border);
+  --ares-border-strong: var(--color-border-strong);
+  --ares-focus: var(--color-focus);
+  --ares-danger: var(--color-danger);
+  --ares-warning: var(--color-warning);
+  --ares-success: var(--color-success);
+  --ares-info: var(--color-info);
+  --ares-motion-fast: var(--motion-fast);
+  --ares-motion-standard: var(--motion-standard);
+}
+
+/* Oscuro: sigue la preferencia del sistema; data-theme fuerza uno u otro. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-primary: #f97316;
+  --color-primary-hover: #fb923c;
+  --color-on-primary: #1a1a1a;
+  --color-accent: #fb923c;
+  --color-accent-text: #fb923c;
+  --color-accent-soft: #3a2216;
+  --color-ink: #f5f5f5;
+  --color-muted: #a3a3a3;
+  --color-canvas: #141414;
+  --color-surface: #1c1c1c;
+  --color-surface-inset: #262626;
+  --color-surface-wash: #2e2e2e;
+  --color-border: #3a3a3a;
+  --color-border-strong: #525252;
+  --color-control-border: #7a7a7a;
+  --color-focus: #fb923c;
+  --color-danger: #f87171;
+  --color-warning: #fbbf24;
+  --color-success: #34d399;
+  --color-info: #7dd3fc;
+  --color-scrim: rgba(0, 0, 0, 0.7);
+  --color-danger-soft: #3b1717;
+  --color-danger-border: #7f2a2a;
+  --color-danger-solid: #dc2626;
+  --color-danger-solid-hover: #b91c1c;
+  --color-success-soft: #0f2e22;
+  --color-success-border: #1f6f4e;
+  --color-success-text: #6ee7b7;
+  --color-warning-soft: #33260a;
+  --color-warning-border: #854d0e;
+  --color-warning-text: #fcd34d;
+  --color-info-soft: #0c2a3b;
+  --color-info-border: #0c4a6e;
+  --color-info-text: #7dd3fc;
+  --shadow-inset-highlight: inset 0 1.5px 0 0 rgba(255, 255, 255, 0.08);
+  --shadow-float: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --color-primary: #f97316;
+    --color-primary-hover: #fb923c;
+    --color-on-primary: #1a1a1a;
+    --color-accent: #fb923c;
+    --color-accent-text: #fb923c;
+    --color-accent-soft: #3a2216;
+    --color-ink: #f5f5f5;
+    --color-muted: #a3a3a3;
+    --color-canvas: #141414;
+    --color-surface: #1c1c1c;
+    --color-surface-inset: #262626;
+    --color-surface-wash: #2e2e2e;
+    --color-border: #3a3a3a;
+    --color-border-strong: #525252;
+    --color-control-border: #7a7a7a;
+    --color-focus: #fb923c;
+    --color-danger: #f87171;
+    --color-warning: #fbbf24;
+    --color-success: #34d399;
+    --color-info: #7dd3fc;
+    --color-scrim: rgba(0, 0, 0, 0.7);
+    --color-danger-soft: #3b1717;
+    --color-danger-border: #7f2a2a;
+    --color-danger-solid: #dc2626;
+    --color-danger-solid-hover: #b91c1c;
+    --color-success-soft: #0f2e22;
+    --color-success-border: #1f6f4e;
+    --color-success-text: #6ee7b7;
+    --color-warning-soft: #33260a;
+    --color-warning-border: #854d0e;
+    --color-warning-text: #fcd34d;
+    --color-info-soft: #0c2a3b;
+    --color-info-border: #0c4a6e;
+    --color-info-text: #7dd3fc;
+    --shadow-inset-highlight: inset 0 1.5px 0 0 rgba(255, 255, 255, 0.08);
+    --shadow-float: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+  }
 }
 
 * {
@@ -37,13 +182,14 @@
 
 html {
   scroll-behavior: smooth;
+  scroll-padding-top: 6rem;
 }
 
 body {
   margin: 0;
   background: var(--ares-paper);
   color: var(--ares-ink);
-  font-family: "Avenir Next", Avenir, "Segoe UI", system-ui, sans-serif;
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -73,14 +219,21 @@ textarea:disabled {
 }
 
 ::selection {
-  background: var(--ares-accent);
-  color: var(--ares-ink);
+  background: color-mix(in srgb, var(--color-accent) 35%, transparent);
+  color: var(--color-ink);
 }
 
 .grid-texture {
   background-image:
-    linear-gradient(rgba(23, 23, 74, 0.055) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(23, 23, 74, 0.055) 1px, transparent 1px);
+    linear-gradient(
+      color-mix(in srgb, var(--color-ink) 6%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--color-ink) 6%, transparent) 1px,
+      transparent 1px
+    );
   background-size: 40px 40px;
 }
 
@@ -95,7 +248,8 @@ textarea:disabled {
   overflow: hidden;
   background: var(--ares-accent-soft);
   padding: 0.125rem;
-  box-shadow: inset 0 0 0 1px rgba(23, 23, 74, 0.12);
+  box-shadow: inset 0 0 0 1px
+    color-mix(in srgb, var(--color-ink) 12%, transparent);
 }
 
 .brand-mark-compact {
@@ -136,7 +290,7 @@ textarea:disabled {
 }
 
 .ares-progress::-webkit-progress-bar {
-  background: #dde1ea;
+  background: var(--color-border);
   border-radius: 999px;
 }
 
@@ -154,14 +308,14 @@ textarea:disabled {
   background:
     radial-gradient(
       circle at 85% 0%,
-      rgba(249, 115, 22, 0.16),
+      color-mix(in srgb, var(--color-accent) 10%, transparent),
       transparent 26rem
     ),
-    #f6f7fb;
+    var(--color-surface-inset);
 }
 
 .table-scroll {
-  scrollbar-color: #cbd1de transparent;
+  scrollbar-color: var(--color-border-strong) transparent;
   scrollbar-width: thin;
 }
 

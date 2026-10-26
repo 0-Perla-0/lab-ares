@@ -108,17 +108,17 @@ export function DashboardPage() {
     <div className="animate-fade-up">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-[11px] font-black uppercase tracking-[0.19em] text-[#ea580c]">
+          <p className="text-xs font-medium uppercase tracking-[var(--tracking-eyebrow)] text-[var(--color-accent-text)]">
             Panel principal
           </p>
-          <h1 className="mt-2 text-3xl font-black tracking-[-0.045em] sm:text-4xl">
+          <h1 className="mt-2 text-3xl font-bold tracking-[-0.045em] sm:text-4xl">
             Hola, {user.codigo}.
           </h1>
-          <p className="mt-2 text-sm text-[#667085]">
+          <p className="mt-2 text-sm text-[var(--color-muted)]">
             Este es el estado actual de tu espacio de trabajo.
           </p>
         </div>
-        <div className="inline-flex w-fit items-center gap-2 rounded-full border border-[#dde1ea] bg-white px-4 py-2 text-xs font-extrabold">
+        <div className="inline-flex w-fit items-center gap-2 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2 text-xs font-bold">
           <span
             className={`h-2 w-2 rounded-full ${data.backendReady ? "bg-emerald-500" : "bg-red-500"}`}
           />
@@ -136,36 +136,38 @@ export function DashboardPage() {
           <Link
             key={label}
             href={href}
-            className="focus-ring group rounded-2xl border border-[#dde1ea] bg-white p-5 shadow-[0_8px_28px_rgba(23,23,74,0.035)] transition hover:-translate-y-0.5 hover:shadow-[0_14px_36px_rgba(23,23,74,0.08)]"
+            className="focus-ring group rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5 transition hover:-translate-y-0.5"
           >
             <div className="flex items-start justify-between">
-              <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#fff1e8] text-[#c2410c]">
+              <span className="grid h-10 w-10 place-items-center rounded-full bg-[var(--color-accent-soft)] text-[var(--color-accent-text)]">
                 <Icon size={19} />
               </span>
               <ArrowUpRight
                 size={17}
-                className="text-[#98a2b3] transition group-hover:text-[#17174a]"
+                className="text-[var(--color-muted)] transition group-hover:text-[var(--color-ink)]"
               />
             </div>
-            <p className="mt-6 text-3xl font-black tracking-[-0.05em]">
+            <p className="mt-6 text-3xl font-bold tracking-[-0.05em]">
               {value}
             </p>
-            <p className="mt-1 text-xs font-bold text-[#667085]">{label}</p>
+            <p className="mt-1 text-xs font-bold text-[var(--color-muted)]">
+              {label}
+            </p>
           </Link>
         ))}
       </section>
 
       <section className="mt-6 grid gap-6 xl:grid-cols-[1.3fr_0.7fr]">
-        <div className="rounded-[1.6rem] border border-white/10 bg-[#17174a] p-6 text-white sm:p-8">
+        <div className="rounded-[var(--radius-card-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-6 sm:p-8">
           <div className="flex items-center gap-3">
-            <span className="grid h-11 w-11 place-items-center rounded-xl bg-[#f97316] text-[#17174a]">
+            <span className="grid h-11 w-11 place-items-center rounded-full bg-[var(--color-primary)] text-[var(--color-on-primary)]">
               <ShieldCheck size={21} />
             </span>
             <div>
-              <p className="text-xs font-bold text-white/45">
+              <p className="text-xs font-medium text-[var(--color-muted)]">
                 Tu responsabilidad
               </p>
-              <h2 className="text-lg font-black">{roleLabels[user.rol]}</h2>
+              <h2 className="text-lg font-bold">{roleLabels[user.rol]}</h2>
             </div>
           </div>
           <div className="mt-7 grid gap-3 sm:grid-cols-3">
@@ -174,12 +176,15 @@ export function DashboardPage() {
               ["Área", area?.nombre ?? "Sin asignar"],
               ["Turno", turno?.nombre ?? "Sin asignar"],
             ].map(([label, value]) => (
-              <div key={label} className="rounded-2xl bg-white/7 p-4">
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/35">
+              <div
+                key={label}
+                className="rounded-[var(--radius-card)] bg-[var(--color-surface-inset)] p-4"
+              >
+                <p className="text-xs font-medium uppercase tracking-[var(--tracking-eyebrow)] text-[var(--color-muted)]">
                   {label}
                 </p>
                 <p
-                  className="mt-2 truncate text-sm font-extrabold text-white/85"
+                  className="mt-2 truncate text-sm font-bold text-[var(--color-ink)]"
                   title={value}
                 >
                   {value}
@@ -189,17 +194,17 @@ export function DashboardPage() {
           </div>
         </div>
 
-        <div className="rounded-[1.6rem] border border-[#dde1ea] bg-[#f97316] p-6 text-[#17174a] sm:p-8">
-          <p className="text-[10px] font-black uppercase tracking-[0.17em] text-[#17174a]/75">
+        <div className="rounded-[var(--radius-card-lg)] border border-[var(--color-border)] bg-[var(--color-accent-soft)] p-6 text-[var(--color-ink)] sm:p-8">
+          <p className="text-xs font-bold uppercase tracking-[var(--tracking-eyebrow)] text-[var(--color-ink)]">
             Cuenta activa
           </p>
-          <h2 className="mt-3 text-2xl font-black tracking-[-0.04em]">
+          <h2 className="mt-3 text-2xl font-bold tracking-[-0.04em]">
             Tu acceso está listo.
           </h2>
-          <p className="mt-3 break-all text-sm font-semibold leading-6 text-[#17174a]/90">
+          <p className="mt-3 break-all text-sm font-semibold leading-6 text-[var(--color-ink)]">
             {user.email}
           </p>
-          <p className="mt-6 text-xs font-bold text-[#17174a]/80">
+          <p className="mt-6 text-xs font-bold text-[var(--color-ink)]">
             Código {user.codigo}
           </p>
         </div>

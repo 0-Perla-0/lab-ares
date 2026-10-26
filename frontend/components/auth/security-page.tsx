@@ -111,7 +111,7 @@ export function SecurityPage() {
         description="Administra contraseña, sesiones y segundo factor opcional."
       />
       {error && (
-        <p role="alert" className="text-red-700">
+        <p role="alert" className="text-[var(--color-danger)]">
           {error}
         </p>
       )}
@@ -358,7 +358,7 @@ function ActionButton({
   return (
     <button
       disabled={busy}
-      className="focus-ring min-h-11 rounded-xl bg-[#17174a] px-5 text-white disabled:opacity-50"
+      className="focus-ring min-h-11 rounded-full bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] px-5 text-[var(--color-on-primary)] disabled:opacity-50"
     >
       {busy ? "Procesando…" : children}
     </button>

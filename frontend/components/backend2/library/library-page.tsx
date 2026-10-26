@@ -205,7 +205,7 @@ export function LibraryPage() {
       {notice && (
         <p
           role="status"
-          className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-900"
+          className="rounded-[var(--radius-card)] border border-[var(--color-success-border)] bg-[var(--color-success-soft)] p-4 text-sm font-bold text-[var(--color-success-text)]"
         >
           {notice}
         </p>
@@ -276,7 +276,7 @@ export function LibraryPage() {
               ))}
             </select>
           </Field>
-          <button className="focus-ring min-h-11 self-end rounded-xl bg-[#17174a] px-4 text-sm font-black text-white">
+          <button className="focus-ring min-h-11 self-end rounded-full bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] px-4 text-sm font-bold text-[var(--color-on-primary)]">
             Aplicar filtros
           </button>
         </form>
@@ -289,10 +289,10 @@ export function LibraryPage() {
                 <button
                   type="button"
                   onClick={() => void detail(document.id)}
-                  className="focus-ring min-h-24 w-full rounded-2xl border border-[var(--ares-border)] p-4 text-left hover:border-[#ea580c]"
+                  className="focus-ring min-h-24 w-full rounded-[var(--radius-card)] border border-[var(--ares-border)] p-4 text-left hover:border-[var(--color-accent)]"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-2">
-                    <h2 className="font-black">{document.titulo}</h2>
+                    <h2 className="font-bold">{document.titulo}</h2>
                     <StatusBadge
                       label={label(document.estado)}
                       tone={tones[document.estado]}
@@ -301,7 +301,7 @@ export function LibraryPage() {
                   <p className="mt-2 text-sm text-[var(--ares-muted)]">
                     {document.descripcion || "Sin descripción"}
                   </p>
-                  <p className="mt-3 text-xs font-extrabold uppercase tracking-wide text-[#ea580c]">
+                  <p className="mt-3 text-xs font-bold uppercase tracking-wide text-[var(--color-accent-text)]">
                     {label(document.categoria)} · {label(document.alcance)}
                   </p>
                 </button>
@@ -457,7 +457,7 @@ export function LibraryPage() {
           </label>
           <button
             disabled={busy || !draft.archivoId}
-            className="focus-ring min-h-11 w-full rounded-xl bg-[#17174a] px-5 text-sm font-black text-white disabled:opacity-50"
+            className="focus-ring min-h-11 w-full rounded-full bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] px-5 text-sm font-bold text-[var(--color-on-primary)] disabled:opacity-50"
           >
             {busy ? "Creando…" : "Crear borrador"}
           </button>
@@ -479,7 +479,7 @@ export function LibraryPage() {
                   setVersionDocument(selected);
                   setSelected(null);
                 }}
-                className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#17174a] px-4 text-sm font-black text-white"
+                className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-full bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] px-4 text-sm font-bold text-[var(--color-on-primary)]"
               >
                 <FilePlus2 size={16} /> Nueva versión
               </button>
@@ -487,10 +487,10 @@ export function LibraryPage() {
             {selected.versiones.map((version) => (
               <article
                 key={version.id}
-                className="rounded-2xl border border-[var(--ares-border)] p-4"
+                className="rounded-[var(--radius-card)] border border-[var(--ares-border)] p-4"
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h3 className="font-black">Versión {version.numero}</h3>
+                  <h3 className="font-bold">Versión {version.numero}</h3>
                   <StatusBadge
                     label={label(version.estado)}
                     tone={tones[version.estado]}
@@ -500,7 +500,7 @@ export function LibraryPage() {
                   {version.resumenCambios}
                 </p>
                 {version.retroalimentacion && (
-                  <p className="mt-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
+                  <p className="mt-2 rounded-[var(--radius-card)] bg-[var(--color-warning-soft)] p-3 text-sm text-[var(--color-warning-text)]">
                     {version.retroalimentacion}
                   </p>
                 )}
@@ -513,7 +513,7 @@ export function LibraryPage() {
                         window.open(url, "_blank", "noopener,noreferrer");
                       }, "Descarga autorizada.")
                     }
-                    className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-xl border border-[var(--ares-border-strong)] px-3 text-sm font-black"
+                    className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-full border border-[var(--ares-border-strong)] px-3 text-sm font-bold"
                   >
                     <Download size={16} /> Descargar
                   </button>
@@ -526,7 +526,7 @@ export function LibraryPage() {
                           "Versión enviada a revisión.",
                         )
                       }
-                      className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#17174a] px-3 text-sm font-black text-white"
+                      className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-full bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] px-3 text-sm font-bold text-[var(--color-on-primary)]"
                     >
                       <Send size={16} /> Enviar a revisión
                     </button>
@@ -544,7 +544,7 @@ export function LibraryPage() {
                             "Revisión aprobada.",
                           )
                         }
-                        className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-xl bg-emerald-700 px-3 text-sm font-black text-white"
+                        className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-full bg-emerald-700 px-3 text-sm font-bold text-white"
                       >
                         <CheckCircle2 size={16} /> Aprobar
                       </button>
@@ -564,7 +564,7 @@ export function LibraryPage() {
                               "Se solicitaron cambios.",
                             );
                         }}
-                        className="focus-ring min-h-11 rounded-xl border border-amber-300 px-3 text-sm font-black"
+                        className="focus-ring min-h-11 rounded-full border border-[var(--color-warning-border)] px-3 text-sm font-bold"
                       >
                         Solicitar cambios
                       </button>
@@ -594,7 +594,7 @@ export function LibraryPage() {
                             "Versión publicada.",
                           );
                         }}
-                        className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#ea580c] px-3 text-sm font-black text-[#17174a]"
+                        className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-full bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] px-3 text-sm font-bold text-[var(--color-on-primary)]"
                       >
                         <ShieldCheck size={16} /> Publicar
                       </button>
@@ -610,7 +610,7 @@ export function LibraryPage() {
                             "Lectura confirmada.",
                           )
                         }
-                        className="focus-ring min-h-11 rounded-xl border border-[var(--ares-border-strong)] px-3 text-sm font-black"
+                        className="focus-ring min-h-11 rounded-full border border-[var(--ares-border-strong)] px-3 text-sm font-bold"
                       >
                         Confirmar lectura
                       </button>
@@ -632,7 +632,7 @@ export function LibraryPage() {
                       "Documento archivado.",
                     );
                 }}
-                className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-xl bg-red-700 px-4 text-sm font-black text-white"
+                className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-[var(--radius-card)] bg-[var(--color-danger-solid)] px-4 text-sm font-bold text-white"
               >
                 <Archive size={16} /> Archivar documento
               </button>
@@ -704,7 +704,7 @@ export function LibraryPage() {
           </div>
           <button
             disabled={busy || !versionDraft.archivoId}
-            className="focus-ring min-h-11 w-full rounded-xl bg-[#17174a] px-5 text-sm font-black text-white disabled:opacity-50"
+            className="focus-ring min-h-11 w-full rounded-full bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] px-5 text-sm font-bold text-[var(--color-on-primary)] disabled:opacity-50"
           >
             {busy ? "Creando…" : "Crear versión"}
           </button>
