@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { notificationContracts } from "../common/domain/operational-notification";
 
 import { Prisma } from "../generated/prisma/client";
 import { EstadoUsuario, type RolUsuario } from "../generated/prisma/enums";
@@ -161,7 +162,9 @@ export class UsersRepository {
             data: {
               userId: id,
               type: "ACCOUNT_CHANGED",
-              payload: { sessionsRevoked: true },
+              payload: notificationContracts.ACCOUNT_CHANGED.parse({
+                sessionsRevoked: true,
+              }),
             },
           });
           await this.outbox.enqueue(
