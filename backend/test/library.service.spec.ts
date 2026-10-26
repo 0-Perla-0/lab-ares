@@ -9,6 +9,7 @@ import {
   RolMiembroProyectoKairos,
   RolUsuario,
 } from "../src/generated/prisma/enums";
+import { operationFingerprint } from "../src/common/domain/canonical-operation";
 import { LibraryService } from "../src/library/library.service";
 import {
   archiveLibraryDocumentSchema,
@@ -70,6 +71,8 @@ const version = {
   archivo: { id: fileId, status: EstadoArchivo.DISPONIBLE },
 };
 
+const KEY = "11111111-1111-4111-8111-111111111111";
+
 function make(overrides: any = {}) {
   const base: any = {
     sede: { findFirst: vi.fn().mockResolvedValue({ id: 20 }) },
@@ -121,7 +124,11 @@ function make(overrides: any = {}) {
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       count: vi.fn().mockResolvedValue(0),
     },
-    usuario: { findMany: vi.fn().mockResolvedValue([{ id: 7 }, { id: 8 }]) },
+    // findUnique lo usa DomainTransaction para revalidar al actor vigente.
+    usuario: {
+      findMany: vi.fn().mockResolvedValue([{ id: 7 }, { id: 8 }]),
+      findUnique: vi.fn(),
+    },
     notification: { createMany: vi.fn().mockResolvedValue({ count: 2 }) },
     outboxEvent: { createMany: vi.fn().mockResolvedValue({ count: 2 }) },
     acuseBiblioteca: {
@@ -134,6 +141,14 @@ function make(overrides: any = {}) {
       }),
     },
     $executeRaw: vi.fn().mockResolvedValue(1),
+    $queryRaw: vi.fn().mockResolvedValue([]),
+    recoveryWriteBarrier: {
+      findUnique: vi.fn().mockResolvedValue({ active: false }),
+    },
+    domainOperation: {
+      findUnique: vi.fn().mockResolvedValue(null),
+      create: vi.fn().mockResolvedValue(undefined),
+    },
   };
   const db: any = { ...base, ...(overrides.db ?? {}) };
   for (const key of [
@@ -165,13 +180,30 @@ function make(overrides: any = {}) {
       key === "LIBRARY_MAX_BYTES" ? 25 * 1024 * 1024 : undefined,
     ),
   };
+  const service: any = new LibraryService(
+    db,
+    storage as any,
+    audit as any,
+    config as any,
+  );
+  // Las pruebas ejercen las reglas de dominio: inyectan una clave fija y fijan al actor vigente.
+  for (const name of [
+    "create",
+    "createVersion",
+    "submitReview",
+    "review",
+    "publish",
+    "archive",
+    "acknowledge",
+  ]) {
+    const original = service[name].bind(service);
+    service[name] = (actor: AuthUser, ...args: unknown[]) => {
+      db.usuario.findUnique.mockResolvedValue(actor);
+      return original(actor, KEY, ...args);
+    };
+  }
   return {
-    service: new LibraryService(
-      db,
-      storage as any,
-      audit as any,
-      config as any,
-    ),
+    service,
     db,
     storage,
     audit,
@@ -662,5 +694,34 @@ describe("operational library contracts", () => {
     await expect(service.download(actor(), "bad")).rejects.toMatchObject({
       status: 400,
     });
+  });
+});
+
+describe("library durable intents", () => {
+  it("replays a recorded acknowledgement without a second effect", async () => {
+    const { service, db } = make();
+    db.domainOperation.findUnique.mockResolvedValue({
+      fingerprint: operationFingerprint({
+        op: "library:acknowledge",
+        id: versionId,
+      }),
+      response: { id: "ack-1" },
+    });
+    await expect(
+      service.acknowledge(actor({ rol: RolUsuario.PRESTADOR }), versionId),
+    ).resolves.toEqual({ id: "ack-1" });
+    expect(db.acuseBiblioteca.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects a key already used for a different library operation", async () => {
+    const { service, db } = make();
+    db.domainOperation.findUnique.mockResolvedValue({
+      fingerprint: "other",
+      response: {},
+    });
+    await expect(
+      service.acknowledge(actor({ rol: RolUsuario.PRESTADOR }), versionId),
+    ).rejects.toMatchObject({ status: 409 });
+    expect(db.acuseBiblioteca.create).not.toHaveBeenCalled();
   });
 });

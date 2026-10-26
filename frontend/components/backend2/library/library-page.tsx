@@ -140,7 +140,7 @@ export function LibraryPage() {
     setBusy(true);
     setError("");
     try {
-      await libraryApi.create(draft);
+      await libraryApi.create(user.id, draft);
       setDraft(emptyDraft);
       setShowCreate(false);
       setNotice("Documento creado como borrador.");
@@ -177,7 +177,7 @@ export function LibraryPage() {
     setBusy(true);
     setError("");
     try {
-      await libraryApi.createVersion(versionDocument.id, versionDraft);
+      await libraryApi.createVersion(user.id, versionDocument.id, versionDraft);
       setNotice("Nueva versión creada como borrador.");
       setVersionDraft({ archivoId: "", resumenCambios: "" });
       setVersionDocument(null);
@@ -522,7 +522,7 @@ export function LibraryPage() {
                       type="button"
                       onClick={() =>
                         void action(
-                          () => libraryApi.submitReview(version.id),
+                          () => libraryApi.submitReview(user.id, version.id),
                           "Versión enviada a revisión.",
                         )
                       }
@@ -538,7 +538,7 @@ export function LibraryPage() {
                         onClick={() =>
                           void action(
                             () =>
-                              libraryApi.review(version.id, {
+                              libraryApi.review(user.id, version.id, {
                                 decision: "APPROVE",
                               }),
                             "Revisión aprobada.",
@@ -557,7 +557,7 @@ export function LibraryPage() {
                           if (retroalimentacion)
                             void action(
                               () =>
-                                libraryApi.review(version.id, {
+                                libraryApi.review(user.id, version.id, {
                                   decision: "REQUEST_CHANGES",
                                   retroalimentacion,
                                 }),
@@ -590,7 +590,8 @@ export function LibraryPage() {
                             : undefined;
                           if (replacesPublished && !motivo) return;
                           void action(
-                            () => libraryApi.publish(version.id, motivo),
+                            () =>
+                              libraryApi.publish(user.id, version.id, motivo),
                             "Versión publicada.",
                           );
                         }}
@@ -628,7 +629,7 @@ export function LibraryPage() {
                     window.confirm("¿Confirmas archivar este documento?")
                   )
                     void action(
-                      () => libraryApi.archive(selected.id, motivo),
+                      () => libraryApi.archive(user.id, selected.id, motivo),
                       "Documento archivado.",
                     );
                 }}

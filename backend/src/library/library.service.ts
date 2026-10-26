@@ -7,6 +7,7 @@ import {
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { randomUUID } from "node:crypto";
+import { DomainTransaction } from "../common/domain/domain-transaction";
 import { notificationContracts } from "../common/domain/operational-notification";
 import { AuditService } from "../auth/audit.service";
 import type { AuthUser } from "../auth/auth-user";
@@ -57,6 +58,21 @@ export class LibraryService {
     private readonly audit: AuditService,
     private readonly config: ConfigService<Environment, true>,
   ) {}
+
+  // Intención durable por actor+clave: efecto, auditoría y recibo atómicos.
+  private run<T>(
+    actor: AuthUser,
+    key: string,
+    operation: object,
+    apply: Parameters<DomainTransaction["run"]>[3],
+  ) {
+    return new DomainTransaction(this.prisma).run(
+      actor,
+      key,
+      operation,
+      apply,
+    ) as Promise<T>;
+  }
 
   private active(actor: AuthUser) {
     if (actor.estado !== EstadoUsuario.ACTIVA) throw new ForbiddenException();
@@ -323,119 +339,135 @@ export class LibraryService {
     return document;
   }
 
-  async create(actor: AuthUser, input: CreateLibraryDocumentInput) {
+  async create(
+    actor: AuthUser,
+    key: string,
+    input: CreateLibraryDocumentInput,
+  ) {
     const target = this.target(input);
     await this.assertTarget(actor, Permission.LIBRARY_DRAFT_CREATE, target);
-    return this.prisma.$transaction(async (tx) => {
-      await tx.$executeRaw`SELECT id FROM Archivo WHERE id = ${input.archivoId} FOR UPDATE`;
-      await this.file(actor, input.archivoId, tx);
-      const document = await tx.documentoBiblioteca.create({
-        data: {
-          titulo: input.titulo,
-          descripcion: input.descripcion,
-          categoria: input.categoria,
-          alcance: target.alcance,
-          requiereAcuse: input.requiereAcuse,
-          sedeId: target.sedeId,
-          areaId: target.areaId,
-          proyectoId: target.proyectoId,
-          creadoPorId: actor.id,
-          versiones: {
-            create: {
-              numero: 1,
-              archivoId: input.archivoId,
-              autorId: actor.id,
-              resumenCambios: input.resumenCambios,
-              vigenteDesde: input.vigenteDesde
-                ? new Date(input.vigenteDesde)
-                : null,
-              vigenteHasta: input.vigenteHasta
-                ? new Date(input.vigenteHasta)
-                : null,
+    return this.run<any>(
+      actor,
+      key,
+      { op: "library:create", input },
+      async (tx) => {
+        await tx.$executeRaw`SELECT id FROM Archivo WHERE id = ${input.archivoId} FOR UPDATE`;
+        await this.file(actor, input.archivoId, tx);
+        const document = await tx.documentoBiblioteca.create({
+          data: {
+            titulo: input.titulo,
+            descripcion: input.descripcion,
+            categoria: input.categoria,
+            alcance: target.alcance,
+            requiereAcuse: input.requiereAcuse,
+            sedeId: target.sedeId,
+            areaId: target.areaId,
+            proyectoId: target.proyectoId,
+            creadoPorId: actor.id,
+            versiones: {
+              create: {
+                numero: 1,
+                archivoId: input.archivoId,
+                autorId: actor.id,
+                resumenCambios: input.resumenCambios,
+                vigenteDesde: input.vigenteDesde
+                  ? new Date(input.vigenteDesde)
+                  : null,
+                vigenteHasta: input.vigenteHasta
+                  ? new Date(input.vigenteHasta)
+                  : null,
+              },
             },
           },
-        },
-        include: { versiones: true },
-      });
-      await this.audit.append(
-        {
-          actorId: actor.id,
-          subjectId: actor.id,
-          action: "LIBRARY_DOCUMENT_CREATED",
-          resource: "library_document",
-          correlationId: document.id,
-          metadata: { alcance: target.alcance, categoria: input.categoria },
-        },
-        tx,
-      );
-      return document;
-    });
+          include: { versiones: true },
+        });
+        await this.audit.append(
+          {
+            actorId: actor.id,
+            subjectId: actor.id,
+            action: "LIBRARY_DOCUMENT_CREATED",
+            resource: "library_document",
+            correlationId: document.id,
+            metadata: { alcance: target.alcance, categoria: input.categoria },
+          },
+          tx,
+        );
+        return document;
+      },
+    );
   }
 
   async createVersion(
     actor: AuthUser,
+    key: string,
     documentId: string,
     input: CreateLibraryVersionInput,
   ) {
     this.id(documentId);
-    return this.prisma.$transaction(async (tx) => {
-      await tx.$executeRaw`SELECT id FROM DocumentoBiblioteca WHERE id = ${documentId} FOR UPDATE`;
-      const document = await tx.documentoBiblioteca.findUnique({
-        where: { id: documentId },
-      });
-      if (!document) throw new NotFoundException("LIBRARY_DOCUMENT_NOT_FOUND");
-      await this.assertTarget(
-        actor,
-        Permission.LIBRARY_DRAFT_CREATE,
-        this.target(document),
-        tx,
-      );
-      if (document.estado === EstadoBiblioteca.ARCHIVADO)
-        throw new ConflictException("LIBRARY_DOCUMENT_ARCHIVED");
-      const open = await tx.versionBiblioteca.findFirst({
-        where: {
-          documentoId: documentId,
-          estado: {
-            in: [EstadoBiblioteca.BORRADOR, EstadoBiblioteca.EN_REVISION],
+    return this.run<any>(
+      actor,
+      key,
+      { op: "library:create-version", documentId, input },
+      async (tx) => {
+        await tx.$executeRaw`SELECT id FROM DocumentoBiblioteca WHERE id = ${documentId} FOR UPDATE`;
+        const document = await tx.documentoBiblioteca.findUnique({
+          where: { id: documentId },
+        });
+        if (!document)
+          throw new NotFoundException("LIBRARY_DOCUMENT_NOT_FOUND");
+        await this.assertTarget(
+          actor,
+          Permission.LIBRARY_DRAFT_CREATE,
+          this.target(document),
+          tx,
+        );
+        if (document.estado === EstadoBiblioteca.ARCHIVADO)
+          throw new ConflictException("LIBRARY_DOCUMENT_ARCHIVED");
+        const open = await tx.versionBiblioteca.findFirst({
+          where: {
+            documentoId: documentId,
+            estado: {
+              in: [EstadoBiblioteca.BORRADOR, EstadoBiblioteca.EN_REVISION],
+            },
           },
-        },
-        select: { id: true },
-      });
-      if (open) throw new ConflictException("LIBRARY_OPEN_VERSION_EXISTS");
-      await tx.$executeRaw`SELECT id FROM Archivo WHERE id = ${input.archivoId} FOR UPDATE`;
-      await this.file(actor, input.archivoId, tx);
-      const latest = await tx.versionBiblioteca.aggregate({
-        where: { documentoId: documentId },
-        _max: { numero: true },
-      });
-      const version = await tx.versionBiblioteca.create({
-        data: {
-          documentoId: documentId,
-          numero: (latest._max.numero ?? 0) + 1,
-          archivoId: input.archivoId,
-          autorId: actor.id,
-          resumenCambios: input.resumenCambios,
-          vigenteDesde: input.vigenteDesde
-            ? new Date(input.vigenteDesde)
-            : null,
-          vigenteHasta: input.vigenteHasta
-            ? new Date(input.vigenteHasta)
-            : null,
-        },
-      });
-      await this.audit.append(
-        {
-          actorId: actor.id,
-          subjectId: actor.id,
-          action: "LIBRARY_VERSION_CREATED",
-          resource: "library_version",
-          correlationId: version.id,
-          metadata: { documentId, numero: version.numero },
-        },
-        tx,
-      );
-      return version;
-    });
+          select: { id: true },
+        });
+        if (open) throw new ConflictException("LIBRARY_OPEN_VERSION_EXISTS");
+        await tx.$executeRaw`SELECT id FROM Archivo WHERE id = ${input.archivoId} FOR UPDATE`;
+        await this.file(actor, input.archivoId, tx);
+        const latest = await tx.versionBiblioteca.aggregate({
+          where: { documentoId: documentId },
+          _max: { numero: true },
+        });
+        const version = await tx.versionBiblioteca.create({
+          data: {
+            documentoId: documentId,
+            numero: (latest._max.numero ?? 0) + 1,
+            archivoId: input.archivoId,
+            autorId: actor.id,
+            resumenCambios: input.resumenCambios,
+            vigenteDesde: input.vigenteDesde
+              ? new Date(input.vigenteDesde)
+              : null,
+            vigenteHasta: input.vigenteHasta
+              ? new Date(input.vigenteHasta)
+              : null,
+          },
+        });
+        await this.audit.append(
+          {
+            actorId: actor.id,
+            subjectId: actor.id,
+            action: "LIBRARY_VERSION_CREATED",
+            resource: "library_version",
+            correlationId: version.id,
+            metadata: { documentId, numero: version.numero },
+          },
+          tx,
+        );
+        return version;
+      },
+    );
   }
 
   private async workflowVersion(client: any, id: string) {
@@ -448,80 +480,32 @@ export class LibraryService {
     return version;
   }
 
-  async submitReview(actor: AuthUser, id: string) {
-    return this.prisma.$transaction(async (tx) => {
-      await tx.$executeRaw`SELECT id FROM VersionBiblioteca WHERE id = ${id} FOR UPDATE`;
-      const version = await this.workflowVersion(tx, id);
-      await this.assertTarget(
-        actor,
-        Permission.LIBRARY_DRAFT_CREATE,
-        this.target(version.documento),
-        tx,
-      );
-      if (version.estado !== EstadoBiblioteca.BORRADOR)
-        throw new ConflictException("LIBRARY_VERSION_NOT_DRAFT");
-      const updated = await tx.versionBiblioteca.update({
-        where: { id },
-        data: {
-          estado: EstadoBiblioteca.EN_REVISION,
-          submittedAt: new Date(),
-          revisadoPorId: null,
-          reviewedAt: null,
-          retroalimentacion: null,
-        },
-      });
-      const published = await tx.versionBiblioteca.count({
-        where: {
-          documentoId: version.documentoId,
-          estado: EstadoBiblioteca.PUBLICADO,
-        },
-      });
-      if (!published)
-        await tx.documentoBiblioteca.update({
-          where: { id: version.documentoId },
-          data: { estado: EstadoBiblioteca.EN_REVISION },
+  async submitReview(actor: AuthUser, key: string, id: string) {
+    return this.run<any>(
+      actor,
+      key,
+      { op: "library:submit-review", id },
+      async (tx) => {
+        await tx.$executeRaw`SELECT id FROM VersionBiblioteca WHERE id = ${id} FOR UPDATE`;
+        const version = await this.workflowVersion(tx, id);
+        await this.assertTarget(
+          actor,
+          Permission.LIBRARY_DRAFT_CREATE,
+          this.target(version.documento),
+          tx,
+        );
+        if (version.estado !== EstadoBiblioteca.BORRADOR)
+          throw new ConflictException("LIBRARY_VERSION_NOT_DRAFT");
+        const updated = await tx.versionBiblioteca.update({
+          where: { id },
+          data: {
+            estado: EstadoBiblioteca.EN_REVISION,
+            submittedAt: new Date(),
+            revisadoPorId: null,
+            reviewedAt: null,
+            retroalimentacion: null,
+          },
         });
-      await this.audit.append(
-        {
-          actorId: actor.id,
-          subjectId: version.autorId,
-          action: "LIBRARY_VERSION_SUBMITTED",
-          resource: "library_version",
-          correlationId: id,
-        },
-        tx,
-      );
-      return updated;
-    });
-  }
-
-  async review(actor: AuthUser, id: string, input: ReviewLibraryVersionInput) {
-    return this.prisma.$transaction(async (tx) => {
-      await tx.$executeRaw`SELECT id FROM VersionBiblioteca WHERE id = ${id} FOR UPDATE`;
-      const version = await this.workflowVersion(tx, id);
-      await this.assertTarget(
-        actor,
-        Permission.LIBRARY_REVIEW,
-        this.target(version.documento),
-        tx,
-      );
-      if (version.estado !== EstadoBiblioteca.EN_REVISION)
-        throw new ConflictException("LIBRARY_VERSION_NOT_IN_REVIEW");
-      if (version.autorId === actor.id)
-        throw new ConflictException("LIBRARY_AUTHOR_CANNOT_REVIEW");
-      const approved = input.decision === "APPROVE";
-      const updated = await tx.versionBiblioteca.update({
-        where: { id },
-        data: {
-          estado: approved
-            ? EstadoBiblioteca.EN_REVISION
-            : EstadoBiblioteca.BORRADOR,
-          revisadoPorId: actor.id,
-          reviewedAt: new Date(),
-          retroalimentacion: input.retroalimentacion ?? null,
-        },
-      });
-      if (!approved) {
         const published = await tx.versionBiblioteca.count({
           where: {
             documentoId: version.documentoId,
@@ -531,24 +515,87 @@ export class LibraryService {
         if (!published)
           await tx.documentoBiblioteca.update({
             where: { id: version.documentoId },
-            data: { estado: EstadoBiblioteca.BORRADOR },
+            data: { estado: EstadoBiblioteca.EN_REVISION },
           });
-      }
-      await this.audit.append(
-        {
-          actorId: actor.id,
-          subjectId: version.autorId,
-          action: approved
-            ? "LIBRARY_VERSION_REVIEWED"
-            : "LIBRARY_VERSION_CHANGES_REQUESTED",
-          resource: "library_version",
-          correlationId: id,
-          metadata: { decision: input.decision },
-        },
-        tx,
-      );
-      return updated;
-    });
+        await this.audit.append(
+          {
+            actorId: actor.id,
+            subjectId: version.autorId,
+            action: "LIBRARY_VERSION_SUBMITTED",
+            resource: "library_version",
+            correlationId: id,
+          },
+          tx,
+        );
+        return updated;
+      },
+    );
+  }
+
+  async review(
+    actor: AuthUser,
+    key: string,
+    id: string,
+    input: ReviewLibraryVersionInput,
+  ) {
+    return this.run<any>(
+      actor,
+      key,
+      { op: "library:review", id, input },
+      async (tx) => {
+        await tx.$executeRaw`SELECT id FROM VersionBiblioteca WHERE id = ${id} FOR UPDATE`;
+        const version = await this.workflowVersion(tx, id);
+        await this.assertTarget(
+          actor,
+          Permission.LIBRARY_REVIEW,
+          this.target(version.documento),
+          tx,
+        );
+        if (version.estado !== EstadoBiblioteca.EN_REVISION)
+          throw new ConflictException("LIBRARY_VERSION_NOT_IN_REVIEW");
+        if (version.autorId === actor.id)
+          throw new ConflictException("LIBRARY_AUTHOR_CANNOT_REVIEW");
+        const approved = input.decision === "APPROVE";
+        const updated = await tx.versionBiblioteca.update({
+          where: { id },
+          data: {
+            estado: approved
+              ? EstadoBiblioteca.EN_REVISION
+              : EstadoBiblioteca.BORRADOR,
+            revisadoPorId: actor.id,
+            reviewedAt: new Date(),
+            retroalimentacion: input.retroalimentacion ?? null,
+          },
+        });
+        if (!approved) {
+          const published = await tx.versionBiblioteca.count({
+            where: {
+              documentoId: version.documentoId,
+              estado: EstadoBiblioteca.PUBLICADO,
+            },
+          });
+          if (!published)
+            await tx.documentoBiblioteca.update({
+              where: { id: version.documentoId },
+              data: { estado: EstadoBiblioteca.BORRADOR },
+            });
+        }
+        await this.audit.append(
+          {
+            actorId: actor.id,
+            subjectId: version.autorId,
+            action: approved
+              ? "LIBRARY_VERSION_REVIEWED"
+              : "LIBRARY_VERSION_CHANGES_REQUESTED",
+            resource: "library_version",
+            correlationId: id,
+            metadata: { decision: input.decision },
+          },
+          tx,
+        );
+        return updated;
+      },
+    );
   }
 
   private async recipients(client: any, document: ScopeTarget) {
@@ -579,161 +626,173 @@ export class LibraryService {
 
   async publish(
     actor: AuthUser,
+    key: string,
     id: string,
     input: PublishLibraryVersionInput,
   ) {
-    return this.prisma.$transaction(async (tx) => {
-      await tx.$executeRaw`SELECT id FROM VersionBiblioteca WHERE id = ${id} FOR UPDATE`;
-      const version = await this.workflowVersion(tx, id);
-      await tx.$executeRaw`SELECT id FROM DocumentoBiblioteca WHERE id = ${version.documentoId} FOR UPDATE`;
-      await this.assertTarget(
-        actor,
-        Permission.LIBRARY_PUBLISH,
-        this.target(version.documento),
-        tx,
-      );
-      if (
-        version.estado !== EstadoBiblioteca.EN_REVISION ||
-        !version.revisadoPorId ||
-        !version.reviewedAt
-      )
-        throw new ConflictException("LIBRARY_VERSION_NOT_APPROVED");
-      const previous = await tx.versionBiblioteca.findFirst({
-        where: {
-          documentoId: version.documentoId,
-          estado: EstadoBiblioteca.PUBLICADO,
-          id: { not: id },
-        },
-      });
-      if (previous && !input.motivoSustitucion)
-        throw new BadRequestException("LIBRARY_REPLACEMENT_REASON_REQUIRED");
-      const now = new Date();
-      if (
-        (version.vigenteDesde && version.vigenteDesde > now) ||
-        (version.vigenteHasta && version.vigenteHasta <= now)
-      )
-        throw new BadRequestException(
-          "LIBRARY_VERSION_OUTSIDE_EFFECTIVE_WINDOW",
+    return this.run<any>(
+      actor,
+      key,
+      { op: "library:publish", id, input },
+      async (tx) => {
+        await tx.$executeRaw`SELECT id FROM VersionBiblioteca WHERE id = ${id} FOR UPDATE`;
+        const version = await this.workflowVersion(tx, id);
+        await tx.$executeRaw`SELECT id FROM DocumentoBiblioteca WHERE id = ${version.documentoId} FOR UPDATE`;
+        await this.assertTarget(
+          actor,
+          Permission.LIBRARY_PUBLISH,
+          this.target(version.documento),
+          tx,
         );
-      if (previous)
-        await tx.versionBiblioteca.update({
-          where: { id: previous.id },
-          data: {
-            estado: EstadoBiblioteca.ARCHIVADO,
-            archivedAt: now,
-            vigenteHasta:
-              previous.vigenteHasta && previous.vigenteHasta < now
-                ? previous.vigenteHasta
-                : now,
-            motivoSustitucion: input.motivoSustitucion,
+        if (
+          version.estado !== EstadoBiblioteca.EN_REVISION ||
+          !version.revisadoPorId ||
+          !version.reviewedAt
+        )
+          throw new ConflictException("LIBRARY_VERSION_NOT_APPROVED");
+        const previous = await tx.versionBiblioteca.findFirst({
+          where: {
+            documentoId: version.documentoId,
+            estado: EstadoBiblioteca.PUBLICADO,
+            id: { not: id },
           },
         });
-      const published = await tx.versionBiblioteca.update({
-        where: { id },
-        data: {
-          estado: EstadoBiblioteca.PUBLICADO,
-          publicadoPorId: actor.id,
-          publishedAt: now,
-          vigenteDesde: version.vigenteDesde ?? now,
-          motivoSustitucion: input.motivoSustitucion ?? null,
-        },
-      });
-      await tx.documentoBiblioteca.update({
-        where: { id: version.documentoId },
-        data: {
-          estado: EstadoBiblioteca.PUBLICADO,
-          motivoArchivo: null,
-          archivadoAt: null,
-          archivadoPorId: null,
-        },
-      });
-      const recipientIds = await this.recipients(
-        tx,
-        this.target(version.documento),
-      );
-      if (recipientIds.length) {
-        const notices = recipientIds.map((userId: number) => ({
-          id: randomUUID(),
-          userId,
-          type: "LIBRARY_PUBLISHED",
-          payload: notificationContracts.LIBRARY_PUBLISHED.parse({
-            documentId: version.documentoId,
-            versionId: id,
-            requiresAcknowledgement: version.documento.requiereAcuse,
-          }),
-        }));
-        await tx.notification.createMany({
-          data: notices,
+        if (previous && !input.motivoSustitucion)
+          throw new BadRequestException("LIBRARY_REPLACEMENT_REASON_REQUIRED");
+        const now = new Date();
+        if (
+          (version.vigenteDesde && version.vigenteDesde > now) ||
+          (version.vigenteHasta && version.vigenteHasta <= now)
+        )
+          throw new BadRequestException(
+            "LIBRARY_VERSION_OUTSIDE_EFFECTIVE_WINDOW",
+          );
+        if (previous)
+          await tx.versionBiblioteca.update({
+            where: { id: previous.id },
+            data: {
+              estado: EstadoBiblioteca.ARCHIVADO,
+              archivedAt: now,
+              vigenteHasta:
+                previous.vigenteHasta && previous.vigenteHasta < now
+                  ? previous.vigenteHasta
+                  : now,
+              motivoSustitucion: input.motivoSustitucion,
+            },
+          });
+        const published = await tx.versionBiblioteca.update({
+          where: { id },
+          data: {
+            estado: EstadoBiblioteca.PUBLICADO,
+            publicadoPorId: actor.id,
+            publishedAt: now,
+            vigenteDesde: version.vigenteDesde ?? now,
+            motivoSustitucion: input.motivoSustitucion ?? null,
+          },
         });
-        await tx.outboxEvent.createMany({
-          data: notices.map((notice: { id: string }) => ({
-            type: "OPERATIONAL_NOTIFICATION",
-            aggregateId: notice.id,
-            payload: { notificationId: notice.id },
-          })),
+        await tx.documentoBiblioteca.update({
+          where: { id: version.documentoId },
+          data: {
+            estado: EstadoBiblioteca.PUBLICADO,
+            motivoArchivo: null,
+            archivadoAt: null,
+            archivadoPorId: null,
+          },
         });
-      }
-      await this.audit.append(
-        {
-          actorId: actor.id,
-          subjectId: version.autorId,
-          action: "LIBRARY_VERSION_PUBLISHED",
-          resource: "library_version",
-          correlationId: id,
-          metadata: { replacedVersionId: previous?.id ?? null },
-        },
-        tx,
-      );
-      return published;
-    });
+        const recipientIds = await this.recipients(
+          tx,
+          this.target(version.documento),
+        );
+        if (recipientIds.length) {
+          const notices = recipientIds.map((userId: number) => ({
+            id: randomUUID(),
+            userId,
+            type: "LIBRARY_PUBLISHED",
+            payload: notificationContracts.LIBRARY_PUBLISHED.parse({
+              documentId: version.documentoId,
+              versionId: id,
+              requiresAcknowledgement: version.documento.requiereAcuse,
+            }),
+          }));
+          await tx.notification.createMany({
+            data: notices,
+          });
+          await tx.outboxEvent.createMany({
+            data: notices.map((notice: { id: string }) => ({
+              type: "OPERATIONAL_NOTIFICATION",
+              aggregateId: notice.id,
+              payload: { notificationId: notice.id },
+            })),
+          });
+        }
+        await this.audit.append(
+          {
+            actorId: actor.id,
+            subjectId: version.autorId,
+            action: "LIBRARY_VERSION_PUBLISHED",
+            resource: "library_version",
+            correlationId: id,
+            metadata: { replacedVersionId: previous?.id ?? null },
+          },
+          tx,
+        );
+        return published;
+      },
+    );
   }
 
-  async archive(actor: AuthUser, id: string, reason: string) {
+  async archive(actor: AuthUser, key: string, id: string, reason: string) {
     this.id(id);
-    return this.prisma.$transaction(async (tx) => {
-      await tx.$executeRaw`SELECT id FROM DocumentoBiblioteca WHERE id = ${id} FOR UPDATE`;
-      const document = await tx.documentoBiblioteca.findUnique({
-        where: { id },
-      });
-      if (!document) throw new NotFoundException("LIBRARY_DOCUMENT_NOT_FOUND");
-      await this.assertTarget(
-        actor,
-        Permission.LIBRARY_ARCHIVE,
-        this.target(document),
-        tx,
-      );
-      if (document.estado === EstadoBiblioteca.ARCHIVADO)
-        throw new ConflictException("LIBRARY_DOCUMENT_ARCHIVED");
-      const now = new Date();
-      await tx.versionBiblioteca.updateMany({
-        where: {
-          documentoId: id,
-          estado: { not: EstadoBiblioteca.ARCHIVADO },
-        },
-        data: { estado: EstadoBiblioteca.ARCHIVADO, archivedAt: now },
-      });
-      const archived = await tx.documentoBiblioteca.update({
-        where: { id },
-        data: {
-          estado: EstadoBiblioteca.ARCHIVADO,
-          motivoArchivo: reason,
-          archivadoPorId: actor.id,
-          archivadoAt: now,
-        },
-      });
-      await this.audit.append(
-        {
-          actorId: actor.id,
-          subjectId: document.creadoPorId,
-          action: "LIBRARY_DOCUMENT_ARCHIVED",
-          resource: "library_document",
-          correlationId: id,
-          metadata: { reason },
-        },
-        tx,
-      );
-      return archived;
-    });
+    return this.run<any>(
+      actor,
+      key,
+      { op: "library:archive", id, reason },
+      async (tx) => {
+        await tx.$executeRaw`SELECT id FROM DocumentoBiblioteca WHERE id = ${id} FOR UPDATE`;
+        const document = await tx.documentoBiblioteca.findUnique({
+          where: { id },
+        });
+        if (!document)
+          throw new NotFoundException("LIBRARY_DOCUMENT_NOT_FOUND");
+        await this.assertTarget(
+          actor,
+          Permission.LIBRARY_ARCHIVE,
+          this.target(document),
+          tx,
+        );
+        if (document.estado === EstadoBiblioteca.ARCHIVADO)
+          throw new ConflictException("LIBRARY_DOCUMENT_ARCHIVED");
+        const now = new Date();
+        await tx.versionBiblioteca.updateMany({
+          where: {
+            documentoId: id,
+            estado: { not: EstadoBiblioteca.ARCHIVADO },
+          },
+          data: { estado: EstadoBiblioteca.ARCHIVADO, archivedAt: now },
+        });
+        const archived = await tx.documentoBiblioteca.update({
+          where: { id },
+          data: {
+            estado: EstadoBiblioteca.ARCHIVADO,
+            motivoArchivo: reason,
+            archivadoPorId: actor.id,
+            archivadoAt: now,
+          },
+        });
+        await this.audit.append(
+          {
+            actorId: actor.id,
+            subjectId: document.creadoPorId,
+            action: "LIBRARY_DOCUMENT_ARCHIVED",
+            resource: "library_document",
+            correlationId: id,
+            metadata: { reason },
+          },
+          tx,
+        );
+        return archived;
+      },
+    );
   }
 
   private async readableVersion(actor: AuthUser, id: string) {
@@ -812,45 +871,52 @@ export class LibraryService {
     );
   }
 
-  async acknowledge(actor: AuthUser, id: string) {
+  async acknowledge(actor: AuthUser, key: string, id: string) {
     this.permission(actor, Permission.LIBRARY_ACKNOWLEDGE);
-    return this.prisma.$transaction(async (tx) => {
-      await tx.$executeRaw`SELECT id FROM VersionBiblioteca WHERE id = ${id} FOR UPDATE`;
-      const version = await tx.versionBiblioteca.findUnique({
-        where: { id },
-        include: { documento: true },
-      });
-      if (
-        !version ||
-        version.estado !== EstadoBiblioteca.PUBLICADO ||
-        !version.documento.requiereAcuse ||
-        !this.isEffective(version)
-      )
-        throw new NotFoundException("LIBRARY_VERSION_NOT_FOUND");
-      const visible = await tx.documentoBiblioteca.findFirst({
-        where: { id: version.documentoId, ...this.visibility(actor) },
-        select: { id: true },
-      });
-      if (!visible) throw new NotFoundException("LIBRARY_VERSION_NOT_FOUND");
-      const existing = await tx.acuseBiblioteca.findUnique({
-        where: { versionId_usuarioId: { versionId: id, usuarioId: actor.id } },
-      });
-      if (existing) return existing;
-      const acknowledgement = await tx.acuseBiblioteca.create({
-        data: { versionId: id, usuarioId: actor.id },
-      });
-      await this.audit.append(
-        {
-          actorId: actor.id,
-          subjectId: actor.id,
-          action: "LIBRARY_VERSION_ACKNOWLEDGED",
-          resource: "library_version",
-          correlationId: id,
-          metadata: { legalAcceptance: false },
-        },
-        tx,
-      );
-      return acknowledgement;
-    });
+    return this.run<any>(
+      actor,
+      key,
+      { op: "library:acknowledge", id },
+      async (tx) => {
+        await tx.$executeRaw`SELECT id FROM VersionBiblioteca WHERE id = ${id} FOR UPDATE`;
+        const version = await tx.versionBiblioteca.findUnique({
+          where: { id },
+          include: { documento: true },
+        });
+        if (
+          !version ||
+          version.estado !== EstadoBiblioteca.PUBLICADO ||
+          !version.documento.requiereAcuse ||
+          !this.isEffective(version)
+        )
+          throw new NotFoundException("LIBRARY_VERSION_NOT_FOUND");
+        const visible = await tx.documentoBiblioteca.findFirst({
+          where: { id: version.documentoId, ...this.visibility(actor) },
+          select: { id: true },
+        });
+        if (!visible) throw new NotFoundException("LIBRARY_VERSION_NOT_FOUND");
+        const existing = await tx.acuseBiblioteca.findUnique({
+          where: {
+            versionId_usuarioId: { versionId: id, usuarioId: actor.id },
+          },
+        });
+        if (existing) return existing;
+        const acknowledgement = await tx.acuseBiblioteca.create({
+          data: { versionId: id, usuarioId: actor.id },
+        });
+        await this.audit.append(
+          {
+            actorId: actor.id,
+            subjectId: actor.id,
+            action: "LIBRARY_VERSION_ACKNOWLEDGED",
+            resource: "library_version",
+            correlationId: id,
+            metadata: { legalAcceptance: false },
+          },
+          tx,
+        );
+        return acknowledgement;
+      },
+    );
   }
 }
