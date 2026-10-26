@@ -44,6 +44,9 @@
     },
     "prisma": {
       "mysql2": "3.24.5"
+    },
+    "@nestjs/platform-express": {
+      "multer": "2.5.0"
     }
   },
   "allowScripts": {
