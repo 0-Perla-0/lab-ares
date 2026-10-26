@@ -7,6 +7,7 @@ import {
 } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 import { AuditService } from "../auth/audit.service";
+import { DomainTransaction } from "../common/domain/domain-transaction";
 import type { AuthUser } from "../auth/auth-user";
 import { getAccessScope, Permission } from "../auth/permissions";
 import { PrismaService } from "../database/prisma.service";
@@ -36,6 +37,21 @@ export class PublicContentService {
     private readonly storage: S3Storage,
     private readonly audit: AuditService,
   ) {}
+
+  // Intención durable por actor+clave: efecto, auditoría y recibo se confirman en una sola transacción.
+  private run<T>(
+    actor: AuthUser,
+    key: string,
+    operation: object,
+    apply: Parameters<DomainTransaction["run"]>[3],
+  ) {
+    return new DomainTransaction(this.prisma).run(
+      actor,
+      key,
+      operation,
+      apply,
+    ) as Promise<T>;
+  }
 
   private require(actor: AuthUser, permission: Permission) {
     if (
@@ -234,45 +250,54 @@ export class PublicContentService {
     return page;
   }
 
-  async createPage(actor: AuthUser, input: CreatePublicPageInput) {
+  async createPage(actor: AuthUser, key: string, input: CreatePublicPageInput) {
     this.require(actor, Permission.PUBLIC_CONTENT_DRAFT);
     await this.assertAssets(input.bloques);
     try {
-      return await this.prisma.$transaction(async (tx) => {
-        const page = await tx.paginaPublica.create({
-          data: {
-            slug: input.slug,
-            titulo: input.titulo,
-            creadoPorId: actor.id,
-            versiones: {
-              create: {
-                numero: 1,
-                autorId: actor.id,
-                titulo: input.titulo,
-                resumenCambios: input.resumenCambios,
-                seoTitulo: input.seoTitulo,
-                seoDescripcion: input.seoDescripcion,
-                bloques: {
-                  create: input.bloques.map((b) => this.blockData(b)),
+      return await this.run<any>(
+        actor,
+        key,
+        { op: "public-content:create-page", input },
+        async (tx) => {
+          if (
+            await tx.paginaPublica.findUnique({ where: { slug: input.slug } })
+          )
+            throw new ConflictException("PUBLIC_PAGE_ALREADY_EXISTS");
+          const page = await tx.paginaPublica.create({
+            data: {
+              slug: input.slug,
+              titulo: input.titulo,
+              creadoPorId: actor.id,
+              versiones: {
+                create: {
+                  numero: 1,
+                  autorId: actor.id,
+                  titulo: input.titulo,
+                  resumenCambios: input.resumenCambios,
+                  seoTitulo: input.seoTitulo,
+                  seoDescripcion: input.seoDescripcion,
+                  bloques: {
+                    create: input.bloques.map((b) => this.blockData(b)),
+                  },
                 },
               },
             },
-          },
-          include: { versiones: { include: { bloques: true } } },
-        });
-        await this.audit.append(
-          {
-            actorId: actor.id,
-            subjectId: actor.id,
-            action: "PUBLIC_PAGE_CREATED",
-            resource: "public_page",
-            correlationId: page.id,
-            metadata: { slug: page.slug, version: 1 },
-          },
-          tx,
-        );
-        return page;
-      });
+            include: { versiones: { include: { bloques: true } } },
+          });
+          await this.audit.append(
+            {
+              actorId: actor.id,
+              subjectId: actor.id,
+              action: "PUBLIC_PAGE_CREATED",
+              resource: "public_page",
+              correlationId: page.id,
+              metadata: { slug: page.slug, version: 1 },
+            },
+            tx,
+          );
+          return page;
+        },
+      );
     } catch (error: any) {
       if (error?.code === "P2002")
         throw new ConflictException("PUBLIC_PAGE_ALREADY_EXISTS");
@@ -282,163 +307,188 @@ export class PublicContentService {
 
   async createVersion(
     actor: AuthUser,
+    key: string,
     pageId: string,
     input: CreatePublicVersionInput,
   ) {
     this.require(actor, Permission.PUBLIC_CONTENT_DRAFT);
     this.id(pageId);
     await this.assertAssets(input.bloques);
-    return this.prisma.$transaction(async (tx) => {
-      await tx.$executeRaw`SELECT id FROM PaginaPublica WHERE id = ${pageId} FOR UPDATE`;
-      const page = await tx.paginaPublica.findUnique({ where: { id: pageId } });
-      if (!page) throw new NotFoundException("PUBLIC_PAGE_NOT_FOUND");
-      if (page.estado === EstadoContenidoPublico.ARCHIVADO)
-        throw new ConflictException("PUBLIC_PAGE_ARCHIVED");
-      const open = await tx.versionContenidoPublico.findFirst({
-        where: { paginaId: pageId, estado: EstadoContenidoPublico.BORRADOR },
-        select: { id: true },
-      });
-      if (open) throw new ConflictException("PUBLIC_DRAFT_ALREADY_EXISTS");
-      const latest = await tx.versionContenidoPublico.aggregate({
-        where: { paginaId: pageId },
-        _max: { numero: true },
-      });
-      const version = await tx.versionContenidoPublico.create({
-        data: {
-          paginaId: pageId,
-          numero: (latest._max.numero ?? 0) + 1,
-          autorId: actor.id,
-          titulo: input.titulo,
-          resumenCambios: input.resumenCambios,
-          seoTitulo: input.seoTitulo,
-          seoDescripcion: input.seoDescripcion,
-          bloques: { create: input.bloques.map((b) => this.blockData(b)) },
-        },
-        include: { bloques: true },
-      });
-      await this.audit.append(
-        {
-          actorId: actor.id,
-          subjectId: actor.id,
-          action: "PUBLIC_CONTENT_VERSION_CREATED",
-          resource: "public_content_version",
-          correlationId: version.id,
-          metadata: { pageId, version: version.numero },
-        },
-        tx,
-      );
-      return version;
-    });
+    return this.run<any>(
+      actor,
+      key,
+      { op: "public-content:create-version", pageId, input },
+      async (tx) => {
+        await tx.$executeRaw`SELECT id FROM PaginaPublica WHERE id = ${pageId} FOR UPDATE`;
+        const page = await tx.paginaPublica.findUnique({
+          where: { id: pageId },
+        });
+        if (!page) throw new NotFoundException("PUBLIC_PAGE_NOT_FOUND");
+        if (page.estado === EstadoContenidoPublico.ARCHIVADO)
+          throw new ConflictException("PUBLIC_PAGE_ARCHIVED");
+        const open = await tx.versionContenidoPublico.findFirst({
+          where: { paginaId: pageId, estado: EstadoContenidoPublico.BORRADOR },
+          select: { id: true },
+        });
+        if (open) throw new ConflictException("PUBLIC_DRAFT_ALREADY_EXISTS");
+        const latest = await tx.versionContenidoPublico.aggregate({
+          where: { paginaId: pageId },
+          _max: { numero: true },
+        });
+        const version = await tx.versionContenidoPublico.create({
+          data: {
+            paginaId: pageId,
+            numero: (latest._max.numero ?? 0) + 1,
+            autorId: actor.id,
+            titulo: input.titulo,
+            resumenCambios: input.resumenCambios,
+            seoTitulo: input.seoTitulo,
+            seoDescripcion: input.seoDescripcion,
+            bloques: { create: input.bloques.map((b) => this.blockData(b)) },
+          },
+          include: { bloques: true },
+        });
+        await this.audit.append(
+          {
+            actorId: actor.id,
+            subjectId: actor.id,
+            action: "PUBLIC_CONTENT_VERSION_CREATED",
+            resource: "public_content_version",
+            correlationId: version.id,
+            metadata: { pageId, version: version.numero },
+          },
+          tx,
+        );
+        return version;
+      },
+    );
   }
 
-  async publish(actor: AuthUser, versionId: string) {
+  async publish(actor: AuthUser, key: string, versionId: string) {
     this.requireAdmin(actor, Permission.PUBLIC_CONTENT_PUBLISH);
     this.id(versionId);
-    return this.prisma.$transaction(async (tx) => {
-      await tx.$executeRaw`SELECT id FROM VersionContenidoPublico WHERE id = ${versionId} FOR UPDATE`;
-      const version = await tx.versionContenidoPublico.findUnique({
-        where: { id: versionId },
-        include: { pagina: true, bloques: true },
-      });
-      if (!version)
-        throw new NotFoundException("PUBLIC_CONTENT_VERSION_NOT_FOUND");
-      if (
-        version.estado !== EstadoContenidoPublico.BORRADOR ||
-        version.pagina.estado === EstadoContenidoPublico.ARCHIVADO
-      )
-        throw new ConflictException("PUBLIC_CONTENT_NOT_PUBLISHABLE");
-      await this.assertAssets(version.bloques as any, tx);
-      const now = new Date();
-      await tx.versionContenidoPublico.updateMany({
-        where: {
-          paginaId: version.paginaId,
-          estado: EstadoContenidoPublico.PUBLICADO,
-        },
-        data: { estado: EstadoContenidoPublico.ARCHIVADO, archivedAt: now },
-      });
-      const published = await tx.versionContenidoPublico.update({
-        where: { id: version.id },
-        data: {
-          estado: EstadoContenidoPublico.PUBLICADO,
-          publicadoPorId: actor.id,
-          publishedAt: now,
-          archivedAt: null,
-        },
-        include: { bloques: true },
-      });
-      await tx.paginaPublica.update({
-        where: { id: version.paginaId },
-        data: {
-          titulo: version.titulo,
-          estado: EstadoContenidoPublico.PUBLICADO,
-          archivadoPorId: null,
-          motivoArchivo: null,
-          archivadoAt: null,
-        },
-      });
-      await this.audit.append(
-        {
-          actorId: actor.id,
-          subjectId: version.autorId,
-          action: "PUBLIC_CONTENT_PUBLISHED",
-          resource: "public_content_version",
-          correlationId: version.id,
-          metadata: {
-            pageId: version.paginaId,
-            slug: version.pagina.slug,
-            version: version.numero,
+    return this.run<any>(
+      actor,
+      key,
+      { op: "public-content:publish", versionId },
+      async (tx) => {
+        await tx.$executeRaw`SELECT id FROM VersionContenidoPublico WHERE id = ${versionId} FOR UPDATE`;
+        const version = await tx.versionContenidoPublico.findUnique({
+          where: { id: versionId },
+          include: { pagina: true, bloques: true },
+        });
+        if (!version)
+          throw new NotFoundException("PUBLIC_CONTENT_VERSION_NOT_FOUND");
+        if (
+          version.estado !== EstadoContenidoPublico.BORRADOR ||
+          version.pagina.estado === EstadoContenidoPublico.ARCHIVADO
+        )
+          throw new ConflictException("PUBLIC_CONTENT_NOT_PUBLISHABLE");
+        await this.assertAssets(version.bloques as any, tx);
+        const now = new Date();
+        await tx.versionContenidoPublico.updateMany({
+          where: {
+            paginaId: version.paginaId,
+            estado: EstadoContenidoPublico.PUBLICADO,
           },
-        },
-        tx,
-      );
-      return published;
-    });
+          data: { estado: EstadoContenidoPublico.ARCHIVADO, archivedAt: now },
+        });
+        const published = await tx.versionContenidoPublico.update({
+          where: { id: version.id },
+          data: {
+            estado: EstadoContenidoPublico.PUBLICADO,
+            publicadoPorId: actor.id,
+            publishedAt: now,
+            archivedAt: null,
+          },
+          include: { bloques: true },
+        });
+        await tx.paginaPublica.update({
+          where: { id: version.paginaId },
+          data: {
+            titulo: version.titulo,
+            estado: EstadoContenidoPublico.PUBLICADO,
+            archivadoPorId: null,
+            motivoArchivo: null,
+            archivadoAt: null,
+          },
+        });
+        await this.audit.append(
+          {
+            actorId: actor.id,
+            subjectId: version.autorId,
+            action: "PUBLIC_CONTENT_PUBLISHED",
+            resource: "public_content_version",
+            correlationId: version.id,
+            metadata: {
+              pageId: version.paginaId,
+              slug: version.pagina.slug,
+              version: version.numero,
+            },
+          },
+          tx,
+        );
+        return published;
+      },
+    );
   }
 
-  async archivePage(actor: AuthUser, pageId: string, motivo: string) {
+  async archivePage(
+    actor: AuthUser,
+    key: string,
+    pageId: string,
+    motivo: string,
+  ) {
     this.requireAdmin(actor, Permission.PUBLIC_CONTENT_ARCHIVE);
     this.id(pageId);
-    return this.prisma.$transaction(async (tx) => {
-      await tx.$executeRaw`SELECT id FROM PaginaPublica WHERE id = ${pageId} FOR UPDATE`;
-      const page = await tx.paginaPublica.findUnique({ where: { id: pageId } });
-      if (!page) throw new NotFoundException("PUBLIC_PAGE_NOT_FOUND");
-      if (page.estado === EstadoContenidoPublico.ARCHIVADO)
-        throw new ConflictException("PUBLIC_PAGE_ALREADY_ARCHIVED");
-      const now = new Date();
-      await tx.versionContenidoPublico.updateMany({
-        where: {
-          paginaId: pageId,
-          estado: {
-            in: [
-              EstadoContenidoPublico.BORRADOR,
-              EstadoContenidoPublico.PUBLICADO,
-            ],
+    return this.run<any>(
+      actor,
+      key,
+      { op: "public-content:archive-page", pageId, motivo },
+      async (tx) => {
+        await tx.$executeRaw`SELECT id FROM PaginaPublica WHERE id = ${pageId} FOR UPDATE`;
+        const page = await tx.paginaPublica.findUnique({
+          where: { id: pageId },
+        });
+        if (!page) throw new NotFoundException("PUBLIC_PAGE_NOT_FOUND");
+        if (page.estado === EstadoContenidoPublico.ARCHIVADO)
+          throw new ConflictException("PUBLIC_PAGE_ALREADY_ARCHIVED");
+        const now = new Date();
+        await tx.versionContenidoPublico.updateMany({
+          where: {
+            paginaId: pageId,
+            estado: {
+              in: [
+                EstadoContenidoPublico.BORRADOR,
+                EstadoContenidoPublico.PUBLICADO,
+              ],
+            },
           },
-        },
-        data: { estado: EstadoContenidoPublico.ARCHIVADO, archivedAt: now },
-      });
-      const archived = await tx.paginaPublica.update({
-        where: { id: pageId },
-        data: {
-          estado: EstadoContenidoPublico.ARCHIVADO,
-          archivadoPorId: actor.id,
-          motivoArchivo: motivo,
-          archivadoAt: now,
-        },
-      });
-      await this.audit.append(
-        {
-          actorId: actor.id,
-          subjectId: actor.id,
-          action: "PUBLIC_PAGE_ARCHIVED",
-          resource: "public_page",
-          correlationId: pageId,
-          metadata: { reason: motivo, slug: page.slug },
-        },
-        tx,
-      );
-      return archived;
-    });
+          data: { estado: EstadoContenidoPublico.ARCHIVADO, archivedAt: now },
+        });
+        const archived = await tx.paginaPublica.update({
+          where: { id: pageId },
+          data: {
+            estado: EstadoContenidoPublico.ARCHIVADO,
+            archivadoPorId: actor.id,
+            motivoArchivo: motivo,
+            archivadoAt: now,
+          },
+        });
+        await this.audit.append(
+          {
+            actorId: actor.id,
+            subjectId: actor.id,
+            action: "PUBLIC_PAGE_ARCHIVED",
+            resource: "public_page",
+            correlationId: pageId,
+            metadata: { reason: motivo, slug: page.slug },
+          },
+          tx,
+        );
+        return archived;
+      },
+    );
   }
 
   async classifyAsset(actor: AuthUser, input: ClassifyPublicAssetInput) {

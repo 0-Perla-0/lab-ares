@@ -986,6 +986,14 @@ const publicContentIdParameter = {
   required: true,
   schema: { type: "string", pattern: "^c[a-z0-9]{20,30}$" },
 };
+const publicContentIdempotencyParameter = {
+  name: "Idempotency-Key",
+  in: "header",
+  required: true,
+  schema: { type: "string", minLength: 8, maxLength: 128 },
+  description:
+    "Durable intent key per actor; the same key with a different body is rejected with IDEMPOTENCY_KEY_REUSED.",
+};
 const publicContentPaths = {
   "/api/public-content/pages/{slug}": {
     get: {
@@ -1095,6 +1103,7 @@ const publicContentPaths = {
     post: {
       tags: ["Public Content"],
       security: cookieSecurity,
+      parameters: [publicContentIdempotencyParameter],
       description:
         "Creates one approved public page and immutable draft version 1 using only controlled blocks.",
       requestBody: jsonBody({
@@ -1121,7 +1130,7 @@ const publicContentPaths = {
     post: {
       tags: ["Public Content"],
       security: cookieSecurity,
-      parameters: [publicContentIdParameter],
+      parameters: [publicContentIdParameter, publicContentIdempotencyParameter],
       description:
         "Creates a new immutable draft. A page may have only one open draft.",
       requestBody: jsonBody({
@@ -1137,7 +1146,7 @@ const publicContentPaths = {
     post: {
       tags: ["Public Content"],
       security: cookieSecurity,
-      parameters: [publicContentIdParameter],
+      parameters: [publicContentIdParameter, publicContentIdempotencyParameter],
       description:
         "Administrator-only atomic publication. The previous publication is archived and author, publisher, date, version and change summary are retained.",
       responses: {
@@ -1150,7 +1159,7 @@ const publicContentPaths = {
     post: {
       tags: ["Public Content"],
       security: cookieSecurity,
-      parameters: [publicContentIdParameter],
+      parameters: [publicContentIdParameter, publicContentIdempotencyParameter],
       description:
         "Administrator-only page withdrawal with a mandatory reason.",
       requestBody: jsonBody({

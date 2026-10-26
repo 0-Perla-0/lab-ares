@@ -10,6 +10,7 @@ import {
   createPublicPageSchema,
   createPublicVersionSchema,
 } from "../src/public-content/public-content.schemas";
+import { operationFingerprint } from "../src/common/domain/canonical-operation";
 import { PublicContentService } from "../src/public-content/public-content.service";
 
 const pageId = "c12345678901234567890123";
@@ -41,6 +42,12 @@ const versionInput = {
   seoTitulo: "Ares",
   seoDescripcion: "Servicio Social Ares",
   bloques: [textBlock],
+};
+
+const KEY = "11111111-1111-4111-8111-111111111111";
+const as = (db: any, who: AuthUser) => {
+  db.usuario.findUnique.mockResolvedValue(who);
+  return who;
 };
 
 function make(overrides: Record<string, any> = {}) {
@@ -80,6 +87,16 @@ function make(overrides: Record<string, any> = {}) {
     },
     archivo: { findUnique: vi.fn() },
     $executeRaw: vi.fn().mockResolvedValue(1),
+    $queryRaw: vi.fn().mockResolvedValue([]),
+    recoveryWriteBarrier: {
+      findUnique: vi.fn().mockResolvedValue({ active: false }),
+    },
+    domainOperation: {
+      findUnique: vi.fn().mockResolvedValue(null),
+      create: vi.fn().mockResolvedValue(undefined),
+    },
+    // DomainTransaction revalida al actor; cada prueba fija el vigente con as().
+    usuario: { findUnique: vi.fn() },
   };
   for (const [model, methods] of Object.entries(overrides.db ?? {}))
     db[model] = { ...db[model], ...(methods as object) };
@@ -256,7 +273,7 @@ describe("public content contracts", () => {
 
   it("creates page version 1 and audits the immutable draft", async () => {
     const { service, db, audit } = make();
-    const result = await service.createPage(actor(), {
+    const result = await service.createPage(as(db, actor()), KEY, {
       slug: "inicio",
       ...versionInput,
     });
@@ -286,7 +303,12 @@ describe("public content contracts", () => {
         },
       },
     });
-    const result = await service.createVersion(actor(), pageId, versionInput);
+    const result = await service.createVersion(
+      as(db, actor()),
+      KEY,
+      pageId,
+      versionInput,
+    );
     expect(result.numero).toBe(2);
     expect(db.$executeRaw).toHaveBeenCalled();
     expect(db.versionContenidoPublico.create).toHaveBeenCalledWith(
@@ -320,8 +342,12 @@ describe("public content contracts", () => {
         },
       },
     });
-    await expect(service.publish(actor(), versionId)).rejects.toThrow();
-    await service.publish(actor({ rol: RolUsuario.ADMIN }), versionId);
+    await expect(service.publish(actor(), KEY, versionId)).rejects.toThrow();
+    await service.publish(
+      as(db, actor({ rol: RolUsuario.ADMIN })),
+      KEY,
+      versionId,
+    );
     expect(db.versionContenidoPublico.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -482,7 +508,8 @@ describe("public content contracts", () => {
       },
     });
     await service.archivePage(
-      actor({ rol: RolUsuario.ADMIN }),
+      as(db, actor({ rol: RolUsuario.ADMIN })),
+      KEY,
       pageId,
       "Contenido retirado",
     );
@@ -500,5 +527,37 @@ describe("public content contracts", () => {
       }),
       expect.anything(),
     );
+  });
+});
+
+describe("public content durable intents", () => {
+  it("replays a recorded publication without applying it twice", async () => {
+    const { service, db, audit } = make();
+    const admin = as(db, actor({ rol: RolUsuario.ADMIN }));
+    db.domainOperation.findUnique.mockResolvedValue({
+      fingerprint: operationFingerprint({
+        op: "public-content:publish",
+        versionId,
+      }),
+      response: { id: versionId },
+    });
+    await expect(service.publish(admin, KEY, versionId)).resolves.toEqual({
+      id: versionId,
+    });
+    expect(db.versionContenidoPublico.update).not.toHaveBeenCalled();
+    expect(audit.append).not.toHaveBeenCalled();
+  });
+
+  it("rejects reusing a key for a different operation", async () => {
+    const { service, db } = make();
+    const admin = as(db, actor({ rol: RolUsuario.ADMIN }));
+    db.domainOperation.findUnique.mockResolvedValue({
+      fingerprint: "other",
+      response: {},
+    });
+    await expect(service.publish(admin, KEY, versionId)).rejects.toMatchObject({
+      response: expect.anything(),
+    });
+    expect(db.versionContenidoPublico.update).not.toHaveBeenCalled();
   });
 });

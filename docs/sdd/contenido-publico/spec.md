@@ -1,6 +1,6 @@
 # Contenido institucional público
 
-ID: `contenido-publico` · Estado: parcial · Revisión: 2026-10-15
+ID: `contenido-publico` · Estado: parcial · Revisión: 2026-10-26
 
 ## Objetivo y alcance
 
@@ -18,14 +18,15 @@ Sin autorregistro, formularios anónimos, HTML arbitrario ni exposición de info
 
 - [CMS](../../../backend/src/public-content/), [administración](../../../frontend/app/portal/contenido/), [páginas](../../../frontend/app/contenido/).
 - [Pruebas](../../../backend/test/public-content.service.spec.ts), [navegador determinista](../../../frontend/e2e/public-content.spec.ts).
-- Brecha comprobada: [la raíz pública](../../../frontend/app/page.tsx) es estática; [header](../../../frontend/components/public/header.tsx) y [footer](../../../frontend/components/public/footer.tsx) sólo enlazan anclas de esa landing y login. Las páginas CMS existen en `/contenido/:slug`, pero no están integradas a esa navegación.
-- [La ruta CMS](../../../frontend/app/contenido/[slug]/page.tsx) usa título genérico; los campos SEO publicados no se reflejan en sus metadatos de ruta.
+- Decisión (26/10): la raíz estática es la landing canónica; la página CMS `inicio` sigue en `/contenido/inicio` y no se enlaza. [Header](../../../frontend/components/public/header.tsx) y [footer](../../../frontend/components/public/footer.tsx) enlazan las páginas CMS desde [una lista única](../../../frontend/components/public/institutional-links.ts).
+- [La ruta CMS](../../../frontend/app/contenido/[slug]/page.tsx) genera metadatos (SEO, canónica) desde la versión publicada vía lectura de servidor (`public-content-server.ts`) con revalidación de 60 s; sin versión publicada cae al título genérico y la página muestra un estado explícito "aún no está publicada".
+- Crear página/versión, publicar y archivar página exigen `Idempotency-Key` y usan `DomainTransaction` (barrera, actor vigente, auditoría y recibo atómicos). Falta clasificar/archivar activos (copia S3).
 - Dependencias: [archivos](../archivos/spec.md), [escrituras seguras](../escrituras-seguras/spec.md).
 
 ## Tareas y pendientes
 
 - [x] **T1 · código · AC-1/2/3:** CMS versionado y separación de activos integrados.
-- [ ] **T2 · código · AC-2/3:** Uniformar idempotencia/barrera del ciclo de publicación y tratamiento de copias públicas.
+- [ ] **T2 · código · AC-2/3:** Idempotencia/barrera del ciclo de páginas hecha ([servicio](../../../backend/src/public-content/public-content.service.ts), [pruebas](../../../backend/test/public-content.service.spec.ts)); pendiente clasificar/archivar activos y copias públicas.
 - [ ] **T3 · validación · AC-1/3:** Revisión accesible de contenido publicado, permisos negativos y aislamiento real de buckets.
 - [ ] **T4 · externo · AC-2/3:** Aprobar contenido/contactos/avisos legales; no inventar identidad institucional ni políticas.
-- [ ] **T5 · código · AC-4:** Integrar inicio/navegación/SEO con páginas publicadas y fallback explícito; probar publicación/cambio/archivo desde la ruta canónica, no sólo acceso directo por slug.
+- [x] **T5 · código · AC-4:** Navegación, SEO y fallback explícito; [e2e interceptado](../../../frontend/e2e/public-content.spec.ts) cubre enlace desde la landing y página sin publicar. Publicación/archivo reales de extremo a extremo siguen en T3.

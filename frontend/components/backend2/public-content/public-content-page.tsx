@@ -6,7 +6,7 @@ import Link from "next/link";
 import { PublicFooter } from "@/components/public/footer";
 import { PublicHeader } from "@/components/public/header";
 import { LoadError, LoadingTable } from "@/components/ui/primitives";
-import { getApiErrorMessage } from "@/lib/api";
+import { ApiError, getApiErrorMessage } from "@/lib/api";
 import {
   publicContentApi,
   type PublicBlock,
@@ -23,10 +23,12 @@ export function PublicContentPage({
   const [page, setPage] = useState<PublishedPage | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [unpublished, setUnpublished] = useState(false);
 
   async function load() {
     setLoading(true);
     setError("");
+    setUnpublished(false);
     try {
       setPage(
         faqOnly
@@ -34,6 +36,11 @@ export function PublicContentPage({
           : await publicContentApi.publishedPage(slug),
       );
     } catch (requestError) {
+      if (requestError instanceof ApiError && requestError.status === 404) {
+        setPage(null);
+        setUnpublished(true);
+        return;
+      }
       setError(getApiErrorMessage(requestError, "load"));
     } finally {
       setLoading(false);
@@ -48,6 +55,22 @@ export function PublicContentPage({
         <div className="mx-auto max-w-4xl">
           {loading && !page ? (
             <LoadingTable />
+          ) : unpublished ? (
+            <section role="status" className="space-y-4">
+              <h1 className="text-3xl font-bold tracking-[-0.04em]">
+                Esta información aún no está publicada
+              </h1>
+              <p className="text-[var(--color-muted)]">
+                El contenido institucional se publica desde administración.
+                Vuelve más tarde o regresa al inicio.
+              </p>
+              <Link
+                href="/"
+                className="focus-ring inline-flex min-h-11 items-center rounded-full bg-[var(--color-primary)] px-5 text-sm font-bold text-[var(--color-on-primary)] hover:bg-[var(--color-primary-hover)]"
+              >
+                Volver al inicio
+              </Link>
+            </section>
           ) : error && !page ? (
             <LoadError message={error} onRetry={() => void load()} />
           ) : page ? (

@@ -1,6 +1,6 @@
 # Escrituras e intenciones seguras
 
-ID: `escrituras-seguras` · Estado: parcial · Revisión: 2026-10-15
+ID: `escrituras-seguras` · Estado: parcial · Revisión: 2026-10-26
 
 ## Objetivo y alcance
 
@@ -18,9 +18,9 @@ No asumir cobertura universal porque existe un guard global o `DomainTransaction
 ## Diseño y evidencia
 
 - [Transacción de dominio](../../../backend/src/common/domain/domain-transaction.ts), [consulta](../../../backend/src/operations/operation-intents.controller.ts), [tests](../../../backend/test/unit/operations/remaining-contracts.test.ts).
-- Cubiertos: asistencia/ausencias, documentos/academia, proyectos/actividades, visitas/inventario, impresión, retención/recuperación y políticas según contrato específico.
+- Cubiertos: páginas CMS (26/10), asistencia/ausencias, documentos/academia, proyectos/actividades, visitas/inventario, impresión, retención/recuperación y políticas según contrato específico.
 - Consulta actual sólo une seis almacenes: domain, attendance, absence, retention, printing y recovery; no es inventario exhaustivo de todas las mutaciones.
-- Brechas visibles de contrato: organización/usuarios, invitaciones, biblioteca, CMS, preferencias de directorio y exportación de reportes sin clave durable uniforme; algunos endpoints operativos usan clave opcional.
+- Brechas visibles de contrato: organización/usuarios, invitaciones, biblioteca, activos del CMS, preferencias de directorio y exportación de reportes sin clave durable uniforme; algunos endpoints operativos usan clave opcional.
 - Helpers cliente heredados deben revisarse por caller: no asumir que todos impiden sustituir intención incierta o guardan únicamente digest.
 - No renombrar namespaces persistidos de reintento como parte de documentación: hacerlo exige migración compatible específica.
 

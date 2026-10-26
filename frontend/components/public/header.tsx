@@ -1,11 +1,15 @@
 import Link from "next/link";
 
 import { Brand } from "./brand";
+import { institutionalLinks } from "./institutional-links";
 
 const links = [
-  { href: "/#plataforma", label: "Plataforma" },
-  { href: "/#como-funciona", label: "Cómo funciona" },
-  { href: "/#nosotros", label: "Nosotros" },
+  { href: "/#plataforma", label: "Plataforma", wide: false },
+  { href: "/#como-funciona", label: "Cómo funciona", wide: false },
+  { href: "/#nosotros", label: "Nosotros", wide: false },
+  // En 768 px no caben más enlaces; el resto vive en el footer.
+  { ...institutionalLinks[0], wide: true },
+  { ...institutionalLinks[1], wide: true },
 ];
 
 export function PublicHeader() {
@@ -22,7 +26,7 @@ export function PublicHeader() {
             <Link
               key={link.href}
               href={link.href}
-              className="focus-ring rounded-md text-sm font-medium text-[var(--color-muted)] transition hover:text-[var(--color-ink)]"
+              className={`focus-ring rounded-md text-sm font-medium text-[var(--color-muted)] transition hover:text-[var(--color-ink)] ${link.wide ? "hidden lg:inline" : ""}`}
             >
               {link.label}
             </Link>
