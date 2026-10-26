@@ -24,4 +24,4 @@ Completar actividades no agrega horas de Servicio Social. Sin automatizaciones a
 
 - [x] **T1 · código · AC-1/2/3/4:** Proyecto a evidencia/revisión/Kanban integrados; no reimplementar.
 - [ ] **T2 · validación · AC-1/2/4:** Recorrido full-stack por rol, revocación/traslado, pausa y respuesta perdida.
-- [ ] **T3 · código · AC-3:** Conservación de evidencias y lifecycle cuando exista política institucional; ver [retención](../retencion/spec.md).
+- [ ] **T3 · externo · AC-3:** Aprobar el tratamiento de las evidencias de Kairos. No hay código pendiente que inventar: al aprobarse el tratamiento se añade un adaptador por categoría con el patrón de [evidencia operativa](../../../backend/src/retention/operational-evidence.ts) y [retención](../retencion/spec.md), activable sólo con la aprobación institucional.

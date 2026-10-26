@@ -151,6 +151,15 @@ jobs:
         run: |
           npm run prisma:migrate:deploy
           npm exec --workspace @ares/backend -- vitest run test/integration/object-deletion.integration.test.ts
+      - name: Create a dedicated object-cleanup database (jobs signed only by this suite)
+        run: docker compose -p ares-acceptance-ci -f compose.yaml -f compose.acceptance.yaml exec -T database sh -c 'MYSQL_PWD="$MARIADB_ROOT_PASSWORD" mariadb -uroot -e "CREATE DATABASE ares_object_cleanup_ci CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"'
+      - name: Orphan cleanup, restore import and upload admission against real MariaDB and MinIO
+        env:
+          DATABASE_URL: mysql://root:ares-local-root-password@127.0.0.1:3307/ares_object_cleanup_ci
+          ARES_TEST_DELETION_S3_ENDPOINT: http://localhost:9000
+        run: |
+          npm run prisma:migrate:deploy
+          npm exec --workspace @ares/backend -- vitest run test/integration/object-cleanup.integration.test.ts test/integration/upload-admission.integration.test.ts --no-file-parallelism
       - name: Upload full-stack evidence
         if: always()
         uses: actions/upload-artifact@v4

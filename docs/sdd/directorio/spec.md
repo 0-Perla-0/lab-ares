@@ -21,4 +21,4 @@ Contactos institucionales internos por área/proyecto y preferencias de privacid
 
 - [x] **T1 · código · AC-1/2:** Consulta y preferencias existentes con filtrado backend.
 - [ ] **T2 · validación · AC-1/2:** Aceptación real con bajas/membresías revocadas y cruce de áreas.
-- [ ] **T3 · código · AC-2:** Incorporar preferencias al inventario de [escrituras seguras](../escrituras-seguras/spec.md) según contrato aprobado.
+- [x] **T3 · código · AC-2:** Las preferencias exigen `Idempotency-Key` y corren en `DomainTransaction` ([servicio](../../../backend/src/directory/directory.service.ts), [pruebas](../../../backend/test/directory.service.spec.ts)).

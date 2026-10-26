@@ -200,6 +200,14 @@ const directoryPaths = {
     patch: {
       tags: ["Directory"],
       security: cookieSecurity,
+      parameters: [
+        {
+          name: "Idempotency-Key",
+          in: "header",
+          required: true,
+          schema: { type: "string", minLength: 8, maxLength: 128 },
+        },
+      ],
       requestBody: jsonBody({
         $ref: "#/components/schemas/DirectoryPreferencesInput",
       }),

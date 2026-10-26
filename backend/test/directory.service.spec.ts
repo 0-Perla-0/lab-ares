@@ -56,6 +56,16 @@ function make(overrides: any = {}) {
     usuario: {
       count: vi.fn().mockResolvedValue(rows.length),
       findMany: vi.fn().mockResolvedValue(rows),
+      // DomainTransaction revalidates the acting user under the write barrier.
+      findUnique: vi.fn().mockResolvedValue(actor()),
+    },
+    $queryRaw: vi.fn().mockResolvedValue([]),
+    recoveryWriteBarrier: {
+      findUnique: vi.fn().mockResolvedValue({ active: false, version: 1 }),
+    },
+    domainOperation: {
+      findUnique: vi.fn().mockResolvedValue(null),
+      create: vi.fn().mockResolvedValue(undefined),
     },
     $executeRaw: vi.fn().mockResolvedValue(undefined),
     $transaction: vi.fn((ops: any) =>
@@ -362,7 +372,9 @@ describe("directory contracts", () => {
     const { service, db, audit } = make();
     await service.getPreferences(actor());
     expect(db.directorioPreferencia.upsert).toHaveBeenCalled();
-    await service.updatePreferences(actor(), { mostrarEmail: false });
+    await service.updatePreferences(actor(), "preferences-key-0001", {
+      mostrarEmail: false,
+    });
     expect(db.$transaction).toHaveBeenCalled();
     expect(audit.append).toHaveBeenCalledWith(
       expect.objectContaining({ action: "DIRECTORY_PREFERENCES_UPDATED" }),
@@ -375,7 +387,9 @@ describe("directory contracts", () => {
       db: { $transaction: vi.fn().mockRejectedValue(new Error("rollback")) },
     });
     await expect(
-      service.updatePreferences(actor(), { visibleEnArea: false }),
+      service.updatePreferences(actor(), "preferences-key-0002", {
+        visibleEnArea: false,
+      }),
     ).rejects.toThrow("rollback");
   });
 });

@@ -15,6 +15,7 @@ import {
   Panel,
   inputClassName,
 } from "@/components/ui/primitives";
+import { useAuth } from "@/components/auth/auth-provider";
 import { getApiErrorMessage } from "@/lib/api";
 import {
   getDirectory,
@@ -27,6 +28,7 @@ import {
 } from "@/lib/backend2/directory";
 
 export function DirectoryPage() {
+  const { user } = useAuth();
   const [scope, setScope] = useState<DirectoryScope>("area");
   const [projectId, setProjectId] = useState("");
   const [query, setQuery] = useState("");
@@ -84,7 +86,7 @@ export function DirectoryPage() {
     setError("");
     setNotice("");
     try {
-      setPreferences(await updateDirectoryPreferences(preferences));
+      setPreferences(await updateDirectoryPreferences(user.id, preferences));
       setNotice("Preferencias de privacidad actualizadas.");
     } catch (requestError) {
       setError(getApiErrorMessage(requestError, "save"));
