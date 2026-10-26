@@ -5,6 +5,8 @@ import { Prisma } from "../generated/prisma/client";
 import { AuditService } from "../auth/audit.service";
 import { observeWorker } from "../common/domain/worker-heartbeat";
 import { workersMayMutate } from "../recovery/barrier";
+import { withWorkerWriteBarrier } from "../common/domain/worker-write-barrier";
+import { ApiException } from "../common/errors/api.exception";
 
 @Injectable()
 export class InventoryCheckWorker implements OnModuleInit, OnModuleDestroy {
@@ -41,14 +43,13 @@ export class InventoryCheckWorker implements OnModuleInit, OnModuleDestroy {
         take: Math.min(1000, Math.max(1, limit)),
       });
       let checked = 0;
+      // The first item fixes the epoch; the rest of the cycle must commit in it.
+      let epoch: number | undefined;
       for (const item of items) {
-        const done = await this.db.$transaction(
-          async (tx) => {
-            await tx.$queryRaw`SELECT id FROM RecoveryWriteBarrier WHERE id = 'global' LOCK IN SHARE MODE`;
-            const barrier = await tx.recoveryWriteBarrier.findUnique({
-              where: { id: "global" },
-            });
-            if (!barrier || barrier.active) return false;
+        const done = await withWorkerWriteBarrier(
+          this.db,
+          async (tx, version) => {
+            epoch = version;
             await tx.$queryRaw`SELECT id FROM ArticuloInventario WHERE id = ${item.id} FOR UPDATE`;
             const live = await tx.articuloInventario.findUnique({
               where: { id: item.id },
@@ -97,18 +98,21 @@ export class InventoryCheckWorker implements OnModuleInit, OnModuleDestroy {
             }
             return true;
           },
-          {
-            isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
-            timeout: 30000,
-          },
+          epoch,
         );
-        if (!done) break;
         checked++;
         this.cursor = item.id;
       }
       if (items.length < limit && checked === items.length)
         this.cursor = undefined;
       return checked;
+    } catch (error) {
+      if (
+        error instanceof ApiException &&
+        error.code === "RECOVERY_WRITE_BARRIER_ACTIVE"
+      )
+        return 0;
+      throw error;
     } finally {
       this.running = false;
     }
