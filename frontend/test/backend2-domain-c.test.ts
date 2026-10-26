@@ -44,7 +44,9 @@ describe("Backend 2 domain C contracts", () => {
         data: { id: "version-1", estado: "EN_REVISION" },
       })
       .mockResolvedValueOnce({ data: "https://storage.example/signed" });
-    await libraryApi.submitReview("version-1");
+    vi.stubGlobal("window", {});
+    vi.stubGlobal("sessionStorage", storage());
+    await libraryApi.submitReview(7, "version-1");
     await expect(libraryApi.download("version-1")).resolves.toBe(
       "https://storage.example/signed",
     );

@@ -1,6 +1,6 @@
 # Biblioteca operativa
 
-ID: `biblioteca` · Estado: implementada · Revisión: 2026-10-15
+ID: `biblioteca` · Estado: implementada · Revisión: 2026-10-26
 
 ## Objetivo y alcance
 
@@ -17,11 +17,11 @@ No reemplaza registros estructurados ni permite edición colaborativa/firma elec
 
 - [Biblioteca](../../../backend/src/library/), [UI](../../../frontend/app/portal/biblioteca/), [tests](../../../backend/test/library.service.spec.ts).
 - Dependencias: [archivos](../archivos/spec.md), [comunicaciones](../comunicaciones/spec.md), [retención](../retencion/spec.md).
-- Controlador conserva mutaciones sin contrato idempotente uniforme: no declarar cierre transversal por existir versionado.
+- Las siete mutaciones exigen `Idempotency-Key` y corren en `DomainTransaction` (26/10); falta ensayo con dos conexiones y respuesta perdida reales.
 
 ## Tareas y pendientes
 
 - [x] **T1 · código · AC-1/2/3:** Versiones, revisión/publicación/archivo, descarga y acuse implementados.
-- [ ] **T2 · código · AC-1/2:** Uniformar mutaciones/replay con [escrituras seguras](../escrituras-seguras/spec.md).
+- [x] **T2 · código · AC-1/2:** Mutaciones y replay uniformes con [escrituras seguras](../escrituras-seguras/spec.md); [pruebas](../../../backend/test/library.service.spec.ts) con mocks.
 - [ ] **T3 · validación · AC-2/3:** Full-stack por alcance, archivos y acuse de versión exacta.
 - [ ] **T4 · externo · AC-1/3:** Aprobar contenidos, vigencias y conservación antes de habilitar operación institucional.

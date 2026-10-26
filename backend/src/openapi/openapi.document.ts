@@ -529,6 +529,14 @@ const libraryIdParameter = {
   required: true,
   schema: { type: "string", pattern: "^c[a-z0-9]{20,30}$" },
 };
+const durableIntentKeyParameter = {
+  name: "Idempotency-Key",
+  in: "header",
+  required: true,
+  schema: { type: "string", minLength: 8, maxLength: 128 },
+  description:
+    "Durable intent key per actor; the same key with a different body is rejected with IDEMPOTENCY_KEY_REUSED.",
+};
 const libraryPaths = {
   "/api/library": {
     get: {
@@ -581,6 +589,7 @@ const libraryPaths = {
     post: {
       tags: ["Library"],
       security: cookieSecurity,
+      parameters: [durableIntentKeyParameter],
       description:
         "Creates library metadata and immutable version 1 from an available private file owned by the actor. GLOBAL drafts are administrator-only.",
       requestBody: jsonBody({
@@ -621,7 +630,7 @@ const libraryPaths = {
     post: {
       tags: ["Library"],
       security: cookieSecurity,
-      parameters: [libraryIdParameter],
+      parameters: [libraryIdParameter, durableIntentKeyParameter],
       description:
         "Adds a new immutable draft version. Only one BORRADOR or EN_REVISION version may exist per document.",
       requestBody: jsonBody({
@@ -644,7 +653,7 @@ const libraryPaths = {
     post: {
       tags: ["Library"],
       security: cookieSecurity,
-      parameters: [libraryIdParameter],
+      parameters: [libraryIdParameter, durableIntentKeyParameter],
       description:
         "Archives the entry and its non-archived versions. A reason is mandatory.",
       requestBody: jsonBody({
@@ -667,7 +676,7 @@ const libraryPaths = {
     post: {
       tags: ["Library"],
       security: cookieSecurity,
-      parameters: [libraryIdParameter],
+      parameters: [libraryIdParameter, durableIntentKeyParameter],
       description: "Moves a draft to EN_REVISION.",
       responses: {
         200: {
@@ -686,7 +695,7 @@ const libraryPaths = {
     post: {
       tags: ["Library"],
       security: cookieSecurity,
-      parameters: [libraryIdParameter],
+      parameters: [libraryIdParameter, durableIntentKeyParameter],
       description:
         "Records an independent review. The author cannot review their own version; REQUEST_CHANGES returns it to BORRADOR.",
       requestBody: jsonBody({
@@ -709,7 +718,7 @@ const libraryPaths = {
     post: {
       tags: ["Library"],
       security: cookieSecurity,
-      parameters: [libraryIdParameter],
+      parameters: [libraryIdParameter, durableIntentKeyParameter],
       description:
         "Publishes an independently reviewed version. Replacing the prior publication requires motivoSustitucion and archives it atomically.",
       requestBody: jsonBody({
@@ -752,7 +761,7 @@ const libraryPaths = {
     post: {
       tags: ["Library"],
       security: cookieSecurity,
-      parameters: [libraryIdParameter],
+      parameters: [libraryIdParameter, durableIntentKeyParameter],
       description:
         "Idempotently records user, version and timestamp for a publication that requires acknowledgement. It is not a signature, legal acceptance or notification read receipt.",
       responses: {

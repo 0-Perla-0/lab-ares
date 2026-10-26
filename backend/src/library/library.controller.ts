@@ -8,12 +8,12 @@ import {
   Post,
   Query,
   Req,
-  UsePipes,
 } from "@nestjs/common";
 import type { Request } from "express";
 import { getAuthenticatedUser } from "../auth/authenticated-user";
 import { Permission } from "../auth/permissions";
 import { RequirePermissions } from "../auth/require-permissions.decorator";
+import { IdempotencyKey } from "../common/http/idempotency-key.decorator";
 import { ZodValidationPipe } from "../common/validation/zod-validation.pipe";
 import { LibraryService } from "./library.service";
 import {
@@ -42,10 +42,13 @@ export class LibraryController {
 
   @Post()
   @RequirePermissions(Permission.LIBRARY_DRAFT_CREATE)
-  @UsePipes(new ZodValidationPipe(createLibraryDocumentSchema))
-  create(@Req() req: Request, @Body() body: any) {
+  create(
+    @Req() req: Request,
+    @IdempotencyKey() key: string,
+    @Body(new ZodValidationPipe(createLibraryDocumentSchema)) body: any,
+  ) {
     return this.library
-      .create(getAuthenticatedUser(req), body)
+      .create(getAuthenticatedUser(req), key, body)
       .then((data) => ({ data }));
   }
 
@@ -59,53 +62,69 @@ export class LibraryController {
 
   @Post(":id/versions")
   @RequirePermissions(Permission.LIBRARY_DRAFT_CREATE)
-  @UsePipes(new ZodValidationPipe(createLibraryVersionSchema))
   createVersion(
     @Req() req: Request,
+    @IdempotencyKey() key: string,
     @Param("id") id: string,
-    @Body() body: any,
+    @Body(new ZodValidationPipe(createLibraryVersionSchema)) body: any,
   ) {
     return this.library
-      .createVersion(getAuthenticatedUser(req), id, body)
+      .createVersion(getAuthenticatedUser(req), key, id, body)
       .then((data) => ({ data }));
   }
 
   @Post("versions/:id/submit-review")
   @HttpCode(HttpStatus.OK)
   @RequirePermissions(Permission.LIBRARY_DRAFT_CREATE)
-  submitReview(@Req() req: Request, @Param("id") id: string) {
+  submitReview(
+    @Req() req: Request,
+    @IdempotencyKey() key: string,
+    @Param("id") id: string,
+  ) {
     return this.library
-      .submitReview(getAuthenticatedUser(req), id)
+      .submitReview(getAuthenticatedUser(req), key, id)
       .then((data) => ({ data }));
   }
 
   @Post("versions/:id/review")
   @HttpCode(HttpStatus.OK)
   @RequirePermissions(Permission.LIBRARY_REVIEW)
-  @UsePipes(new ZodValidationPipe(reviewLibraryVersionSchema))
-  review(@Req() req: Request, @Param("id") id: string, @Body() body: any) {
+  review(
+    @Req() req: Request,
+    @IdempotencyKey() key: string,
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(reviewLibraryVersionSchema)) body: any,
+  ) {
     return this.library
-      .review(getAuthenticatedUser(req), id, body)
+      .review(getAuthenticatedUser(req), key, id, body)
       .then((data) => ({ data }));
   }
 
   @Post("versions/:id/publish")
   @HttpCode(HttpStatus.OK)
   @RequirePermissions(Permission.LIBRARY_PUBLISH)
-  @UsePipes(new ZodValidationPipe(publishLibraryVersionSchema))
-  publish(@Req() req: Request, @Param("id") id: string, @Body() body: any) {
+  publish(
+    @Req() req: Request,
+    @IdempotencyKey() key: string,
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(publishLibraryVersionSchema)) body: any,
+  ) {
     return this.library
-      .publish(getAuthenticatedUser(req), id, body)
+      .publish(getAuthenticatedUser(req), key, id, body)
       .then((data) => ({ data }));
   }
 
   @Post(":id/archive")
   @HttpCode(HttpStatus.OK)
   @RequirePermissions(Permission.LIBRARY_ARCHIVE)
-  @UsePipes(new ZodValidationPipe(archiveLibraryDocumentSchema))
-  archive(@Req() req: Request, @Param("id") id: string, @Body() body: any) {
+  archive(
+    @Req() req: Request,
+    @IdempotencyKey() key: string,
+    @Param("id") id: string,
+    @Body(new ZodValidationPipe(archiveLibraryDocumentSchema)) body: any,
+  ) {
     return this.library
-      .archive(getAuthenticatedUser(req), id, body.motivo)
+      .archive(getAuthenticatedUser(req), key, id, body.motivo)
       .then((data) => ({ data }));
   }
 
@@ -120,9 +139,13 @@ export class LibraryController {
   @Post("versions/:id/acknowledge")
   @HttpCode(HttpStatus.OK)
   @RequirePermissions(Permission.LIBRARY_ACKNOWLEDGE)
-  acknowledge(@Req() req: Request, @Param("id") id: string) {
+  acknowledge(
+    @Req() req: Request,
+    @IdempotencyKey() key: string,
+    @Param("id") id: string,
+  ) {
     return this.library
-      .acknowledge(getAuthenticatedUser(req), id)
+      .acknowledge(getAuthenticatedUser(req), key, id)
       .then((data) => ({ data }));
   }
 }

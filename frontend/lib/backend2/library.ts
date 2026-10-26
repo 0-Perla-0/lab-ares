@@ -142,47 +142,69 @@ export const libraryApi = {
       `/api/library/${encodeURIComponent(id)}`,
     ).then((result) => result.data);
   },
-  create(input: LibraryCreateInput) {
-    return apiRequest<ApiEnvelope<LibraryDocument>>(
+  create(userId: number, input: LibraryCreateInput) {
+    return idempotent<LibraryDocument>(
+      userId,
+      "library-create",
+      input.archivoId,
       "/api/library",
-      json("POST", input),
-    ).then((result) => result.data);
+      input,
+    );
   },
-  createVersion(documentId: string, input: LibraryVersionInput) {
-    return apiRequest<ApiEnvelope<LibraryVersion>>(
+  createVersion(
+    userId: number,
+    documentId: string,
+    input: LibraryVersionInput,
+  ) {
+    return idempotent<LibraryVersion>(
+      userId,
+      "library-create-version",
+      documentId,
       `/api/library/${encodeURIComponent(documentId)}/versions`,
-      json("POST", input),
-    ).then((result) => result.data);
+      input,
+    );
   },
-  submitReview(versionId: string) {
-    return apiRequest<ApiEnvelope<LibraryVersion>>(
+  submitReview(userId: number, versionId: string) {
+    return idempotent<LibraryVersion>(
+      userId,
+      "library-submit-review",
+      versionId,
       `/api/library/versions/${encodeURIComponent(versionId)}/submit-review`,
-      json("POST"),
-    ).then((result) => result.data);
+    );
   },
   review(
+    userId: number,
     versionId: string,
     input: {
       decision: "APPROVE" | "REQUEST_CHANGES";
       retroalimentacion?: string;
     },
   ) {
-    return apiRequest<ApiEnvelope<LibraryVersion>>(
+    return idempotent<LibraryVersion>(
+      userId,
+      "library-review",
+      versionId,
       `/api/library/versions/${encodeURIComponent(versionId)}/review`,
-      json("POST", input),
-    ).then((result) => result.data);
+      input,
+    );
   },
-  publish(versionId: string, motivoSustitucion?: string) {
-    return apiRequest<ApiEnvelope<LibraryVersion>>(
+  publish(userId: number, versionId: string, motivoSustitucion?: string) {
+    return idempotent<LibraryVersion>(
+      userId,
+      "library-publish",
+      versionId,
       `/api/library/versions/${encodeURIComponent(versionId)}/publish`,
-      json("POST", motivoSustitucion ? { motivoSustitucion } : {}),
-    ).then((result) => result.data);
+      motivoSustitucion ? { motivoSustitucion } : {},
+    );
   },
-  archive(documentId: string, motivo: string) {
-    return apiRequest<ApiEnvelope<LibraryDocument>>(
+  archive(userId: number, documentId: string, motivo: string) {
+    return idempotent<LibraryDocument>(
+      userId,
+      "library-archive",
+      documentId,
       `/api/library/${encodeURIComponent(documentId)}/archive`,
-      json("POST", { motivo }),
-    ).then((result) => result.data);
+      { motivo },
+    );
   },
   download(versionId: string) {
     return apiRequest<ApiEnvelope<DownloadGrant>>(
