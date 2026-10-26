@@ -1,5 +1,6 @@
 import { ConfigService } from "@nestjs/config";
 import { describe, expect, it, vi } from "vitest";
+import { ApiException } from "../../../src/common/errors/api.exception";
 import { OutboxDispatcherService } from "../../../src/auth/outbox-dispatcher.service";
 
 function make(fail = false) {
@@ -8,11 +9,13 @@ function make(fail = false) {
     type: "OPERATIONAL_NOTIFICATION",
     aggregateId: "notice",
     attempts: 1,
+    barrierVersion: 3,
     payload: { notificationId: "notice" },
   };
   const db: any = {
+    $queryRaw: vi.fn().mockResolvedValue([]),
     recoveryWriteBarrier: {
-      findUnique: vi.fn().mockResolvedValue({ active: false }),
+      findUnique: vi.fn().mockResolvedValue({ active: false, version: 3 }),
     },
     emailDelivery: {
       findUnique: vi.fn().mockResolvedValue(null),
@@ -30,9 +33,11 @@ function make(fail = false) {
       findUnique: vi.fn().mockResolvedValue({ email: "subject@example.test" }),
     },
   };
+  db.$transaction = vi.fn((effect: any) => effect(db));
   const outbox: any = {
     claim: vi.fn().mockResolvedValue(event),
     decryptPayload: vi.fn(),
+    holdsLease: vi.fn().mockResolvedValue(true),
     markSent: vi.fn(),
     markFailure: vi.fn(),
   };
@@ -79,6 +84,7 @@ describe("operational mail privacy and retry", () => {
       expect.any(String),
       "DELIVERY_FAILED",
       5,
+      expect.anything(),
     );
     expect(outbox.markSent).not.toHaveBeenCalled();
   });
@@ -94,5 +100,47 @@ describe("operational mail privacy and retry", () => {
     db.recoveryWriteBarrier.findUnique.mockResolvedValue({ active: true });
     await service.tick();
     expect(outbox.claim).not.toHaveBeenCalled();
+  });
+  it("records the receipt and the outbox state in the claimed epoch", async () => {
+    const { service, db, outbox } = make();
+    await service.tick();
+    expect(outbox.markSent).toHaveBeenCalledWith(
+      "event",
+      expect.any(String),
+      db,
+    );
+    expect(db.emailDelivery.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: "SENT" }),
+      }),
+    );
+  });
+  it("does not prepare an attempt without a live lease", async () => {
+    const { service, db, outbox, email } = make();
+    outbox.holdsLease.mockResolvedValue(false);
+    await service.tick();
+    expect(db.emailDelivery.upsert).not.toHaveBeenCalled();
+    expect(email.send).not.toHaveBeenCalled();
+    expect(outbox.markFailure).not.toHaveBeenCalled();
+  });
+  it("leaves the event leased when a freeze interrupts the final receipt", async () => {
+    const { service, db, outbox, email } = make();
+    // Epoch 3 at claim; the barrier moves to 4 while SMTP is in flight.
+    db.recoveryWriteBarrier.findUnique
+      .mockResolvedValueOnce({ active: false, version: 3 }) // worker check
+      .mockResolvedValueOnce({ active: false, version: 3 }) // attempt preparation
+      .mockResolvedValue({ active: false, version: 4 });
+    await service.tick();
+    expect(email.send).toHaveBeenCalledOnce();
+    expect(outbox.markSent).not.toHaveBeenCalled();
+    expect(outbox.markFailure).not.toHaveBeenCalled();
+  });
+  it("skips the cycle when a freeze lands between the check and the claim", async () => {
+    const { service, outbox, email } = make();
+    outbox.claim.mockRejectedValue(
+      new ApiException("RECOVERY_WRITE_BARRIER_ACTIVE", 503),
+    );
+    await service.tick();
+    expect(email.send).not.toHaveBeenCalled();
   });
 });

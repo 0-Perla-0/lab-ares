@@ -8,6 +8,8 @@ import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "../database/prisma.service";
 import type { Environment } from "../config/environment";
+import type { Prisma } from "../generated/prisma/client";
+import { withWorkerWriteBarrier } from "../common/domain/worker-write-barrier";
 
 export interface DeliveryEvent {
   type: string;
@@ -76,9 +78,11 @@ export class OutboxService {
       },
     });
   }
+  /** The claim is a durable effect: it commits under the write barrier and
+   * returns the epoch so every later transition can be fenced to it. */
   async claim(owner: string, now = new Date()) {
     const until = new Date(now.getTime() + 60_000);
-    return this.prisma.$transaction(async (tx) => {
+    return withWorkerWriteBarrier(this.prisma, async (tx, barrierVersion) => {
       const candidate = await tx.outboxEvent.findFirst({
         where: {
           OR: [
@@ -105,13 +109,35 @@ export class OutboxService {
           attempts: { increment: 1 },
         },
       });
-      return claimed.count
-        ? tx.outboxEvent.findUnique({ where: { id: candidate.id } })
+      const row = claimed.count
+        ? await tx.outboxEvent.findUnique({ where: { id: candidate.id } })
         : null;
+      return row && { ...row, barrierVersion };
     });
   }
-  async markSent(id: string, owner: string) {
-    return this.prisma.outboxEvent.updateMany({
+  /** True only while this owner still holds an unexpired lease. */
+  async holdsLease(
+    id: string,
+    owner: string,
+    client: Prisma.TransactionClient | PrismaService = this.prisma,
+  ) {
+    return (
+      (await client.outboxEvent.count({
+        where: {
+          id,
+          state: "PROCESSING",
+          leaseOwner: owner,
+          leaseUntil: { gt: new Date() },
+        },
+      })) === 1
+    );
+  }
+  async markSent(
+    id: string,
+    owner: string,
+    client: Prisma.TransactionClient | PrismaService = this.prisma,
+  ) {
+    return client.outboxEvent.updateMany({
       where: { id, state: "PROCESSING", leaseOwner: owner },
       data: {
         state: "SENT",
@@ -121,8 +147,14 @@ export class OutboxService {
       },
     });
   }
-  async markFailure(id: string, owner: string, error: string, maxAttempts = 5) {
-    return this.prisma.$transaction(async (tx) => {
+  async markFailure(
+    id: string,
+    owner: string,
+    error: string,
+    maxAttempts = 5,
+    client?: Prisma.TransactionClient,
+  ) {
+    const apply = async (tx: Prisma.TransactionClient | PrismaService) => {
       const row = await tx.outboxEvent.findFirst({
         where: { id, state: "PROCESSING", leaseOwner: owner },
         select: { attempts: true },
@@ -148,6 +180,7 @@ export class OutboxService {
           leaseUntil: null,
         },
       });
-    });
+    };
+    return client ? apply(client) : this.prisma.$transaction(apply);
   }
 }
