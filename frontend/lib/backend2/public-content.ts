@@ -1,4 +1,8 @@
 import { apiRequest } from "@/lib/api";
+import {
+  actionIdempotencyKey,
+  clearActionIdempotencyKey,
+} from "@/lib/backend2/idempotency";
 import type { ApiEnvelope } from "@/lib/types";
 
 export const publicPageSlugs = [
@@ -113,6 +117,23 @@ const body = (value?: unknown): RequestInit => ({
   ...(value === undefined ? {} : { body: JSON.stringify(value) }),
 });
 
+// Mutaciones de páginas: la clave sigue ligada a acción+destino+cuerpo hasta confirmar la respuesta.
+async function mutate<T>(
+  userId: number,
+  action: string,
+  target: string,
+  path: string,
+  payload?: unknown,
+) {
+  const key = actionIdempotencyKey({ userId, action, target, payload });
+  const response = await apiRequest<ApiEnvelope<T>>(path, {
+    ...body(payload),
+    headers: { "Idempotency-Key": key },
+  });
+  clearActionIdempotencyKey({ userId, action, target });
+  return response.data;
+}
+
 export const publicContentApi = {
   publishedPage(slug: string) {
     return apiRequest<ApiEnvelope<PublishedPage>>(
@@ -141,29 +162,43 @@ export const publicContentApi = {
       `/api/public-content/admin/pages/${encodeURIComponent(id)}`,
     ).then((result) => result.data);
   },
-  createPage(input: PublicPageVersionInput & { slug: PublicPageSlug }) {
-    return apiRequest<ApiEnvelope<AdminPublicPage>>(
+  createPage(
+    userId: number,
+    input: PublicPageVersionInput & { slug: PublicPageSlug },
+  ) {
+    return mutate<AdminPublicPage>(
+      userId,
+      "public-content:create-page",
+      input.slug,
       "/api/public-content/admin/pages",
-      body(input),
-    ).then((result) => result.data);
+      input,
+    );
   },
-  createVersion(id: string, input: PublicPageVersionInput) {
-    return apiRequest<ApiEnvelope<AdminPublicVersion>>(
+  createVersion(userId: number, id: string, input: PublicPageVersionInput) {
+    return mutate<AdminPublicVersion>(
+      userId,
+      "public-content:create-version",
+      id,
       `/api/public-content/admin/pages/${encodeURIComponent(id)}/versions`,
-      body(input),
-    ).then((result) => result.data);
+      input,
+    );
   },
-  publish(versionId: string) {
-    return apiRequest<ApiEnvelope<AdminPublicVersion>>(
+  publish(userId: number, versionId: string) {
+    return mutate<AdminPublicVersion>(
+      userId,
+      "public-content:publish",
+      versionId,
       `/api/public-content/admin/versions/${encodeURIComponent(versionId)}/publish`,
-      body(),
-    ).then((result) => result.data);
+    );
   },
-  archivePage(id: string, motivo: string) {
-    return apiRequest<ApiEnvelope<AdminPublicPage>>(
+  archivePage(userId: number, id: string, motivo: string) {
+    return mutate<AdminPublicPage>(
+      userId,
+      "public-content:archive-page",
+      id,
       `/api/public-content/admin/pages/${encodeURIComponent(id)}/archive`,
-      body({ motivo }),
-    ).then((result) => result.data);
+      { motivo },
+    );
   },
   classifyAsset(archivoId: string) {
     return apiRequest<ApiEnvelope<PublicAsset>>(

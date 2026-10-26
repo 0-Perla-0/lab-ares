@@ -106,8 +106,12 @@ describe("Backend 2 domain C contracts", () => {
       ],
     };
     requestMock.mockResolvedValue({ data: { id: "page-1" } });
-    await publicContentApi.createPage({ slug: "servicio-social", ...input });
+    await publicContentApi.createPage(7, {
+      slug: "servicio-social",
+      ...input,
+    });
     const options = requestMock.mock.calls[0][1] as RequestInit;
+    expect(new Headers(options.headers).get("Idempotency-Key")).toBeTruthy();
     const body = JSON.parse(String(options.body)) as typeof input;
     expect(body.bloques.map((block) => block.tipo)).toEqual([
       "TEXTO",

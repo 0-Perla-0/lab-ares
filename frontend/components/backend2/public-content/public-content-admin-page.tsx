@@ -98,8 +98,9 @@ export function PublicContentAdminPage() {
     setBusy(true);
     setError("");
     try {
-      if (editorId) await publicContentApi.createVersion(editorId, version);
-      else await publicContentApi.createPage({ slug, ...version });
+      if (editorId)
+        await publicContentApi.createVersion(user.id, editorId, version);
+      else await publicContentApi.createPage(user.id, { slug, ...version });
       setEditorId(undefined);
       setVersion(initialVersion);
       setNotice(editorId ? "Nueva versión creada." : "Página creada.");
@@ -478,7 +479,7 @@ export function PublicContentAdminPage() {
                     type="button"
                     onClick={() =>
                       void act(
-                        () => publicContentApi.publish(item.id),
+                        () => publicContentApi.publish(user.id, item.id),
                         "Versión publicada.",
                       )
                     }
@@ -510,7 +511,12 @@ export function PublicContentAdminPage() {
                     window.confirm("¿Archivar esta página pública?")
                   )
                     void act(
-                      () => publicContentApi.archivePage(selected.id, motivo),
+                      () =>
+                        publicContentApi.archivePage(
+                          user.id,
+                          selected.id,
+                          motivo,
+                        ),
                       "Página archivada.",
                     );
                 }}

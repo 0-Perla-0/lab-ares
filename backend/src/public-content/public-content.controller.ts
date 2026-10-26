@@ -7,13 +7,13 @@ import {
   Post,
   Query,
   Req,
-  UsePipes,
 } from "@nestjs/common";
 import type { Request } from "express";
 import { getAuthenticatedUser } from "../auth/authenticated-user";
 import { Permission } from "../auth/permissions";
 import { RequirePermissions } from "../auth/require-permissions.decorator";
 import { Public } from "../auth/public.decorator";
+import { IdempotencyKey } from "../common/http/idempotency-key.decorator";
 import { ZodValidationPipe } from "../common/validation/zod-validation.pipe";
 import {
   archivePublicAssetSchema,
@@ -68,32 +68,39 @@ export class PublicContentController {
 
   @Post("admin/pages")
   @RequirePermissions(Permission.PUBLIC_CONTENT_DRAFT)
-  @UsePipes(new ZodValidationPipe(createPublicPageSchema))
-  createPage(@Req() req: Request, @Body() body: any) {
+  createPage(
+    @Req() req: Request,
+    @IdempotencyKey() key: string,
+    @Body(new ZodValidationPipe(createPublicPageSchema)) body: any,
+  ) {
     return this.content
-      .createPage(getAuthenticatedUser(req), body)
+      .createPage(getAuthenticatedUser(req), key, body)
       .then((data) => ({ data }));
   }
 
   @Post("admin/pages/:id/versions")
   @RequirePermissions(Permission.PUBLIC_CONTENT_DRAFT)
-  @UsePipes(new ZodValidationPipe(createPublicVersionSchema))
   createVersion(
     @Req() req: Request,
+    @IdempotencyKey() key: string,
     @Param("id") id: string,
-    @Body() body: any,
+    @Body(new ZodValidationPipe(createPublicVersionSchema)) body: any,
   ) {
     return this.content
-      .createVersion(getAuthenticatedUser(req), id, body)
+      .createVersion(getAuthenticatedUser(req), key, id, body)
       .then((data) => ({ data }));
   }
 
   @Post("admin/versions/:id/publish")
   @HttpCode(200)
   @RequirePermissions(Permission.PUBLIC_CONTENT_PUBLISH)
-  publish(@Req() req: Request, @Param("id") id: string) {
+  publish(
+    @Req() req: Request,
+    @IdempotencyKey() key: string,
+    @Param("id") id: string,
+  ) {
     return this.content
-      .publish(getAuthenticatedUser(req), id)
+      .publish(getAuthenticatedUser(req), key, id)
       .then((data) => ({ data }));
   }
 
@@ -102,11 +109,12 @@ export class PublicContentController {
   @RequirePermissions(Permission.PUBLIC_CONTENT_ARCHIVE)
   archivePage(
     @Req() req: Request,
+    @IdempotencyKey() key: string,
     @Param("id") id: string,
     @Body(new ZodValidationPipe(archivePublicPageSchema)) body: any,
   ) {
     return this.content
-      .archivePage(getAuthenticatedUser(req), id, body.motivo)
+      .archivePage(getAuthenticatedUser(req), key, id, body.motivo)
       .then((data) => ({ data }));
   }
 
