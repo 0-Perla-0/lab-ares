@@ -33,6 +33,8 @@ import {
 import { S3Storage } from "../storage/s3.storage";
 import { StorageService } from "../storage/storage.service";
 import { ObjectDeletionService } from "../storage/object-deletion.service";
+import { OrphanObjectDeletionService } from "../storage/orphan-object-deletion.service";
+import { StorageReconciler } from "../storage/storage.reconciler";
 import { DomainTransaction } from "../common/domain/domain-transaction";
 import {
   retentionAdapters,
@@ -163,7 +165,137 @@ export class RetentionService {
     private readonly storage: StorageService,
     private readonly objectStorage: S3Storage,
     @Optional() private readonly objectDeletions?: ObjectDeletionService,
+    @Optional() private readonly orphanCleanup?: OrphanObjectDeletionService,
+    @Optional() private readonly reconciler?: StorageReconciler,
   ) {}
+
+  private get cleanup() {
+    return (
+      this.orphanCleanup ??
+      new OrphanObjectDeletionService(
+        this.prisma,
+        this.objectStorage,
+        this.config,
+        this.deletions,
+      )
+    );
+  }
+
+  /** Cleanup is irreversible and global: only a live GLOBAL executor may drive it. */
+  private authorizeCleanup(actor: AuthUser) {
+    return async (tx: Prisma.TransactionClient) => {
+      await tx.$queryRaw`SELECT id FROM Usuario WHERE id = ${actor.id} LOCK IN SHARE MODE`;
+      const fresh = await tx.usuario.findUnique({ where: { id: actor.id } });
+      if (
+        !fresh ||
+        fresh.estado !== "ACTIVA" ||
+        getAccessScope(fresh, Permission.RETENTION_EXECUTE) !==
+          AccessScope.GLOBAL
+      )
+        throw api("UNAUTHORIZED", 401);
+    };
+  }
+
+  async listObjectCleanups(actor: AuthUser, page = 1, pageSize = 20) {
+    this.require(actor, Permission.RETENTION_READ);
+    return this.cleanup.list(page, pageSize);
+  }
+
+  async objectCleanupCandidates(actor: AuthUser, limit = 50) {
+    this.require(actor, Permission.RETENTION_EXECUTE);
+    if (!this.reconciler) throw api("OBJECT_CLEANUP_UNAVAILABLE", 503);
+    const found = await this.reconciler.cleanupCandidates(limit);
+    return {
+      orphans: found.orphans.map((row) => ({ kind: "ORPHAN_OBJECT", ...row })),
+      quarantineCopies: found.quarantineCopies.map((row) => ({
+        kind: "QUARANTINE_COPY",
+        ...row,
+      })),
+      semantics:
+        "Candidates are a read-only proposal. Each one is revalidated against references, holds, age and the served copy before anything is sealed or deleted.",
+    };
+  }
+
+  async cleanupObject(
+    actor: AuthUser,
+    key: string,
+    input: {
+      kind: "ORPHAN_OBJECT" | "QUARANTINE_COPY";
+      bucket: "quarantine" | "available";
+      key: string;
+    },
+  ) {
+    this.require(actor, Permission.RETENTION_EXECUTE);
+    const authorize = this.authorizeCleanup(actor);
+    const accepted = await new DomainTransaction(this.prisma).run(
+      actor,
+      key,
+      { action: "OBJECT_CLEANUP", input },
+      async (tx) => {
+        await authorize(tx);
+        const job = await this.cleanup.prepare(tx, input);
+        await this.audit.append(
+          {
+            actorId: actor.id,
+            action: "OBJECT_CLEANUP_REQUESTED",
+            resource: "object_cleanup",
+            objectId: job.id,
+            metadata: { kind: input.kind, bucket: input.bucket },
+          },
+          tx,
+        );
+        return { id: job.id };
+      },
+      authorize,
+    );
+    // The SQL receipt is committed; the irreversible I/O never runs inside it.
+    await this.cleanup.process(accepted.id, authorize);
+    await withWorkerWriteBarrier(this.prisma, async (tx) => {
+      await authorize(tx);
+      await this.cleanup.complete(tx, accepted.id);
+    });
+    return {
+      ...accepted,
+      state: "COMPLETE",
+      semantics:
+        "COMPLETE means the sealed exact versions were verified absent. Replaying the key re-checks current evidence and never deletes twice.",
+    };
+  }
+
+  async reconcileObjectCleanup(actor: AuthUser, id: string, key: string) {
+    this.require(actor, Permission.RETENTION_EXECUTE);
+    this.id(id);
+    const authorize = this.authorizeCleanup(actor);
+    const accepted = await new DomainTransaction(this.prisma).run(
+      actor,
+      key,
+      { action: "OBJECT_CLEANUP_RECONCILE", id },
+      async (tx) => {
+        await authorize(tx);
+        if (
+          !(await tx.orphanObjectDeletion.findUnique({
+            where: { id },
+            select: { id: true },
+          }))
+        )
+          throw api("OBJECT_CLEANUP_NOT_FOUND", 404);
+        return { id, accepted: true };
+      },
+      authorize,
+    );
+    const state = await this.cleanup.reconcile(id, authorize);
+    if (state === "VERIFIED")
+      await withWorkerWriteBarrier(this.prisma, async (tx) => {
+        await authorize(tx);
+        await this.cleanup.complete(tx, id);
+      });
+    return {
+      ...accepted,
+      state: state === "VERIFIED" ? "COMPLETE" : state,
+      semantics:
+        "Read-only S3 inspection: no DELETE is emitted by a reconcile. UNCONFIRMED is not success.",
+    };
+  }
 
   private get deletions() {
     return (

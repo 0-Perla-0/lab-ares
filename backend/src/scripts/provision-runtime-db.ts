@@ -21,12 +21,13 @@ export function runtimeGrants(
     "auditevent",
     "formalizacionexpediente",
     "eventoperiodoservicio",
+    "objectdeletionacknowledgement",
   ]);
   return tables
     .filter((t) => t.toLowerCase() !== "_prisma_migrations")
     .map(
       (table) =>
-        `GRANT ${appendOnly.has(table.toLowerCase()) ? "SELECT, INSERT" : table.toLowerCase() === "objectdeletionjob" ? "SELECT, INSERT, UPDATE" : "SELECT, INSERT, UPDATE, DELETE"} ON \`${database}\`.\`${table}\` TO '${user}'@'${host}'`,
+        `GRANT ${appendOnly.has(table.toLowerCase()) ? "SELECT, INSERT" : ["objectdeletionjob", "orphanobjectdeletion"].includes(table.toLowerCase()) ? "SELECT, INSERT, UPDATE" : "SELECT, INSERT, UPDATE, DELETE"} ON \`${database}\`.\`${table}\` TO '${user}'@'${host}'`,
     );
 }
 

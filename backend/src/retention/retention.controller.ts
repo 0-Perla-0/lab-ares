@@ -36,6 +36,23 @@ import {
 } from "./retention.schemas";
 import { RetentionService } from "./retention.service";
 
+const cleanupListSchema = z
+  .object({
+    page: z.coerce.number().int().min(1).max(10000).default(1),
+    pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  })
+  .strict();
+const cleanupCandidatesSchema = z
+  .object({ limit: z.coerce.number().int().min(1).max(200).default(50) })
+  .strict();
+const cleanupObjectSchema = z
+  .object({
+    kind: z.enum(["ORPHAN_OBJECT", "QUARANTINE_COPY"]),
+    bucket: z.enum(["quarantine", "available"]),
+    key: z.string().min(1).max(500),
+  })
+  .strict();
+
 @Controller("retention")
 export class RetentionController {
   constructor(private readonly retention: RetentionService) {}
@@ -91,6 +108,69 @@ export class RetentionController {
   ) {
     return {
       data: await this.retention.reconcileObjectDeletion(
+        getAuthenticatedUser(req),
+        id,
+        this.idempotencyKey(key),
+      ),
+    };
+  }
+  @Get("object-cleanup")
+  @RequirePermissions(Permission.RETENTION_READ)
+  async objectCleanups(
+    @Req() req: Request,
+    @Query(new ZodValidationPipe(cleanupListSchema))
+    query: { page: number; pageSize: number },
+  ) {
+    return {
+      data: await this.retention.listObjectCleanups(
+        getAuthenticatedUser(req),
+        query.page,
+        query.pageSize,
+      ),
+    };
+  }
+  @Get("object-cleanup/candidates")
+  @RequirePermissions(Permission.RETENTION_EXECUTE)
+  async objectCleanupCandidates(
+    @Req() req: Request,
+    @Query(new ZodValidationPipe(cleanupCandidatesSchema))
+    query: { limit: number },
+  ) {
+    return {
+      data: await this.retention.objectCleanupCandidates(
+        getAuthenticatedUser(req),
+        query.limit,
+      ),
+    };
+  }
+  @Post("object-cleanup")
+  @HttpCode(200)
+  @RequirePermissions(Permission.RETENTION_EXECUTE)
+  async objectCleanup(
+    @Req() req: Request,
+    @Headers("idempotency-key") key: string | undefined,
+    @Body(new ZodValidationPipe(cleanupObjectSchema))
+    body: z.infer<typeof cleanupObjectSchema>,
+  ) {
+    return {
+      data: await this.retention.cleanupObject(
+        getAuthenticatedUser(req),
+        this.idempotencyKey(key),
+        body,
+      ),
+    };
+  }
+  @Post("object-cleanup/:id/reconcile")
+  @HttpCode(200)
+  @RequirePermissions(Permission.RETENTION_EXECUTE)
+  async reconcileCleanup(
+    @Req() req: Request,
+    @Param("id", new ZodValidationPipe(z.string().regex(/^c[a-z0-9]{20,30}$/)))
+    id: string,
+    @Headers("idempotency-key") key: string | undefined,
+  ) {
+    return {
+      data: await this.retention.reconcileObjectCleanup(
         getAuthenticatedUser(req),
         id,
         this.idempotencyKey(key),

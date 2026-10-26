@@ -48,6 +48,7 @@ import {
   type SuppressionRequest,
 } from "@/lib/backend2/retention";
 import { hasPermission, permissions } from "@/lib/permissions";
+import { ObjectCleanupPanel } from "./object-cleanup-panel";
 
 type AdminData = {
   rules: PageResult<RetentionRule>;
@@ -614,6 +615,8 @@ export function RetentionPage() {
               ))}
             </CardGrid>
           </Panel>
+
+          {canExecute && <ObjectCleanupPanel />}
         </>
       )}
 

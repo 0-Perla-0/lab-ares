@@ -97,3 +97,42 @@ test("retención crea solicitud y exige confirmación para reaplicar el ledger",
     )
     .toBe(true);
 });
+
+test("limpieza de objetos propone candidatos y exige confirmación antes de eliminar", async ({
+  page,
+}) => {
+  const state = await installBackend2Api(page);
+  await page.goto("/portal/retencion");
+  await page.getByRole("button", { name: "Buscar candidatos" }).click();
+  await expect(page.getByText("synthetic/stray-object")).toBeVisible();
+  expect(
+    state.requests.some(
+      (item) =>
+        item.method === "POST" && item.path === "/api/retention/object-cleanup",
+    ),
+  ).toBe(false);
+  page.once("dialog", (browserDialog) => browserDialog.dismiss());
+  await page.getByRole("button", { name: "Eliminar" }).click();
+  expect(
+    state.requests.some(
+      (item) =>
+        item.method === "POST" && item.path === "/api/retention/object-cleanup",
+    ),
+  ).toBe(false);
+  page.once("dialog", (browserDialog) => browserDialog.accept());
+  await page.getByRole("button", { name: "Eliminar" }).click();
+  await expect
+    .poll(() =>
+      state.requests.some(
+        (item) =>
+          item.method === "POST" &&
+          item.path === "/api/retention/object-cleanup",
+      ),
+    )
+    .toBe(true);
+  const sent = state.requests.find(
+    (item) =>
+      item.path === "/api/retention/object-cleanup" && item.method === "POST",
+  );
+  expect(sent?.headers?.["idempotency-key"]).toBeTruthy();
+});

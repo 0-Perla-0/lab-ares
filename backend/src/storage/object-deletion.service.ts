@@ -21,7 +21,7 @@ import { AuditService } from "../auth/audit.service";
 import { parseDeletionKeyring } from "./deletion-keyring";
 
 const LEASE_MS = 120000;
-const manifestSchema = z
+export const manifestSchema = z
   .object({
     protocol: z.literal("ares-object-deletion-v1"),
     operationId: z.string(),
@@ -30,6 +30,8 @@ const manifestSchema = z
       "GENERATED_REPORT",
       "REJECTED_FILE",
       "ABSENCE_ATTACHMENT",
+      "ORPHAN_OBJECT",
+      "QUARANTINE_COPY",
     ]),
     storageNamespace: z.string().regex(/^[a-f0-9]{64}$/),
     occurredAt: z.iso.datetime(),
@@ -76,9 +78,17 @@ export type RecoveryAssessment = {
   }>;
   truncated: boolean;
 };
-export type DeletionPurpose = z.infer<typeof manifestSchema>["purpose"];
-const hash = (value: unknown) =>
-  createHash("sha256").update(canonicalOperation(value)).digest("hex");
+export type DeletionManifest = z.infer<typeof manifestSchema>;
+/** Purposes tied to an Archivo row; object-level cleanup has its own table. */
+export type DeletionPurpose = Exclude<
+  DeletionManifest["purpose"],
+  "ORPHAN_OBJECT" | "QUARANTINE_COPY"
+>;
+export const manifestHash = hashOf;
+function hashOf(value: unknown) {
+  return createHash("sha256").update(canonicalOperation(value)).digest("hex");
+}
+const hash = hashOf;
 
 /** Irreversible I/O is never inside the SQL effect transaction. A committed
  * reservation and immutable external intent survive crashes/ambiguous replies. */
@@ -90,7 +100,23 @@ export class ObjectDeletionService {
     private readonly config: ConfigService<Environment, true>,
     @Optional() private readonly audit?: AuditService,
   ) {}
-  private append(tx: Prisma.TransactionClient, action: string, id: string) {
+  /** Seals an unsigned manifest with the active signing key. */
+  sign(unsigned: Omit<DeletionManifest, "signature">): DeletionManifest {
+    const manifest = manifestSchema.parse({
+      ...unsigned,
+      signature: createHmac(
+        "sha256",
+        this.config.get("SUPPRESSION_JOURNAL_HMAC_SECRET"),
+      )
+        .update(canonicalOperation(unsigned))
+        .digest("hex"),
+    });
+    if (Buffer.byteLength(canonicalOperation(manifest)) > 1048576)
+      throw new ApiException("OBJECT_DELETION_INVENTORY_TOO_LARGE", 409);
+    return manifest;
+  }
+
+  append(tx: Prisma.TransactionClient, action: string, id: string) {
     return (this.audit ?? new AuditService(this.db)).append(
       {
         actorType: "SYSTEM",
@@ -328,7 +354,55 @@ export class ObjectDeletionService {
     manifestHash: string;
     manifestRef: string;
   }) {
-    const parsed = manifestSchema.safeParse(job.manifest);
+    const manifest = this.verifySigned(job.manifest);
+    if (
+      manifest.operationId !== job.id ||
+      manifest.fileFingerprint !== hash(job.fileId) ||
+      manifest.purpose !== job.purpose ||
+      hash(manifest) !== job.manifestHash ||
+      job.manifestRef !== `deletion-intents/${job.id}-${job.manifestHash}.json`
+    )
+      throw new ApiException("OBJECT_DELETION_MANIFEST_INVALID", 409);
+    // Object-level purposes belong to OrphanObjectDeletion, never to a file job.
+    if (
+      manifest.purpose === "ORPHAN_OBJECT" ||
+      manifest.purpose === "QUARANTINE_COPY"
+    )
+      throw new ApiException("OBJECT_DELETION_MANIFEST_INVALID", 409);
+    return manifest as DeletionManifest & { purpose: DeletionPurpose };
+  }
+
+  /** Same checks for an object-level job: identity is bucket+key, never a file. */
+  verifyObjectJob(job: {
+    id: string;
+    kind: string;
+    bucket: string;
+    objectKey: string;
+    manifest: unknown;
+    manifestHash: string;
+    manifestRef: string;
+  }) {
+    const manifest = this.verifySigned(job.manifest);
+    const [target, ...rest] = manifest.targets;
+    if (
+      manifest.operationId !== job.id ||
+      manifest.fileFingerprint !== hash(`${job.bucket}:${job.objectKey}`) ||
+      manifest.purpose !== job.kind ||
+      (manifest.purpose !== "ORPHAN_OBJECT" &&
+        manifest.purpose !== "QUARANTINE_COPY") ||
+      rest.length ||
+      target?.bucket !== job.bucket ||
+      target?.key !== job.objectKey ||
+      hash(manifest) !== job.manifestHash ||
+      job.manifestRef !== `deletion-intents/${job.id}-${job.manifestHash}.json`
+    )
+      throw new ApiException("OBJECT_DELETION_MANIFEST_INVALID", 409);
+    return manifest;
+  }
+
+  /** Schema, signing key, HMAC and storage namespace; identity is checked by the caller. */
+  verifySigned(raw: unknown): DeletionManifest {
+    const parsed = manifestSchema.safeParse(raw);
     if (!parsed.success)
       throw new ApiException("OBJECT_DELETION_MANIFEST_INVALID", 409);
     const manifest = parsed.data;
@@ -351,14 +425,6 @@ export class ObjectDeletionService {
       throw new ApiException("OBJECT_DELETION_MANIFEST_INVALID", 409);
     if (manifest.storageNamespace !== this.storage.deletionNamespace())
       throw new ApiException("OBJECT_DELETION_STORAGE_CHANGED", 409);
-    if (
-      manifest.operationId !== job.id ||
-      manifest.fileFingerprint !== hash(job.fileId) ||
-      manifest.purpose !== job.purpose ||
-      hash(manifest) !== job.manifestHash ||
-      job.manifestRef !== `deletion-intents/${job.id}-${job.manifestHash}.json`
-    )
-      throw new ApiException("OBJECT_DELETION_MANIFEST_INVALID", 409);
     return manifest;
   }
   private identity(
@@ -375,7 +441,7 @@ export class ObjectDeletionService {
       throw new ApiException("OBJECT_DELETION_IDENTITY_CHANGED", 409);
   }
 
-  private async inventory(targets: DeletionTarget[], signal: AbortSignal) {
+  async inventory(targets: DeletionTarget[], signal: AbortSignal) {
     const present: DeletionTarget[] = [];
     for (const target of targets) {
       const versions = await this.storage.deletionVersions(
@@ -398,7 +464,7 @@ export class ObjectDeletionService {
     return present;
   }
 
-  private async publishIntent(ref: string, body: Buffer, signal: AbortSignal) {
+  async publishIntent(ref: string, body: Buffer, signal: AbortSignal) {
     try {
       await this.storage.putSuppressionJournal(ref, body, signal);
     } catch (error) {
@@ -698,49 +764,79 @@ export class ObjectDeletionService {
     });
     return "VERIFIED";
   }
+  /** Every external intent a restored SQL snapshot may or may not know about. */
+  private async knownIntents() {
+    const known = new Map<string, DeletionManifest>();
+    let after: string | undefined;
+    for (;;) {
+      const page = await this.db.objectDeletionJob.findMany({
+        where: after ? { id: { gt: after } } : {},
+        orderBy: { id: "asc" },
+        take: 200,
+      });
+      for (const job of page) known.set(job.manifestRef, this.manifest(job));
+      if (known.size > 10000) return null;
+      if (page.length < 200) break;
+      after = page.at(-1)!.id;
+    }
+    let afterOrphan: string | undefined;
+    for (;;) {
+      const page = await this.db.orphanObjectDeletion.findMany({
+        where: afterOrphan ? { id: { gt: afterOrphan } } : {},
+        orderBy: { id: "asc" },
+        take: 200,
+      });
+      for (const job of page)
+        known.set(job.manifestRef, this.verifyObjectJob(job));
+      if (known.size > 10000) return null;
+      if (page.length < 200) break;
+      afterOrphan = page.at(-1)!.id;
+    }
+    return known;
+  }
+
+  private async acknowledgedRefs() {
+    const rows = await this.db.objectDeletionAcknowledgement.findMany({
+      select: { manifestRef: true },
+      take: 10001,
+    });
+    return new Set(rows.map((row) => row.manifestRef));
+  }
+
   /** Read-only, bounded comparison between SQL intents and the external intent
    * store. It never imports, deletes or closes anything; it only explains why
    * reopening is (not) safe. Caps fail closed through `truncated`. */
   async recoveryAssessment(): Promise<RecoveryAssessment> {
     const result: RecoveryAssessment = {
       ready: false,
-      unfinishedJobs: await this.db.objectDeletionJob.count({
-        where: { state: { not: "COMPLETE" } },
-      }),
+      unfinishedJobs:
+        (await this.db.objectDeletionJob.count({
+          where: { state: { not: "COMPLETE" } },
+        })) +
+        (await this.db.orphanObjectDeletion.count({
+          where: { state: { not: "COMPLETE" } },
+        })),
       orphanIntents: [],
       truncated: false,
     };
     if (result.unfinishedJobs) return result;
-    const known = new Map<
-      string,
-      Awaited<ReturnType<typeof this.db.objectDeletionJob.findMany>>[number]
-    >();
-    let after: string | undefined;
-    while (true) {
-      const page = await this.db.objectDeletionJob.findMany({
-        where: after ? { id: { gt: after } } : {},
-        orderBy: { id: "asc" },
-        take: 200,
-      });
-      for (const job of page) known.set(job.manifestRef, job);
-      if (known.size > 10000) return { ...result, truncated: true };
-      if (page.length < 200) break;
-      after = page.at(-1)!.id;
-    }
+    const known = await this.knownIntents();
+    if (!known) return { ...result, truncated: true };
+    const acknowledged = await this.acknowledgedRefs();
     let cursor: string | undefined,
       seen = 0;
     do {
       const page = await this.storage.listDeletionIntents(cursor);
       for (const ref of page.keys) {
         if (++seen > 10000) return { ...result, truncated: true };
-        const job = known.get(ref);
-        if (!job) {
+        if (acknowledged.has(ref)) continue;
+        const manifest = known.get(ref);
+        if (!manifest) {
           // Written after the restored snapshot: SQL does not know this intent.
           result.orphanIntents.push({ ref, reason: "NOT_IN_SQL" });
           continue;
         }
-        const manifest = this.manifest(job),
-          body = Buffer.from(canonicalOperation(manifest));
+        const body = Buffer.from(canonicalOperation(manifest));
         const stream = await this.storage.getSuppressionJournal(
           ref,
           AbortSignal.timeout(10000),
@@ -786,5 +882,345 @@ export class ObjectDeletionService {
 
   async recoveryReady() {
     return (await this.recoveryAssessment()).ready;
+  }
+
+  /** External intents (bounded) that neither a job nor an acknowledgement explains. */
+  async unknownIntents(limit = 100) {
+    const known = await this.knownIntents();
+    if (!known)
+      throw new ApiException("OBJECT_DELETION_INVENTORY_TOO_LARGE", 409);
+    const acknowledged = await this.acknowledgedRefs();
+    const refs: string[] = [];
+    let cursor: string | undefined,
+      seen = 0;
+    do {
+      const page = await this.storage.listDeletionIntents(cursor);
+      for (const ref of page.keys) {
+        if (++seen > 10000)
+          throw new ApiException("OBJECT_DELETION_INVENTORY_TOO_LARGE", 409);
+        if (!known.has(ref) && !acknowledged.has(ref) && refs.length < limit)
+          refs.push(ref);
+      }
+      cursor = page.nextCursor;
+    } while (cursor);
+    return refs.sort();
+  }
+
+  /** Control-plane writes during a freeze: valid only for the run that owns the barrier. */
+  private async underRecovery<T>(
+    runId: string,
+    version: number,
+    effect: (tx: Prisma.TransactionClient) => Promise<T>,
+  ) {
+    return this.db.$transaction(
+      async (tx) => {
+        await tx.$queryRaw`SELECT id FROM RecoveryWriteBarrier WHERE id = 'global' LOCK IN SHARE MODE`;
+        const barrier = await tx.recoveryWriteBarrier.findUnique({
+          where: { id: "global" },
+        });
+        if (
+          !barrier?.active ||
+          barrier.runId !== runId ||
+          barrier.version !== version
+        )
+          throw new ApiException("RECOVERY_BARRIER_LOST", 503);
+        return effect(tx);
+      },
+      { isolationLevel: "ReadCommitted", timeout: 30000 },
+    );
+  }
+
+  private async readIntent(ref: string) {
+    const stream = await this.storage.getSuppressionJournal(
+      ref,
+      AbortSignal.timeout(10000),
+    );
+    const chunks: Buffer[] = [];
+    let size = 0;
+    for await (const chunk of stream) {
+      size += chunk.length;
+      if (size > 1048576) {
+        stream.destroy();
+        throw new ApiException("OBJECT_DELETION_MANIFEST_INVALID", 409);
+      }
+      chunks.push(Buffer.from(chunk));
+    }
+    const body = Buffer.concat(chunks);
+    let raw: unknown;
+    try {
+      raw = JSON.parse(body.toString("utf8"));
+    } catch {
+      throw new ApiException("OBJECT_DELETION_MANIFEST_INVALID", 409);
+    }
+    const manifest = this.verifySigned(raw);
+    // The stored bytes must be exactly the canonical sealed manifest under its own name.
+    if (
+      !body.equals(Buffer.from(canonicalOperation(manifest))) ||
+      ref !== `deletion-intents/${manifest.operationId}-${hash(manifest)}.json`
+    )
+      throw new ApiException("OBJECT_DELETION_MANIFEST_INVALID", 409);
+    return manifest;
+  }
+
+  /**
+   * After a restore to an earlier snapshot, imports an external intent the SQL
+   * does not know. The sealed manifest is verified (HMAC, namespace, exact bytes);
+   * the job enters UNCERTAIN, never DISPATCHED-by-us, so the only way forward is
+   * the read-only reconcile. A subject that does not exist in the snapshot (the
+   * file was created after it) is acknowledged instead of imported.
+   */
+  async importExternalIntent(
+    ref: string,
+    runId: string,
+    version: number,
+  ): Promise<{
+    outcome: "IMPORTED" | "ACKNOWLEDGED" | "ALREADY_KNOWN";
+    id?: string;
+  }> {
+    const manifest = await this.readIntent(ref);
+    const manifestDigest = hash(manifest);
+    const objectPurpose =
+      manifest.purpose === "ORPHAN_OBJECT" ||
+      manifest.purpose === "QUARANTINE_COPY";
+    const occurredAt = new Date(manifest.occurredAt);
+    return this.underRecovery(runId, version, async (tx) => {
+      const known =
+        (await tx.objectDeletionJob.findUnique({
+          where: { manifestRef: ref },
+          select: { id: true },
+        })) ??
+        (await tx.orphanObjectDeletion.findUnique({
+          where: { manifestRef: ref },
+          select: { id: true },
+        })) ??
+        (await tx.objectDeletionAcknowledgement.findUnique({
+          where: { manifestRef: ref },
+          select: { id: true },
+        }));
+      if (known) return { outcome: "ALREADY_KNOWN" as const };
+      const acknowledge = async (reason: "SUBJECT_ABSENT_IN_SNAPSHOT") => {
+        await tx.objectDeletionAcknowledgement.create({
+          data: {
+            manifestRef: ref,
+            manifestHash: manifestDigest,
+            purpose: manifest.purpose,
+            reason,
+            recoveryRunId: runId,
+          },
+        });
+        await this.append(
+          tx,
+          "OBJECT_DELETION_INTENT_ACKNOWLEDGED",
+          manifest.operationId,
+        );
+        return { outcome: "ACKNOWLEDGED" as const };
+      };
+      if (objectPurpose) {
+        const target = manifest.targets[0];
+        if (
+          manifest.targets.length !== 1 ||
+          manifest.fileFingerprint !== hash(`${target.bucket}:${target.key}`)
+        )
+          throw new ApiException("OBJECT_DELETION_MANIFEST_INVALID", 409);
+        const owner =
+          manifest.purpose === "QUARANTINE_COPY"
+            ? await tx.archivo.findFirst({
+                where: { quarantineKey: target.key },
+                select: { id: true },
+              })
+            : null;
+        const created = await tx.orphanObjectDeletion.create({
+          data: {
+            id: manifest.operationId,
+            kind: manifest.purpose,
+            bucket: target.bucket,
+            objectKey: target.key,
+            activeKey: `${target.bucket}:${target.key}`,
+            archivoId: owner?.id ?? null,
+            manifest: manifest as Prisma.InputJsonValue,
+            manifestHash: manifestDigest,
+            manifestRef: ref,
+            state: "UNCERTAIN",
+            manifestPublishedAt: occurredAt,
+            irreversibleAt: occurredAt,
+          },
+        });
+        await this.append(tx, "OBJECT_DELETION_INTENT_IMPORTED", created.id);
+        return { outcome: "IMPORTED" as const, id: created.id };
+      }
+      const subject = await this.findFileByFingerprint(
+        tx,
+        manifest.fileFingerprint,
+      );
+      if (!subject) return acknowledge("SUBJECT_ABSENT_IN_SNAPSHOT");
+      if (
+        await tx.objectDeletionJob.findUnique({ where: { fileId: subject.id } })
+      )
+        throw new ApiException("OBJECT_DELETION_PURPOSE_MISMATCH", 409);
+      await tx.$queryRaw`SELECT id FROM Archivo WHERE id = ${subject.id} FOR UPDATE`;
+      const resourceId = await this.importedResource(
+        tx,
+        manifest.purpose,
+        subject.id,
+      );
+      const job = await tx.objectDeletionJob.create({
+        data: {
+          id: manifest.operationId,
+          fileId: subject.id,
+          purpose: manifest.purpose,
+          resourceId,
+          originalStatus: subject.status,
+          manifest: manifest as Prisma.InputJsonValue,
+          manifestHash: manifestDigest,
+          manifestRef: ref,
+          state: "UNCERTAIN",
+          manifestPublishedAt: occurredAt,
+          irreversibleAt: occurredAt,
+        },
+      });
+      // Reserve the file like prepare() does so nothing new attaches to it.
+      if (subject.status !== "ELIMINADO")
+        await tx.archivo.update({
+          where: { id: subject.id },
+          data: { status: "ELIMINACION_PENDIENTE" },
+        });
+      await this.append(tx, "OBJECT_DELETION_INTENT_IMPORTED", job.id);
+      return { outcome: "IMPORTED" as const, id: job.id };
+    });
+  }
+
+  private async findFileByFingerprint(
+    tx: Prisma.TransactionClient,
+    fingerprint: string,
+  ) {
+    // The manifest stores only hash(fileId): rediscover the subject by scanning ids.
+    let after: string | undefined;
+    for (let scanned = 0; scanned < 100000;) {
+      const page = await tx.archivo.findMany({
+        where: after ? { id: { gt: after } } : {},
+        orderBy: { id: "asc" },
+        take: 500,
+        select: { id: true, status: true },
+      });
+      const hit = page.find((row) => hash(row.id) === fingerprint);
+      if (hit) return hit;
+      scanned += page.length;
+      if (page.length < 500) return null;
+      after = page.at(-1)!.id;
+    }
+    throw new ApiException("OBJECT_DELETION_INVENTORY_TOO_LARGE", 409);
+  }
+
+  /** The owner a purpose needs; ambiguity fails closed instead of guessing. */
+  private async importedResource(
+    tx: Prisma.TransactionClient,
+    purpose: DeletionManifest["purpose"],
+    fileId: string,
+  ) {
+    if (purpose === "REJECTED_FILE") return fileId;
+    if (purpose === "GENERATED_REPORT") return undefined;
+    const owners = new Set([
+      ...(
+        await tx.justificacionAusencia.findMany({
+          where: { archivoId: fileId },
+          select: { ausenciaId: true },
+        })
+      ).map((row) => row.ausenciaId),
+      ...(
+        await tx.apelacionAusencia.findMany({
+          where: { archivoId: fileId },
+          select: { ausenciaId: true },
+        })
+      ).map((row) => row.ausenciaId),
+    ]);
+    if (owners.size !== 1)
+      throw new ApiException("OBJECT_DELETION_IMPORT_AMBIGUOUS", 409);
+    return [...owners][0];
+  }
+
+  /**
+   * Read-only proof for an imported file job, then finalization inside the same
+   * recovery run. If the domain preconditions no longer hold in the restored
+   * snapshot the job stays VERIFIED and reopening stays blocked.
+   */
+  async verifyImported(id: string, runId: string, version: number) {
+    const job = await this.db.objectDeletionJob.findUniqueOrThrow({
+      where: { id },
+    });
+    const manifest = this.manifest(job);
+    const remaining = await this.inventory(
+      manifest.targets,
+      AbortSignal.timeout(10000),
+    );
+    if (remaining.some((target) => target.versions.length))
+      return "UNCONFIRMED" as const;
+    return this.underRecovery(runId, version, async (tx) => {
+      await tx.$queryRaw`SELECT id FROM ObjectDeletionJob WHERE id = ${id} FOR UPDATE`;
+      const fresh = await tx.objectDeletionJob.findUniqueOrThrow({
+        where: { id },
+      });
+      if (fresh.state === "COMPLETE") return "COMPLETE" as const;
+      if (fresh.state !== "VERIFIED")
+        await tx.objectDeletionJob.update({
+          where: { id },
+          data: {
+            state: "VERIFIED",
+            verifiedAt: new Date(),
+            leaseOwner: null,
+            leaseUntil: null,
+            lastErrorCode: null,
+          },
+        });
+      await this.append(tx, "OBJECT_DELETION_IMPORT_VERIFIED", id);
+      try {
+        await this.complete(tx, id);
+      } catch (error) {
+        if (!(error instanceof ApiException)) throw error;
+        return "VERIFIED" as const;
+      }
+      return "COMPLETE" as const;
+    });
+  }
+
+  /** Verifies whichever kind of job an import just created. */
+  async verifyAnyImported(id: string, runId: string, version: number) {
+    if (await this.db.objectDeletionJob.count({ where: { id } }))
+      return this.verifyImported(id, runId, version);
+    return this.verifyImportedObject(id, runId, version);
+  }
+
+  /** Same for an object-level job (no domain finalization beyond sealing). */
+  async verifyImportedObject(id: string, runId: string, version: number) {
+    const job = await this.db.orphanObjectDeletion.findUniqueOrThrow({
+      where: { id },
+    });
+    const manifest = this.verifyObjectJob(job);
+    const remaining = await this.inventory(
+      manifest.targets,
+      AbortSignal.timeout(10000),
+    );
+    if (remaining.some((target) => target.versions.length))
+      return "UNCONFIRMED" as const;
+    return this.underRecovery(runId, version, async (tx) => {
+      await tx.$queryRaw`SELECT id FROM OrphanObjectDeletion WHERE id = ${id} FOR UPDATE`;
+      const fresh = await tx.orphanObjectDeletion.findUniqueOrThrow({
+        where: { id },
+      });
+      if (fresh.state === "COMPLETE") return "COMPLETE" as const;
+      await tx.orphanObjectDeletion.update({
+        where: { id },
+        data: {
+          state: "COMPLETE",
+          verifiedAt: fresh.verifiedAt ?? new Date(),
+          completedAt: new Date(),
+          activeKey: null,
+          leaseOwner: null,
+          leaseUntil: null,
+          lastErrorCode: null,
+        },
+      });
+      await this.append(tx, "OBJECT_DELETION_IMPORT_VERIFIED", id);
+      return "COMPLETE" as const;
+    });
   }
 }
