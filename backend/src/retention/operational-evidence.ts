@@ -1,6 +1,6 @@
 import { Prisma } from "../generated/prisma/client";
 import type { PrismaService } from "../database/prisma.service";
-import type { S3Storage } from "../storage/s3.storage";
+import type { ObjectDeletionService } from "../storage/object-deletion.service";
 import { ApiException } from "../common/errors/api.exception";
 
 export const operationalEvidencePolicies: Record<string, string> = {
@@ -51,12 +51,14 @@ export async function operationalEvidenceExists(
 
 export async function suppressOperationalEvidence(
   db: PrismaService,
-  _storage: S3Storage,
+  deletions: ObjectDeletionService,
   type: string,
   id: string,
   transaction?: Prisma.TransactionClient,
-) {
-  const apply = async (tx: Prisma.TransactionClient) => {
+): Promise<{ deletionJobId: string } | undefined> {
+  const apply = async (
+    tx: Prisma.TransactionClient,
+  ): Promise<{ deletionJobId: string } | undefined> => {
     const records = await tx.registroRetencion.findMany({
       where: { resourceType: type, resourceId: id },
       select: { id: true },
@@ -186,8 +188,29 @@ export async function suppressOperationalEvidence(
       )
         throw new ApiException("RETENTION_SHARED_EVIDENCE_OR_HOLD", 409);
     }
-    if (ids.length)
+    // Attachments leave through the durable phased protocol, one intent per file.
+    // Text is redacted only after every attachment is verified gone; until then
+    // the retention item stays pending and the caller drives each job.
+    if (ids.length && !transaction)
       throw new ApiException("OBJECT_DELETION_PROTOCOL_REQUIRED", 409);
+    for (const fileId of ids) {
+      const existing = await tx.objectDeletionJob.findUnique({
+        where: { fileId },
+      });
+      if (existing) {
+        if (
+          existing.purpose !== "ABSENCE_ATTACHMENT" ||
+          existing.resourceId !== id
+        )
+          throw new ApiException("OBJECT_DELETION_PURPOSE_MISMATCH", 409);
+        if (existing.state !== "VERIFIED" && existing.state !== "COMPLETE")
+          return { deletionJobId: existing.id };
+        await deletions.complete(tx, existing.id);
+        continue;
+      }
+      const job = await deletions.prepare(tx, fileId, "ABSENCE_ATTACHMENT", id);
+      return { deletionJobId: job.id };
+    }
     await tx.ausencia.update({
       where: { id },
       data: {
@@ -213,13 +236,10 @@ export async function suppressOperationalEvidence(
         },
         data: { response: redactAbsenceReceipt(receipt.response) },
       });
-    return;
+    return undefined;
   };
-  if (transaction) {
-    await apply(transaction);
-    return;
-  }
-  await db.$transaction(apply, {
+  if (transaction) return apply(transaction);
+  return db.$transaction(apply, {
     isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
     timeout: 30000,
   });

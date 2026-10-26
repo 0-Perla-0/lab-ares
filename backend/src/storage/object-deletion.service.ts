@@ -26,7 +26,11 @@ const manifestSchema = z
     protocol: z.literal("ares-object-deletion-v1"),
     operationId: z.string(),
     fileFingerprint: z.string().regex(/^[a-f0-9]{64}$/),
-    purpose: z.enum(["GENERATED_REPORT", "REJECTED_FILE"]),
+    purpose: z.enum([
+      "GENERATED_REPORT",
+      "REJECTED_FILE",
+      "ABSENCE_ATTACHMENT",
+    ]),
     storageNamespace: z.string().regex(/^[a-f0-9]{64}$/),
     occurredAt: z.iso.datetime(),
     keyVersion: z.string(),
@@ -88,12 +92,20 @@ export class ObjectDeletionService {
     tx: Prisma.TransactionClient,
     fileId: string,
     purpose: DeletionPurpose,
+    resourceId?: string | null,
   ) {
+    // Absence attachments are owned by exactly one absence; the intent is bound to it.
+    if (purpose === "ABSENCE_ATTACHMENT" && !resourceId)
+      throw new ApiException("OBJECT_DELETION_PURPOSE_MISMATCH", 409);
     const reports = await tx.reporteExportacion.findMany({
       where: { archivoId: fileId },
       select: { id: true, status: true, expiresAt: true, nextAttemptAt: true },
     });
-    const ids = [fileId, ...reports.map((row) => row.id)].sort();
+    const ids = [
+      fileId,
+      ...reports.map((row) => row.id),
+      ...(purpose === "ABSENCE_ATTACHMENT" && resourceId ? [resourceId] : []),
+    ].sort();
     const records = await tx.registroRetencion.findMany({
       where: { resourceId: { in: ids } },
       select: { id: true },
@@ -125,13 +137,24 @@ export class ObjectDeletionService {
       },
     });
     if (!file) throw new ApiException("FILE_NOT_FOUND", 404);
+    const {
+      justificacionesAusencia: absenceJustifications,
+      apelacionesAusencia: absenceAppeals,
+      ...otherReferences
+    } = file._count;
     if (
-      Object.values(file._count).some(Boolean) ||
+      Object.values(otherReferences).some(Boolean) ||
       file.bibliotecaVersion ||
-      file.activoPublico
+      file.activoPublico ||
+      (purpose !== "ABSENCE_ATTACHMENT" &&
+        (absenceJustifications || absenceAppeals))
     )
       throw new ApiException("RETENTION_SHARED_EVIDENCE_OR_HOLD", 409);
-    if (purpose === "GENERATED_REPORT") {
+    if (purpose === "ABSENCE_ATTACHMENT") {
+      if (reports.length)
+        throw new ApiException("RETENTION_SHARED_EVIDENCE_OR_HOLD", 409);
+      await this.assertAbsenceAttachment(tx, fileId, resourceId!, file.status);
+    } else if (purpose === "GENERATED_REPORT") {
       if (
         !file.objectKey.startsWith("reports/") ||
         (file.status !== "ELIMINADO" && file.detectedMime !== "text/csv")
@@ -158,13 +181,65 @@ export class ObjectDeletionService {
     return file;
   }
 
+  /** Locks the owning absence and requires it terminal, appeal-closed and the only reference. */
+  private async assertAbsenceAttachment(
+    tx: Prisma.TransactionClient,
+    fileId: string,
+    absenceId: string,
+    status: string,
+  ) {
+    await tx.$queryRaw`SELECT id FROM Ausencia WHERE id = ${absenceId} FOR UPDATE`;
+    const absence = await tx.ausencia.findUnique({
+      where: { id: absenceId },
+      include: { apelacion: true },
+    });
+    if (!absence)
+      throw new ApiException("RETENTION_RESOURCE_NOT_TERMINAL", 409);
+    if (
+      !["JUSTIFICADA", "NO_JUSTIFICADA", "CANCELADA"].includes(
+        absence.estado,
+      ) ||
+      (absence.apelacion && !absence.apelacion.resolvedAt) ||
+      (absence.apelacionLimiteAt && absence.apelacionLimiteAt >= new Date())
+    )
+      throw new ApiException("RETENTION_RESOURCE_NOT_TERMINAL", 409);
+    const own =
+      (await tx.justificacionAusencia.count({
+        where: { archivoId: fileId, ausenciaId: absenceId },
+      })) +
+      (await tx.apelacionAusencia.count({
+        where: { archivoId: fileId, ausenciaId: absenceId },
+      }));
+    const foreign =
+      (await tx.justificacionAusencia.count({
+        where: { archivoId: fileId, ausenciaId: { not: absenceId } },
+      })) +
+      (await tx.apelacionAusencia.count({
+        where: { archivoId: fileId, ausenciaId: { not: absenceId } },
+      }));
+    if (foreign)
+      throw new ApiException("RETENTION_SHARED_EVIDENCE_OR_HOLD", 409);
+    if (!own) throw new ApiException("OBJECT_DELETION_PURPOSE_MISMATCH", 409);
+    // Files still inside the scanner pipeline are owned by it, not by retention.
+    if (
+      ![
+        "DISPONIBLE",
+        "RECHAZADO",
+        "ERROR_ANALISIS",
+        "ELIMINACION_PENDIENTE",
+        "ELIMINADO",
+      ].includes(status)
+    )
+      throw new ApiException("RETENTION_RESOURCE_NOT_TERMINAL", 409);
+  }
+
   async prepare(
     tx: Prisma.TransactionClient,
     fileId: string,
     purpose: DeletionPurpose,
     resourceId?: string,
   ) {
-    const file = await this.protectedFile(tx, fileId, purpose);
+    const file = await this.protectedFile(tx, fileId, purpose, resourceId);
     const existing = await tx.objectDeletionJob.findUnique({
       where: { fileId },
     });
@@ -357,6 +432,7 @@ export class ObjectDeletionService {
           tx,
           initial.fileId,
           manifest.purpose,
+          initial.resourceId,
         );
         this.identity(file, manifest.targets);
         await tx.$queryRaw`SELECT id FROM ObjectDeletionJob WHERE id = ${id} FOR UPDATE`;
@@ -392,6 +468,7 @@ export class ObjectDeletionService {
             tx,
             claim.job.fileId,
             claim.manifest.purpose,
+            claim.job.resourceId,
           );
           this.identity(file, claim.manifest.targets);
           if (file.status !== "ELIMINACION_PENDIENTE")
@@ -427,6 +504,7 @@ export class ObjectDeletionService {
               tx,
               claim.job.fileId,
               claim.manifest.purpose,
+              claim.job.resourceId,
             );
             const dispatched = await tx.objectDeletionJob.updateMany({
               where: { id, leaseOwner: owner, leaseUntil: { gt: new Date() } },
@@ -526,7 +604,12 @@ export class ObjectDeletionService {
       where: { id },
     });
     const manifest = this.manifest(initial);
-    const file = await this.protectedFile(tx, initial.fileId, manifest.purpose);
+    const file = await this.protectedFile(
+      tx,
+      initial.fileId,
+      manifest.purpose,
+      initial.resourceId,
+    );
     this.identity(file, manifest.targets);
     await tx.$queryRaw`SELECT id FROM ObjectDeletionJob WHERE id = ${id} FOR UPDATE`;
     const job = await tx.objectDeletionJob.findUniqueOrThrow({ where: { id } });

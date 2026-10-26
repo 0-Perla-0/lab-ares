@@ -1,6 +1,6 @@
 # Conservación y supresión
 
-ID: `retencion` · Estado: parcial · Revisión: 2026-10-15
+ID: `retencion` · Estado: parcial · Revisión: 2026-10-26
 
 ## Objetivo y alcance
 
@@ -18,7 +18,7 @@ Enum/categoría declarada no equivale a adaptador ejecutable ni autoriza tratami
 ## Diseño y evidencia
 
 - [Retención](../../../backend/src/retention/), [adaptadores ejecutables](../../../backend/src/retention/retention-adapters.ts), [UI](../../../frontend/app/portal/retencion/).
-- Hoy: reportes, sesiones/tokens/desafíos inutilizables, notificaciones, rechazados y evidencia DB de asistencia/visitas/ausencias; adjuntos de ausencia bloqueados hasta adaptador por fases.
+- Hoy: reportes, sesiones/tokens/desafíos inutilizables, notificaciones, rechazados y evidencia DB de asistencia/visitas/ausencias; adjuntos de ausencia vía borrado durable `ABSENCE_ATTACHMENT` (sin integración real aún); copias y huérfanos siguen bloqueados.
 - Identidad, academia, expediente, Kairos, biblioteca, auditoría y logs no tienen tratamientos universales. `TechnicalLog` no se admite como adaptador ficticio.
 - [Carreras reales](../../../backend/test/integration/retention-worker-safety.integration.test.ts), [journal](../../../backend/src/recovery/suppression-journal.worker.ts).
 - `RETENTION_WORKER_ENABLED=false`; políticas institucionales exigen aprobación separada. Registrar población elegible sigue siendo operación gobernada, no barrido automático completo.
@@ -29,6 +29,6 @@ Enum/categoría declarada no equivale a adaptador ejecutable ni autoriza tratami
 
 - [x] **T1 · código · AC-2/3/4/5:** Matriz/lotes/holds, barrera/época y journal implementados para recursos cubiertos.
 - [ ] **T2 · código · AC-1/2/4:** Lifecycle/registro gobernado y adaptadores reales para categorías restantes, una vez definido el tratamiento.
-- [ ] **T3 · código · AC-4/5:** Adaptar adjuntos/copias al borrado durable; no certificar con DELETE dentro de rollback SQL.
+- [ ] **T3 · código · AC-4/5:** Adjuntos de ausencia adaptados ([borrado](../borrado-objetos/spec.md)); pendientes copias y huérfanos. No certificar con DELETE dentro de rollback SQL.
 - [ ] **T4 · validación · AC-3/4/5:** Matriz completa de carreras/dependencias compartidas/leases y restore con journal.
 - [ ] **T5 · externo · AC-1:** Aprobar plazos/tratamientos institucionales y holds; no usar defaults inventados ni activar supresión real.
