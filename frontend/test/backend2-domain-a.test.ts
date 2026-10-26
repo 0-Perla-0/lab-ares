@@ -148,11 +148,17 @@ describe("Backend 2 domain A API adapters", () => {
         mostrarEmail: false,
       },
     });
-    await updateDirectoryPreferences({ mostrarEmail: false });
-    expect(requestMock).toHaveBeenCalledWith("/api/directory/preferences/me", {
+    await updateDirectoryPreferences(7, { mostrarEmail: false });
+    const [path, options] = requestMock.mock.calls.at(-1) as [
+      string,
+      RequestInit,
+    ];
+    expect(path).toBe("/api/directory/preferences/me");
+    expect(options).toMatchObject({
       method: "PATCH",
       body: JSON.stringify({ mostrarEmail: false }),
     });
+    expect(new Headers(options.headers).get("Idempotency-Key")).toBeTruthy();
   });
 
   it("uses an exclusive report end date and accepts metric envelopes", async () => {

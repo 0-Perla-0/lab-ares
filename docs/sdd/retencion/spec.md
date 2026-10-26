@@ -28,7 +28,7 @@ Enum/categoría declarada no equivale a adaptador ejecutable ni autoriza tratami
 ## Tareas y pendientes
 
 - [x] **T1 · código · AC-2/3/4/5:** Matriz/lotes/holds, barrera/época y journal implementados para recursos cubiertos.
-- [ ] **T2 · código · AC-1/2/4:** Lifecycle/registro gobernado y adaptadores reales para categorías restantes, una vez definido el tratamiento.
+- [ ] **T2 · externo · AC-1/2/4:** Aprobar el tratamiento de las categorías restantes (identidad, academia, expediente, Kairos, biblioteca, auditoría, logs). No hay código pendiente que inventar: al aprobarse el tratamiento se añade un adaptador por categoría con el patrón de [evidencia operativa](../../../backend/src/retention/operational-evidence.ts) y [retención](../retencion/spec.md), activable sólo con la aprobación institucional. Una enum o un adaptador listado no autoriza supresión.
 - [x] **T3 · código · AC-4/5:** Adjuntos de ausencia, huérfanos y copias de cuarentena adaptados al borrado durable ([borrado](../borrado-objetos/spec.md)); ningún DELETE corre dentro de un rollback SQL.
 - [ ] **T4 · validación · AC-3/4/5:** Matriz completa de carreras/dependencias compartidas/leases y restore con journal.
 - [ ] **T5 · externo · AC-1:** Aprobar plazos/tratamientos institucionales y holds; no usar defaults inventados ni activar supresión real.

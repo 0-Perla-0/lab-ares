@@ -115,6 +115,7 @@ export class OperationsService {
               {
                 attendance: 30000,
                 absences: 60000,
+                identityCleanup: 900000,
                 outbox: 5000,
                 storage: this.config.get("STORAGE_WORKER_INTERVAL_MS"),
                 reports: this.config.get("REPORTS_WORKER_INTERVAL_MS"),

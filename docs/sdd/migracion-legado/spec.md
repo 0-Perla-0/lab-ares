@@ -23,5 +23,5 @@ No es requisito de implementación nueva sin fuente disponible; no se encontró 
 ## Tareas y pendientes
 
 - [ ] **T1 · externo · AC-1/2/3/4:** Identificar fuente confiable y autoridad que apruebe alcance/mapeo/tratamiento.
-- [ ] **T2 · código · AC-1/2/3/4:** Diseñar/implementar importador por lote sólo tras T1, con preview, deduplicación y auditoría.
+- [ ] **T2 · externo · AC-1/2/3/4:** Depende de T1: sólo si aparece una fuente confiable se diseña el importador por lote con preview, deduplicación y auditoría.
 - [ ] **T3 · validación · AC-1/3/4:** Ensayo aislado repetible y conciliación de cantidades, permisos y archivos; aprobación previa a datos reales.

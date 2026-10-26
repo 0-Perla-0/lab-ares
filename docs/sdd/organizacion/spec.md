@@ -23,6 +23,6 @@ Sedes, áreas, turnos, cuentas y adscripción operativa; autoridad única para R
 ## Tareas y pendientes
 
 - [x] **T1 · código · AC-1/2/3/4:** CRUD lógico, permisos, revocación e historia transaccional existentes.
-- [ ] **T2 · código · AC-2/3:** Incorporar mutaciones restantes a idempotencia/barrera/intenciones uniformes sin invalidar clientes existentes.
+- [x] **T2 · código · AC-2/3:** Sedes, áreas, turnos, usuarios e invitaciones con clave durable y los repositorios unidos a la transacción de la intención ([servicios](../../../backend/src/organization/services/), [usuarios](../../../backend/src/users/users.service.ts), [invitaciones](../../../backend/src/invitations/invitations.service.ts)); clientes del portal actualizados.
 - [ ] **T3 · validación · AC-1/4:** Probar traslados/desactivaciones concurrentes con evaluación y workers.
 - [ ] **T4 · externo · AC-1:** Revisar grants/roles heredados y asignaciones institucionales antes del piloto.

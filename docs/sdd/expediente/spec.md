@@ -25,5 +25,5 @@ Formalizar no autoriza todos los documentos, no acredita horas ni libera legalme
 
 - [x] **T1 · código · AC-1/2/3/4:** API/UI, constancias y límites coherentes implementados.
 - [ ] **T2 · validación · AC-1/3/4:** Completar aceptación de tipos/estados, descargas revocadas y concurrencia por alcance.
-- [ ] **T3 · código · AC-3:** Integrar conservación del expediente cuando exista tratamiento aprobado; ver [retención](../retencion/spec.md).
+- [ ] **T3 · externo · AC-3:** Aprobar el tratamiento de conservación del expediente (plazo, acción, fundamento). No hay código pendiente que inventar: al aprobarse el tratamiento se añade un adaptador por categoría con el patrón de [evidencia operativa](../../../backend/src/retention/operational-evidence.ts) y [retención](../retencion/spec.md), activable sólo con la aprobación institucional.
 - [ ] **T4 · externo · AC-4:** Aceptación institucional de formalización; no convertirla en constancia de liberación.

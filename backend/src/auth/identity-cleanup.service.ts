@@ -4,6 +4,7 @@ import {
   type OnModuleDestroy,
 } from "@nestjs/common";
 import { PrismaService } from "../database/prisma.service";
+import { observeWorker } from "../common/domain/worker-heartbeat";
 import { withWorkerWriteBarrier } from "../common/domain/worker-write-barrier";
 import { ApiException } from "../common/errors/api.exception";
 
@@ -15,9 +16,12 @@ export class IdentityCleanupService
   private running = false;
   constructor(private readonly prisma: PrismaService) {}
   onApplicationBootstrap() {
-    this.timer = setInterval(() => void this.run(), 15 * 60_000);
+    // Heartbeat telemetry like every other scheduled worker (stops under a freeze).
+    const cycle = () =>
+      void observeWorker(this.prisma, "identityCleanup", () => this.run());
+    this.timer = setInterval(cycle, 15 * 60_000);
     this.timer.unref();
-    void this.run();
+    cycle();
   }
   onModuleDestroy() {
     if (this.timer) clearInterval(this.timer);

@@ -26,6 +26,6 @@ No reconstruye estados punto-en-el-tiempo de documentos/Kairos ni inventa organi
 ## Tareas y pendientes
 
 - [x] **T1 · código · AC-1/2/3/4:** Reportes por cohorte, CSV paginado y descarga revalidada presentes.
-- [ ] **T2 · código · AC-5:** Especificar/implementar temporalidad restante si la aceptación requiere estados históricos exactos.
+- [ ] **T2 · externo · AC-5:** Decidir si la aceptación exige estados históricos exactos de documentos y Kairos. Si se exige, definir antes qué eventos se capturan y desde qué corte; nunca rellenar con el estado actual.
 - [ ] **T3 · validación · AC-2/3:** Carga grande, disco lleno, pérdida de lease/replica y respuesta S3 incierta; 5001 filas no certifica capacidad.
 - [ ] **T4 · externo · AC-1/5:** Autorizar fuentes/backfill verificable; nunca rellenar adscripción con la cuenta actual.

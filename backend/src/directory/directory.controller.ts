@@ -3,6 +3,7 @@ import type { Request } from "express";
 import { RequirePermissions } from "../auth/require-permissions.decorator";
 import { Permission } from "../auth/permissions";
 import { getAuthenticatedUser } from "../auth/authenticated-user";
+import { IdempotencyKey } from "../common/http/idempotency-key.decorator";
 import { ZodValidationPipe } from "../common/validation/zod-validation.pipe";
 import { DirectoryService } from "./directory.service";
 import {
@@ -26,11 +27,12 @@ export class DirectoryController {
       .then((data) => ({ data }));
   }
   @Patch("preferences/me") update(
+    @IdempotencyKey() key: string,
     @Body(new ZodValidationPipe(preferenceSchema)) body: any,
     @Req() r: Request,
   ) {
     return this.s
-      .updatePreferences(getAuthenticatedUser(r), body)
+      .updatePreferences(getAuthenticatedUser(r), key, body)
       .then((data) => ({ data }));
   }
 }

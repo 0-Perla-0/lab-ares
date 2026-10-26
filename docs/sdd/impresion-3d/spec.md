@@ -23,5 +23,5 @@ Sin laminado, control de impresora, cotización/cobro, marketplace ni 3MF inicia
 
 - [x] **T1 · código · AC-1/2/3:** Modelo/API/UI, ejecuciones, descarga y reintento existentes.
 - [ ] **T2 · validación · AC-1/2/3:** Recorrido real STL/scanner/operador/fallo/reintento y concurrencia de finalización.
-- [ ] **T3 · código · AC-2:** Tratamiento de archivo y lifecycle gobernado cuando exista política institucional.
+- [ ] **T3 · externo · AC-2:** Aprobar el tratamiento de archivos STL y su ciclo de vida. No hay código pendiente que inventar: al aprobarse el tratamiento se añade un adaptador por categoría con el patrón de [evidencia operativa](../../../backend/src/retention/operational-evidence.ts) y [retención](../retencion/spec.md), activable sólo con la aprobación institucional.
 - [ ] **T4 · externo · AC-3:** Aprobar operación/operadores y activación por anillo; sin control físico automatizado.
