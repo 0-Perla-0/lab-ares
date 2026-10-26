@@ -6,6 +6,8 @@ import { PrismaService } from "../database/prisma.service";
 import { StorageService } from "./storage.service";
 import type { Environment } from "../config/environment";
 import { workersMayMutate } from "../recovery/barrier";
+import { withWorkerWriteBarrier } from "../common/domain/worker-write-barrier";
+import { ApiException } from "../common/errors/api.exception";
 import { observeWorker } from "../common/domain/worker-heartbeat";
 
 /** Durable queue drain hook. Invoke from a scheduler/worker process; safe to repeat after crashes. */
@@ -38,6 +40,15 @@ export class StorageWorker implements OnModuleInit, OnModuleDestroy {
     try {
       if (!(await workersMayMutate(this.prisma))) return 0;
       return await this.processDueLocked(limit);
+    } catch (error) {
+      // A freeze (or an unfreeze that opened a new epoch) ends this cycle; the
+      // next one starts from the new epoch.
+      if (
+        error instanceof ApiException &&
+        error.code === "RECOVERY_WRITE_BARRIER_ACTIVE"
+      )
+        return 0;
+      throw error;
     } finally {
       this.running = false;
     }
@@ -45,15 +56,22 @@ export class StorageWorker implements OnModuleInit, OnModuleDestroy {
   private async processDueLocked(limit: number) {
     const now = new Date();
     const lease = new Date(now.getTime() + 120000);
-    await this.prisma.archivo.updateMany({
-      where: { status: EstadoArchivo.ANALIZANDO, leaseUntil: { lt: now } },
-      data: {
-        status: EstadoArchivo.ERROR_ANALISIS,
-        leaseUntil: null,
-        leaseOwner: null,
-        nextAttemptAt: now,
+    // The first durable write fixes the epoch; every later write must match it.
+    const epoch = await withWorkerWriteBarrier(
+      this.prisma,
+      async (tx, version) => {
+        await tx.archivo.updateMany({
+          where: { status: EstadoArchivo.ANALIZANDO, leaseUntil: { lt: now } },
+          data: {
+            status: EstadoArchivo.ERROR_ANALISIS,
+            leaseUntil: null,
+            leaseOwner: null,
+            nextAttemptAt: now,
+          },
+        });
+        return version;
       },
-    });
+    );
     const due = await this.prisma.archivo.findMany({
       where: {
         status: {
@@ -70,46 +88,62 @@ export class StorageWorker implements OnModuleInit, OnModuleDestroy {
     const max = this.config.get("STORAGE_MAX_ATTEMPTS");
     for (const file of due) {
       if (!(await workersMayMutate(this.prisma))) break;
-      const claim = await this.prisma.archivo.updateMany({
-        where: {
-          id: file.id,
-          status: {
-            in: [
-              EstadoArchivo.PENDIENTE_ANALISIS,
-              EstadoArchivo.ERROR_ANALISIS,
-            ],
-          },
-          analysisAttempts: { lt: max },
-          analysisExhaustedAt: null,
-        },
-        data: {
-          status: EstadoArchivo.ANALIZANDO,
-          leaseUntil: lease,
-          leaseOwner: this.owner,
-          analysisAttempts: { increment: 1 },
-        },
-      });
+      const claim = await withWorkerWriteBarrier(
+        this.prisma,
+        (tx) =>
+          tx.archivo.updateMany({
+            where: {
+              id: file.id,
+              status: {
+                in: [
+                  EstadoArchivo.PENDIENTE_ANALISIS,
+                  EstadoArchivo.ERROR_ANALISIS,
+                ],
+              },
+              analysisAttempts: { lt: max },
+              analysisExhaustedAt: null,
+            },
+            data: {
+              status: EstadoArchivo.ANALIZANDO,
+              leaseUntil: lease,
+              leaseOwner: this.owner,
+              analysisAttempts: { increment: 1 },
+            },
+          }),
+        epoch,
+      );
       if (claim.count) {
         count++;
         try {
-          await this.storage.analyze(file.id, this.owner);
-        } catch {
-          /* isolate a failed job from the queue */
+          await this.storage.analyze(file.id, this.owner, epoch);
+        } catch (error) {
+          // A moved epoch invalidates the rest of the cycle; any other failure
+          // stays isolated to its own file.
+          if (
+            error instanceof ApiException &&
+            error.code === "RECOVERY_WRITE_BARRIER_ACTIVE"
+          )
+            throw error;
         }
       }
     }
-    await this.prisma.archivo.updateMany({
-      where: {
-        status: EstadoArchivo.ERROR_ANALISIS,
-        analysisAttempts: { gte: max },
-        analysisExhaustedAt: null,
-      },
-      data: {
-        nextAttemptAt: null,
-        analysisExhaustedAt: now,
-        lastError: "límite de intentos alcanzado",
-      },
-    });
+    await withWorkerWriteBarrier(
+      this.prisma,
+      (tx) =>
+        tx.archivo.updateMany({
+          where: {
+            status: EstadoArchivo.ERROR_ANALISIS,
+            analysisAttempts: { gte: max },
+            analysisExhaustedAt: null,
+          },
+          data: {
+            nextAttemptAt: null,
+            analysisExhaustedAt: now,
+            lastError: "límite de intentos alcanzado",
+          },
+        }),
+      epoch,
+    );
     return count;
   }
 }

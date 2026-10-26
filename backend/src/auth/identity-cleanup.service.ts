@@ -4,6 +4,8 @@ import {
   type OnModuleDestroy,
 } from "@nestjs/common";
 import { PrismaService } from "../database/prisma.service";
+import { withWorkerWriteBarrier } from "../common/domain/worker-write-barrier";
+import { ApiException } from "../common/errors/api.exception";
 
 @Injectable()
 export class IdentityCleanupService
@@ -32,23 +34,20 @@ export class IdentityCleanupService
       const cutoff = new Date(
         now.getTime() - Math.max(0, retentionDays) * 24 * 60 * 60_000,
       );
-      await this.prisma.$transaction([
-        ...(this.prisma.authThrottle
-          ? [
-              this.prisma.authThrottle.deleteMany({
-                where: {
-                  resetAt: { lt: now },
-                  OR: [{ blockedUntil: null }, { blockedUntil: { lt: now } }],
-                },
-              }),
-            ]
-          : []),
-        this.prisma.recoveryToken.deleteMany({
+      await withWorkerWriteBarrier(this.prisma, async (tx: any) => {
+        if (tx.authThrottle)
+          await tx.authThrottle.deleteMany({
+            where: {
+              resetAt: { lt: now },
+              OR: [{ blockedUntil: null }, { blockedUntil: { lt: now } }],
+            },
+          });
+        await tx.recoveryToken.deleteMany({
           where: {
             OR: [{ expiresAt: { lt: now } }, { usedAt: { not: null } }],
           },
-        }),
-        this.prisma.session.deleteMany({
+        });
+        await tx.session.deleteMany({
           where: {
             OR: [
               { expiresAt: { lt: now } },
@@ -56,36 +55,24 @@ export class IdentityCleanupService
               { revokedAt: { not: null } },
             ],
           },
-        }),
-        ...(this.prisma.mfaChallenge
-          ? [
-              this.prisma.mfaChallenge.deleteMany({
-                where: {
-                  OR: [
-                    { expiresAt: { lt: now } },
-                    { consumedAt: { not: null } },
-                  ],
-                },
-              }),
-            ]
-          : []),
-        ...(this.prisma.mfaRecoveryCode
-          ? [
-              this.prisma.mfaRecoveryCode.deleteMany({
-                where: { usedAt: { not: null, lt: cutoff } },
-              }),
-            ]
-          : []),
-        ...(this.prisma.outboxEvent
-          ? [
-              this.prisma.outboxEvent.deleteMany({
-                where: { processedAt: { not: null, lt: cutoff } },
-              }),
-            ]
-          : []),
+        });
+        if (tx.mfaChallenge)
+          await tx.mfaChallenge.deleteMany({
+            where: {
+              OR: [{ expiresAt: { lt: now } }, { consumedAt: { not: null } }],
+            },
+          });
+        if (tx.mfaRecoveryCode)
+          await tx.mfaRecoveryCode.deleteMany({
+            where: { usedAt: { not: null, lt: cutoff } },
+          });
+        if (tx.outboxEvent)
+          await tx.outboxEvent.deleteMany({
+            where: { processedAt: { not: null, lt: cutoff } },
+          });
         // Invitations are retained for audit/history. Only mark them archived;
         // never delete them as part of identity maintenance.
-        this.prisma.invitation.updateMany({
+        await tx.invitation.updateMany({
           where: {
             archivedAt: null,
             OR: [
@@ -95,8 +82,15 @@ export class IdentityCleanupService
             ],
           },
           data: { archivedAt: now },
-        }),
-      ]);
+        });
+      });
+    } catch (error) {
+      // Frozen for recovery: maintenance simply waits for the next cycle.
+      if (!(
+        error instanceof ApiException &&
+        error.code === "RECOVERY_WRITE_BARRIER_ACTIVE"
+      ))
+        throw error;
     } finally {
       this.running = false;
     }

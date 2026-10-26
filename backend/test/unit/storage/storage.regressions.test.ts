@@ -203,7 +203,9 @@ describe("Storage regressions", () => {
   });
   it("marks max-attempt jobs terminal", async () => {
     const updateMany = vi.fn().mockResolvedValue({ count: 0 });
-    const p = {
+    const p: any = {
+      $queryRaw: vi.fn().mockResolvedValue([]),
+      $transaction: (fn: any) => fn(p),
       recoveryWriteBarrier: {
         findUnique: vi.fn().mockResolvedValue({
           active: false,
@@ -236,7 +238,9 @@ describe("Storage regressions", () => {
         }),
     );
     const updateMany = vi.fn().mockResolvedValue({ count: 1 });
-    const p = {
+    const p: any = {
+      $queryRaw: vi.fn().mockResolvedValue([]),
+      $transaction: (fn: any) => fn(p),
       recoveryWriteBarrier: {
         findUnique: vi.fn().mockResolvedValue({
           active: false,
@@ -262,6 +266,40 @@ describe("Storage regressions", () => {
     release();
     await one;
     expect(analyze).toHaveBeenCalledTimes(1);
+  });
+  it("fences the scan outcome to the claimed epoch without recording a false scanner error", async () => {
+    const p: any = {
+      $queryRaw: vi.fn().mockResolvedValue([]),
+      recoveryWriteBarrier: {
+        findUnique: vi.fn().mockResolvedValue({ active: false, version: 5 }),
+      },
+      archivo: {
+        findUnique: vi.fn().mockResolvedValue(f()),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      },
+      analisisArchivo: { create: vi.fn() },
+    };
+    p.$transaction = (fn: any) => fn(p);
+    const storage = {
+      get: vi.fn().mockResolvedValue(Readable.from([Buffer.from("x")])),
+      copy: vi.fn(),
+      delete: vi.fn(),
+    };
+    const service = new StorageService(
+      p as never,
+      storage as never,
+      { scan: vi.fn().mockResolvedValue({ clean: true }) } as never,
+      cfg(),
+    );
+    // Claimed in epoch 4; the barrier is now in epoch 5.
+    await expect(service.analyze("f", "owner", 4)).rejects.toMatchObject({
+      code: "RECOVERY_WRITE_BARRIER_ACTIVE",
+    });
+    expect(p.analisisArchivo.create).not.toHaveBeenCalled();
+    expect(p.archivo.updateMany).not.toHaveBeenCalled();
+    // The same epoch still publishes.
+    await service.analyze("f", "owner", 5);
+    expect(p.archivo.updateMany).toHaveBeenCalled();
   });
   it("does not finalize a lost lease", async () => {
     const updateMany = vi.fn().mockResolvedValue({ count: 0 });
@@ -345,7 +383,9 @@ describe("Storage regressions", () => {
 });
 describe("Reconciler regressions", () => {
   it("loads references beyond batch and uses independent cursors", async () => {
-    const p = {
+    const p: any = {
+      $queryRaw: vi.fn().mockResolvedValue([]),
+      $transaction: (fn: any) => fn(p),
       recoveryWriteBarrier: {
         findUnique: vi.fn().mockResolvedValue({
           active: false,
@@ -389,7 +429,9 @@ describe("Reconciler regressions", () => {
   });
   it("isolates head and list failures", async () => {
     const list = vi.fn().mockRejectedValue(new Error("offline"));
-    const p = {
+    const p: any = {
+      $queryRaw: vi.fn().mockResolvedValue([]),
+      $transaction: (fn: any) => fn(p),
       recoveryWriteBarrier: {
         findUnique: vi.fn().mockResolvedValue({
           active: false,

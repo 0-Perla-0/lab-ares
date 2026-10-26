@@ -21,6 +21,7 @@ import type { Environment } from "../config/environment";
 import type { DownloadCapability, MalwareScanner } from "./storage.types";
 import { S3Storage } from "./s3.storage";
 import { withWorkerWriteBarrier } from "../common/domain/worker-write-barrier";
+import { ApiException } from "../common/errors/api.exception";
 import { ObjectDeletionService } from "./object-deletion.service";
 
 const extensionMime: Record<string, string> = {
@@ -445,7 +446,17 @@ export class StorageService {
       await fh.close();
     }
   }
-  async analyze(id: string, owner?: string) {
+  /** Worker writes pass the claimed epoch; without one (direct calls) they stay plain. */
+  private effect<T>(
+    barrierVersion: number | undefined,
+    work: (db: Prisma.TransactionClient | PrismaService) => Promise<T>,
+  ) {
+    return barrierVersion === undefined
+      ? work(this.prisma)
+      : withWorkerWriteBarrier(this.prisma, (tx) => work(tx), barrierVersion);
+  }
+
+  async analyze(id: string, owner?: string, barrierVersion?: number) {
     const file = await this.prisma.archivo.findUnique({ where: { id } });
     if (!file) throw new NotFoundException("Archivo no encontrado");
     if (
@@ -460,19 +471,41 @@ export class StorageService {
       const result = await this.scanner.scan(
         await this.storage.get("quarantine", file.quarantineKey),
       );
-      await this.prisma.analisisArchivo.create({
-        data: {
-          archivoId: id,
-          scanner: "clamav",
-          resultado: result.clean ? "LIMPIO" : "INFECTADO",
-          signature: result.signature,
-          finishedAt: new Date(),
-        },
-      });
+      await this.effect(barrierVersion, (db) =>
+        db.analisisArchivo.create({
+          data: {
+            archivoId: id,
+            scanner: "clamav",
+            resultado: result.clean ? "LIMPIO" : "INFECTADO",
+            signature: result.signature,
+            finishedAt: new Date(),
+          },
+        }),
+      );
       if (!result.clean) {
         // Rejection denies access. Governed retention owns physical deletion;
         // a scanner lease is not authority for an unlogged destructive effect.
-        await this.prisma.archivo.updateMany({
+        await this.effect(barrierVersion, (db) =>
+          db.archivo.updateMany({
+            where: {
+              id,
+              leaseOwner: owner,
+              status: EstadoArchivo.ANALIZANDO,
+              leaseUntil: { gt: new Date() },
+            },
+            data: {
+              status: EstadoArchivo.RECHAZADO,
+              lastError: result.signature,
+              leaseOwner: null,
+              leaseUntil: null,
+            },
+          }),
+        );
+        return this.prisma.archivo.findUnique({ where: { id } });
+      }
+      await this.storage.copy("quarantine", "available", file.quarantineKey);
+      const promoted = await this.effect(barrierVersion, (db) =>
+        db.archivo.updateMany({
           where: {
             id,
             leaseOwner: owner,
@@ -480,29 +513,13 @@ export class StorageService {
             leaseUntil: { gt: new Date() },
           },
           data: {
-            status: EstadoArchivo.RECHAZADO,
-            lastError: result.signature,
+            status: EstadoArchivo.DISPONIBLE,
+            objectKey: file.quarantineKey,
             leaseOwner: null,
             leaseUntil: null,
           },
-        });
-        return this.prisma.archivo.findUnique({ where: { id } });
-      }
-      await this.storage.copy("quarantine", "available", file.quarantineKey);
-      const promoted = await this.prisma.archivo.updateMany({
-        where: {
-          id,
-          leaseOwner: owner,
-          status: EstadoArchivo.ANALIZANDO,
-          leaseUntil: { gt: new Date() },
-        },
-        data: {
-          status: EstadoArchivo.DISPONIBLE,
-          objectKey: file.quarantineKey,
-          leaseOwner: null,
-          leaseUntil: null,
-        },
-      });
+        }),
+      );
       if (!promoted.count) {
         // Another owner may have published this same key. Keep the private
         // preparation rather than deleting a potentially committed promotion.
@@ -511,30 +528,39 @@ export class StorageService {
       // Source-copy cleanup needs a separate durable intent, not whole-file purge.
       return this.prisma.archivo.findUnique({ where: { id } });
     } catch (error) {
+      // A moved epoch is not a scan failure: leave the lease to expire and let
+      // the next cycle retry instead of recording a bogus ERROR.
+      if (
+        error instanceof ApiException &&
+        error.code === "RECOVERY_WRITE_BARRIER_ACTIVE"
+      )
+        throw error;
       const safe = this.safeError(error);
-      await this.prisma.analisisArchivo.create({
-        data: {
-          archivoId: id,
-          scanner: "clamav",
-          resultado: "ERROR",
-          error: safe,
-          finishedAt: new Date(),
-        },
-      });
-      await this.prisma.archivo.updateMany({
-        where: {
-          id,
-          leaseOwner: owner,
-          status: EstadoArchivo.ANALIZANDO,
-          leaseUntil: { gt: new Date() },
-        },
-        data: {
-          status: EstadoArchivo.ERROR_ANALISIS,
-          lastError: safe,
-          nextAttemptAt: new Date(Date.now() + 60000),
-          leaseOwner: null,
-          leaseUntil: null,
-        },
+      await this.effect(barrierVersion, async (db) => {
+        await db.analisisArchivo.create({
+          data: {
+            archivoId: id,
+            scanner: "clamav",
+            resultado: "ERROR",
+            error: safe,
+            finishedAt: new Date(),
+          },
+        });
+        await db.archivo.updateMany({
+          where: {
+            id,
+            leaseOwner: owner,
+            status: EstadoArchivo.ANALIZANDO,
+            leaseUntil: { gt: new Date() },
+          },
+          data: {
+            status: EstadoArchivo.ERROR_ANALISIS,
+            lastError: safe,
+            nextAttemptAt: new Date(Date.now() + 60000),
+            leaseOwner: null,
+            leaseUntil: null,
+          },
+        });
       });
       return this.prisma.archivo.findUnique({ where: { id } });
     }

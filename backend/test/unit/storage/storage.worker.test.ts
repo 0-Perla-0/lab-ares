@@ -21,8 +21,10 @@ const barrier = {
 describe("StorageWorker", () => {
   it("claims a due file atomically and processes only the winner", async () => {
     const updateMany = vi.fn().mockResolvedValue({ count: 1 });
-    const prisma = {
+    const prisma: any = {
       ...barrier,
+      $queryRaw: vi.fn().mockResolvedValue([]),
+      $transaction: (fn: any) => fn(prisma),
       archivo: {
         updateMany,
         findMany: vi.fn().mockResolvedValue([{ id: "f" }]),
@@ -31,12 +33,14 @@ describe("StorageWorker", () => {
     const storage: any = { analyze: vi.fn().mockResolvedValue({}) };
     const worker = new StorageWorker(prisma, storage, config);
     await expect(worker.processDue(1)).resolves.toBe(1);
-    expect(storage.analyze).toHaveBeenCalledWith("f", expect.any(String));
+    expect(storage.analyze).toHaveBeenCalledWith("f", expect.any(String), 0);
     expect(updateMany).toHaveBeenCalledTimes(3);
   });
   it("does not process when another worker wins the lease", async () => {
-    const prisma = {
+    const prisma: any = {
       ...barrier,
+      $queryRaw: vi.fn().mockResolvedValue([]),
+      $transaction: (fn: any) => fn(prisma),
       archivo: {
         updateMany: vi.fn().mockResolvedValue({ count: 0 }),
         findMany: vi.fn().mockResolvedValue([{ id: "f" }]),
@@ -50,8 +54,10 @@ describe("StorageWorker", () => {
   });
   it("recovers expired leases before claiming", async () => {
     const updateMany = vi.fn().mockResolvedValue({ count: 0 });
-    const prisma = {
+    const prisma: any = {
       ...barrier,
+      $queryRaw: vi.fn().mockResolvedValue([]),
+      $transaction: (fn: any) => fn(prisma),
       archivo: { updateMany, findMany: vi.fn().mockResolvedValue([]) },
     } as never;
     await new StorageWorker(
@@ -83,5 +89,29 @@ describe("StorageWorker", () => {
       ).processDue(),
     ).resolves.toBe(0);
     expect(findMany).not.toHaveBeenCalled();
+  });
+  it("ends the cycle without analyzing when the epoch moves after the first write", async () => {
+    const prisma: any = {
+      $queryRaw: vi.fn().mockResolvedValue([]),
+      recoveryWriteBarrier: {
+        findUnique: vi
+          .fn()
+          .mockResolvedValueOnce({ active: false, version: 0 }) // worker check
+          .mockResolvedValueOnce({ active: false, version: 0 }) // lease recovery fixes epoch 0
+          .mockResolvedValue({ active: false, version: 1 }), // unfreeze opened epoch 1
+      },
+      archivo: {
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+        findMany: vi.fn().mockResolvedValue([{ id: "f" }]),
+      },
+    };
+    prisma.$transaction = (fn: any) => fn(prisma);
+    const storage: any = { analyze: vi.fn() };
+    await expect(
+      new StorageWorker(prisma, storage, config).processDue(1),
+    ).resolves.toBe(0);
+    expect(storage.analyze).not.toHaveBeenCalled();
+    // Only the epoch-0 recovery write happened; claim and exhaustion were fenced out.
+    expect(prisma.archivo.updateMany).toHaveBeenCalledTimes(1);
   });
 });
