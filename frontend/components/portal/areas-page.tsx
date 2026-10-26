@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Layers3, Pencil, Trash2 } from "lucide-react";
 
 import { useAuth } from "@/components/auth/auth-provider";
+import { durableRequest } from "@/lib/backend2/durable-request";
 import {
   ConfirmDialog,
   EmptyState,
@@ -71,11 +72,15 @@ export function AreasPage() {
 
     try {
       const isEdit = editor.mode === "edit";
-      await apiRequest(
+      await durableRequest(
+        user.id,
+        isEdit ? "org-area-update" : "org-area-create",
+        isEdit ? String(editor.item.id) : `${payload.sedeId}:${payload.nombre}`,
         isEdit
           ? `/api/organization/areas/${editor.item.id}`
           : "/api/organization/areas",
-        { method: isEdit ? "PUT" : "POST", body: JSON.stringify(payload) },
+        isEdit ? "PUT" : "POST",
+        payload,
       );
       setEditor(null);
       setSuccess(
@@ -96,9 +101,13 @@ export function AreasPage() {
     setDeleting(true);
     setSuccess("");
     try {
-      await apiRequest(`/api/organization/areas/${deleteTarget.id}`, {
-        method: "DELETE",
-      });
+      await durableRequest(
+        user.id,
+        "org-area-deactivate",
+        String(deleteTarget.id),
+        `/api/organization/areas/${deleteTarget.id}`,
+        "DELETE",
+      );
       setDeleteTarget(null);
       setSuccess("El área y sus turnos quedaron inactivos.");
       await load();

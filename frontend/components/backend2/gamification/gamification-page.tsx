@@ -92,14 +92,14 @@ export function GamificationPage() {
     setError("");
     try {
       if (form === "rule")
-        await gamificationApi.createRule({
+        await gamificationApi.createRule(user.id, {
           codigo: String(data.get("codigo")).trim().toUpperCase(),
           origen: "KAIROS_TERMINADA",
           puntos: Number(data.get("puntos")),
           motivo: String(data.get("motivo")),
         });
       if (form === "badge")
-        await gamificationApi.createBadge({
+        await gamificationApi.createBadge(user.id, {
           codigo: String(data.get("codigo")).trim().toUpperCase(),
           nombre: String(data.get("nombre")),
           descripcion: String(data.get("descripcion")),

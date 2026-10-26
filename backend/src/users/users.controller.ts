@@ -16,6 +16,7 @@ import { getAuthenticatedUser } from "../auth/authenticated-user";
 import { Permission } from "../auth/permissions";
 import { RequirePermissions } from "../auth/require-permissions.decorator";
 import { PositiveIntPipe } from "../common/validation/positive-int.pipe";
+import { IdempotencyKey } from "../common/http/idempotency-key.decorator";
 import { ZodValidationPipe } from "../common/validation/zod-validation.pipe";
 import {
   actualizarUsuarioSchema,
@@ -90,6 +91,7 @@ export class UsersController {
   @Put(":id")
   @RequirePermissions(Permission.USERS_MANAGE)
   async actualizar(
+    @IdempotencyKey() key: string,
     @Param("id", new PositiveIntPipe()) id: number,
     @Body(new ZodValidationPipe(actualizarUsuarioSchema))
     input: ActualizarUsuarioInput,
@@ -100,9 +102,10 @@ export class UsersController {
     await this.policy.requireUpdate(getAuthenticatedUser(request), id, input);
     return {
       data: await this.users.actualizar(
+        getAuthenticatedUser(request),
+        key,
         id,
         input,
-        getAuthenticatedUser(request).id,
       ),
     };
   }
@@ -110,12 +113,13 @@ export class UsersController {
   @Delete(":id")
   @RequirePermissions(Permission.USERS_MANAGE)
   async darDeBaja(
+    @IdempotencyKey() key: string,
     @Param("id", new PositiveIntPipe()) id: number,
     @Req() request: Request,
   ) {
     await this.policy.requireDeletion(getAuthenticatedUser(request), id);
     return {
-      data: await this.users.darDeBaja(id, getAuthenticatedUser(request).id),
+      data: await this.users.darDeBaja(getAuthenticatedUser(request), key, id),
     };
   }
 }

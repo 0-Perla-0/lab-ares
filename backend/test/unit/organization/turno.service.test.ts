@@ -4,6 +4,7 @@ import { UniqueConstraintError } from "../../../src/common/errors/unique-constra
 import { DiaSemana } from "../../../src/generated/prisma/enums";
 import type { AreaRepository } from "../../../src/organization/repositories/area.repository";
 import type { TurnoRepository } from "../../../src/organization/repositories/turno.repository";
+import { passthroughDomain, tx, withIdentity } from "../support/domain";
 import { TurnoService } from "../../../src/organization/services/turno.service";
 
 const turnos = {
@@ -16,9 +17,13 @@ const turnos = {
   deactivate: vi.fn(),
 };
 const areas = { findById: vi.fn() };
-const service = new TurnoService(
-  turnos as unknown as TurnoRepository,
-  areas as unknown as AreaRepository,
+const service = withIdentity(
+  new TurnoService(
+    turnos as unknown as TurnoRepository,
+    areas as unknown as AreaRepository,
+    passthroughDomain,
+  ),
+  ["crear", "actualizar", "desactivar"],
 );
 const now = new Date("2026-01-01T00:00:00.000Z");
 const area = {
@@ -79,6 +84,7 @@ describe("TurnoService", () => {
         horaInicio: new Date("1970-01-01T08:00:00.000Z"),
         horaFin: new Date("1970-01-01T12:30:00.000Z"),
       }),
+      tx,
     );
   });
 
@@ -122,6 +128,7 @@ describe("TurnoService", () => {
     expect(turnos.reactivate).toHaveBeenCalledWith(
       2,
       expect.objectContaining({ nombre: "Matutino" }),
+      tx,
     );
   });
 
@@ -157,7 +164,7 @@ describe("TurnoService", () => {
     turnos.findByNombreEnArea.mockResolvedValue(null);
     turnos.update.mockResolvedValue({ ...turno, nombre: "Temprano" });
     await service.actualizar(2, { nombre: "Temprano" });
-    expect(turnos.update).toHaveBeenCalledWith(2, { nombre: "Temprano" });
+    expect(turnos.update).toHaveBeenCalledWith(2, { nombre: "Temprano" }, tx);
   });
 
   it("keeps delete idempotent", async () => {
@@ -170,6 +177,6 @@ describe("TurnoService", () => {
     turnos.findById.mockResolvedValue(turno);
     turnos.deactivate.mockResolvedValue({ ...turno, activo: false });
     await service.desactivar(2);
-    expect(turnos.deactivate).toHaveBeenCalledWith(2);
+    expect(turnos.deactivate).toHaveBeenCalledWith(2, tx);
   });
 });

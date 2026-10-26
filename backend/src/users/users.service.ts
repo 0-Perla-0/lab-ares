@@ -1,12 +1,15 @@
 import { Injectable } from "@nestjs/common";
 
+import type { AuthUser } from "../auth/auth-user";
 import { hashPassword } from "../auth/password";
+import { DomainTransaction } from "../common/domain/domain-transaction";
 import {
   conflict,
   invalidInput,
   notFound,
 } from "../common/errors/domain-error";
 import { UniqueConstraintError } from "../common/errors/unique-constraint-error";
+import type { Prisma } from "../generated/prisma/client";
 import { EstadoUsuario } from "../generated/prisma/enums";
 import { AreaRepository } from "../organization/repositories/area.repository";
 import { SedeRepository } from "../organization/repositories/sede.repository";
@@ -23,6 +26,7 @@ export class UsersService {
     private readonly sedes: SedeRepository,
     private readonly areas: AreaRepository,
     private readonly turnos: TurnoRepository,
+    private readonly domain: DomainTransaction,
   ) {}
 
   listar(scope: UserListScope) {
@@ -47,10 +51,25 @@ export class UsersService {
     );
   }
 
-  async actualizar(
+  actualizar(
+    actor: AuthUser,
+    key: string,
     id: number,
     input: ActualizarUsuarioInput,
-    actorId?: number,
+  ) {
+    return this.domain.run(
+      actor,
+      key,
+      { op: "users:update", id, input },
+      (tx) => this.applyUpdate(id, input, actor.id, tx),
+    );
+  }
+
+  private async applyUpdate(
+    id: number,
+    input: ActualizarUsuarioInput,
+    actorId: number,
+    tx: Prisma.TransactionClient,
   ) {
     const current = await this.obtener(id);
     const assignments: UserAssignments = {
@@ -75,18 +94,26 @@ export class UsersService {
     };
 
     return this.withUniqueIdentity(() =>
-      actorId === undefined
-        ? this.users.update(id, data)
-        : this.users.update(id, data, actorId),
+      this.users.update(id, data, actorId, tx),
     );
   }
 
-  async darDeBaja(id: number, actorId?: number) {
-    const current = await this.obtener(id);
-    if (current.estado === EstadoUsuario.DESACTIVADA) return current;
-    return actorId === undefined
-      ? this.users.update(id, { estado: EstadoUsuario.DESACTIVADA })
-      : this.users.update(id, { estado: EstadoUsuario.DESACTIVADA }, actorId);
+  darDeBaja(actor: AuthUser, key: string, id: number) {
+    return this.domain.run(
+      actor,
+      key,
+      { op: "users:deactivate", id },
+      async (tx) => {
+        const current = await this.obtener(id);
+        if (current.estado === EstadoUsuario.DESACTIVADA) return current;
+        return this.users.update(
+          id,
+          { estado: EstadoUsuario.DESACTIVADA },
+          actor.id,
+          tx,
+        );
+      },
+    );
   }
 
   private async ensureUniqueIdentity(

@@ -1,5 +1,8 @@
 import { Injectable } from "@nestjs/common";
 
+import type { AuthUser } from "../../auth/auth-user";
+import { DomainTransaction } from "../../common/domain/domain-transaction";
+
 import { conflict, notFound } from "../../common/errors/domain-error";
 import { UniqueConstraintError } from "../../common/errors/unique-constraint-error";
 import type {
@@ -14,6 +17,7 @@ export class AreaService {
   constructor(
     private readonly areas: AreaRepository,
     private readonly sedes: SedeRepository,
+    private readonly domain: DomainTransaction,
   ) {}
 
   listar() {
@@ -26,40 +30,70 @@ export class AreaService {
     return area;
   }
 
-  async crear(input: CrearAreaInput) {
-    await this.ensureSedeUsable(input.sedeId);
-    const existing = await this.areas.findByNombreEnSede(
-      input.sedeId,
-      input.nombre,
+  crear(actor: AuthUser, key: string, input: CrearAreaInput) {
+    return this.domain.run(
+      actor,
+      key,
+      { op: "organization:area:create", input },
+      async (tx) => {
+        await this.ensureSedeUsable(input.sedeId);
+        const existing = await this.areas.findByNombreEnSede(
+          input.sedeId,
+          input.nombre,
+        );
+
+        if (existing?.activa) throw conflict("AREA_ALREADY_EXISTS");
+
+        const data = { nombre: input.nombre, sedeId: input.sedeId };
+        if (existing) {
+          return this.withUniqueName(() =>
+            this.areas.reactivate(existing.id, data, tx),
+          );
+        }
+        return this.withUniqueName(() => this.areas.create(data, tx));
+      },
     );
-
-    if (existing?.activa) throw conflict("AREA_ALREADY_EXISTS");
-
-    const data = { nombre: input.nombre, sedeId: input.sedeId };
-    if (existing) {
-      return this.withUniqueName(() =>
-        this.areas.reactivate(existing.id, data),
-      );
-    }
-    return this.withUniqueName(() => this.areas.create(data));
   }
 
-  async actualizar(id: number, input: ActualizarAreaInput) {
-    const area = await this.obtener(id);
-    const sedeId = input.sedeId ?? area.sedeId;
-    const nombre = input.nombre ?? area.nombre;
+  actualizar(
+    actor: AuthUser,
+    key: string,
+    id: number,
+    input: ActualizarAreaInput,
+  ) {
+    return this.domain.run(
+      actor,
+      key,
+      { op: "organization:area:update", id, input },
+      async (tx) => {
+        const area = await this.obtener(id);
+        const sedeId = input.sedeId ?? area.sedeId;
+        const nombre = input.nombre ?? area.nombre;
 
-    await this.ensureSedeUsable(sedeId);
-    const existing = await this.areas.findByNombreEnSede(sedeId, nombre, id);
-    if (existing) throw conflict("AREA_ALREADY_EXISTS");
+        await this.ensureSedeUsable(sedeId);
+        const existing = await this.areas.findByNombreEnSede(
+          sedeId,
+          nombre,
+          id,
+        );
+        if (existing) throw conflict("AREA_ALREADY_EXISTS");
 
-    return this.withUniqueName(() => this.areas.update(id, input));
+        return this.withUniqueName(() => this.areas.update(id, input, tx));
+      },
+    );
   }
 
-  async desactivar(id: number) {
-    const area = await this.obtener(id);
-    if (!area.activa) return area;
-    return this.areas.deactivateCascade(id);
+  desactivar(actor: AuthUser, key: string, id: number) {
+    return this.domain.run(
+      actor,
+      key,
+      { op: "organization:area:deactivate", id },
+      async (tx) => {
+        const area = await this.obtener(id);
+        if (!area.activa) return area;
+        return this.areas.deactivateCascade(id, tx);
+      },
+    );
   }
 
   private async ensureSedeUsable(sedeId: number) {

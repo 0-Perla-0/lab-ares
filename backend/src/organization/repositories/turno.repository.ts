@@ -4,6 +4,7 @@ import type { Prisma } from "../../generated/prisma/client";
 import type { TurnoCreateInput } from "../../generated/prisma/models";
 
 import { PrismaService } from "../../database/prisma.service";
+import { transact } from "../../common/domain/transact";
 import { translateUniqueViolation } from "./prisma-errors";
 import { recordOperationalHistory } from "../../common/domain/operational-history";
 
@@ -41,9 +42,9 @@ export class TurnoRepository {
     });
   }
 
-  create({ dias, ...turno }: Datos) {
+  create({ dias, ...turno }: Datos, client?: Prisma.TransactionClient) {
     return translateUniqueViolation(() =>
-      this.prisma.$transaction(async (tx) => {
+      transact(this.prisma, client, async (tx) => {
         const row = await tx.turno.create({
           data: { ...turno, dias: { create: dias.map((dia) => ({ dia })) } },
           include: conDias,
@@ -54,9 +55,13 @@ export class TurnoRepository {
     );
   }
 
-  update(id: number, { dias, ...turno }: UpdateData) {
+  update(
+    id: number,
+    { dias, ...turno }: UpdateData,
+    client?: Prisma.TransactionClient,
+  ) {
     return translateUniqueViolation(() =>
-      this.prisma.$transaction(async (tx) => {
+      transact(this.prisma, client, async (tx) => {
         await tx.$queryRaw`SELECT id FROM Turno WHERE id = ${id} FOR UPDATE`;
         if (dias !== undefined) {
           await replaceDias(tx, id, dias);
@@ -72,9 +77,13 @@ export class TurnoRepository {
     );
   }
 
-  reactivate(id: number, { dias, ...turno }: Datos) {
+  reactivate(
+    id: number,
+    { dias, ...turno }: Datos,
+    client?: Prisma.TransactionClient,
+  ) {
     return translateUniqueViolation(() =>
-      this.prisma.$transaction(async (tx) => {
+      transact(this.prisma, client, async (tx) => {
         await tx.$queryRaw`SELECT id FROM Turno WHERE id = ${id} FOR UPDATE`;
         await replaceDias(tx, id, dias);
         const row = await tx.turno.update({
@@ -88,8 +97,8 @@ export class TurnoRepository {
     );
   }
 
-  deactivate(id: number) {
-    return this.prisma.$transaction(async (tx) => {
+  deactivate(id: number, client?: Prisma.TransactionClient) {
+    return transact(this.prisma, client, async (tx) => {
       await tx.$queryRaw`SELECT id FROM Turno WHERE id = ${id} FOR UPDATE`;
       const row = await tx.turno.update({
         where: { id },

@@ -11,6 +11,7 @@ import type { Request } from "express";
 import { getAuthenticatedUser } from "../auth/authenticated-user";
 import { Permission } from "../auth/permissions";
 import { RequirePermissions } from "../auth/require-permissions.decorator";
+import { IdempotencyKey } from "../common/http/idempotency-key.decorator";
 import { ZodValidationPipe } from "../common/validation/zod-validation.pipe";
 import { z } from "zod";
 import { InvitationsService } from "./invitations.service";
@@ -33,12 +34,14 @@ const acceptSchema = z.object({
 export class InvitationsController {
   constructor(private readonly service: InvitationsService) {}
   @Post() @RequirePermissions(Permission.USERS_MANAGE) async create(
+    @IdempotencyKey() key: string,
     @Body(new ZodValidationPipe(createSchema)) body: any,
     @Req() req: Request,
   ) {
     return {
       data: await this.service.create({
         ...body,
+        key,
         actor: getAuthenticatedUser(req),
       }),
     };
@@ -66,7 +69,13 @@ export class InvitationsController {
   @Post(":id/revoke")
   @HttpCode(200)
   @RequirePermissions(Permission.USERS_MANAGE)
-  async revoke(@Param("id") id: string, @Req() req: Request) {
-    return { data: await this.service.revoke(id, getAuthenticatedUser(req)) };
+  async revoke(
+    @IdempotencyKey() key: string,
+    @Param("id") id: string,
+    @Req() req: Request,
+  ) {
+    return {
+      data: await this.service.revoke(id, getAuthenticatedUser(req), key),
+    };
   }
 }

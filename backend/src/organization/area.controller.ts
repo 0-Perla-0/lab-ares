@@ -14,6 +14,7 @@ import { getAuthenticatedUser } from "../auth/authenticated-user";
 import { Permission } from "../auth/permissions";
 import { RequirePermissions } from "../auth/require-permissions.decorator";
 import { PositiveIntPipe } from "../common/validation/positive-int.pipe";
+import { IdempotencyKey } from "../common/http/idempotency-key.decorator";
 import { ZodValidationPipe } from "../common/validation/zod-validation.pipe";
 import {
   actualizarAreaSchema,
@@ -40,6 +41,7 @@ export class AreaController {
   @Post()
   @RequirePermissions(Permission.ORGANIZATION_MANAGE)
   async crear(
+    @IdempotencyKey() key: string,
     @Body(new ZodValidationPipe(crearAreaSchema)) input: CrearAreaInput,
     @Req() request: Request,
   ) {
@@ -47,7 +49,9 @@ export class AreaController {
       getAuthenticatedUser(request),
       input.sedeId,
     );
-    return { data: await this.areas.crear(input) };
+    return {
+      data: await this.areas.crear(getAuthenticatedUser(request), key, input),
+    };
   }
 
   @Get(":id")
@@ -59,6 +63,7 @@ export class AreaController {
   @Put(":id")
   @RequirePermissions(Permission.ORGANIZATION_MANAGE)
   async actualizar(
+    @IdempotencyKey() key: string,
     @Param("id", new PositiveIntPipe()) id: number,
     @Body(new ZodValidationPipe(actualizarAreaSchema))
     input: ActualizarAreaInput,
@@ -69,16 +74,26 @@ export class AreaController {
       id,
       input.sedeId,
     );
-    return { data: await this.areas.actualizar(id, input) };
+    return {
+      data: await this.areas.actualizar(
+        getAuthenticatedUser(request),
+        key,
+        id,
+        input,
+      ),
+    };
   }
 
   @Delete(":id")
   @RequirePermissions(Permission.ORGANIZATION_MANAGE)
   async desactivar(
+    @IdempotencyKey() key: string,
     @Param("id", new PositiveIntPipe()) id: number,
     @Req() request: Request,
   ) {
     await this.policy.requireAreaManagement(getAuthenticatedUser(request), id);
-    return { data: await this.areas.desactivar(id) };
+    return {
+      data: await this.areas.desactivar(getAuthenticatedUser(request), key, id),
+    };
   }
 }

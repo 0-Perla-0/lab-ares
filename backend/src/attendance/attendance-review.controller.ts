@@ -14,6 +14,7 @@ import { getAuthenticatedUser } from "../auth/authenticated-user";
 import { Permission } from "../auth/permissions";
 import { RequirePermissions } from "../auth/require-permissions.decorator";
 import { PositiveIntPipe } from "../common/validation/positive-int.pipe";
+import { IdempotencyKey } from "../common/http/idempotency-key.decorator";
 import { ZodValidationPipe } from "../common/validation/zod-validation.pipe";
 import { idempotencyKeySchema } from "./attendance.schemas";
 import {
@@ -130,6 +131,7 @@ export class AttendanceReviewController {
   @RequirePermissions(Permission.ORGANIZATION_MANAGE)
   async policy(
     @Req() req: Request,
+    @IdempotencyKey() key: string,
     @Param("sedeId", new PositiveIntPipe()) sedeId: number,
     @Body(new ZodValidationPipe(attendancePolicySchema))
     body: z.infer<typeof attendancePolicySchema>,
@@ -137,6 +139,7 @@ export class AttendanceReviewController {
     return {
       data: await this.service.publishPolicy(
         getAuthenticatedUser(req),
+        key,
         sedeId,
         body,
       ),

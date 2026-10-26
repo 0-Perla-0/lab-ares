@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useAuth } from "@/components/auth/auth-provider";
+import { durableRequest } from "@/lib/backend2/durable-request";
 import { apiRequest, getApiErrorMessage } from "@/lib/api";
 import {
   hasPermission,
@@ -46,18 +47,20 @@ export function InvitationsPage() {
     setError("");
     setLink("");
     try {
-      const result = await apiRequest<ApiEnvelope<{ token: string }>>(
+      const body = {
+        targetEmail: form.get("email"),
+        role: form.get("role"),
+        sedeId: user.sedeId,
+        areaId: user.areaId,
+        turnoId: user.turnoId,
+      };
+      const result = await durableRequest<ApiEnvelope<{ token: string }>>(
+        user.id,
+        "invitation-create",
+        String(body.targetEmail),
         "/api/invitations",
-        {
-          method: "POST",
-          body: JSON.stringify({
-            targetEmail: form.get("email"),
-            role: form.get("role"),
-            sedeId: user.sedeId,
-            areaId: user.areaId,
-            turnoId: user.turnoId,
-          }),
-        },
+        "POST",
+        body,
       );
       setLink(
         `${window.location.origin}/invitacion?token=${encodeURIComponent(result.data.token)}`,
@@ -74,9 +77,13 @@ export function InvitationsPage() {
     setBusy(true);
     setError("");
     try {
-      await apiRequest(`/api/invitations/${encodeURIComponent(id)}/revoke`, {
-        method: "POST",
-      });
+      await durableRequest(
+        user.id,
+        "invitation-revoke",
+        id,
+        `/api/invitations/${encodeURIComponent(id)}/revoke`,
+        "POST",
+      );
       await load();
     } catch (cause) {
       setError(getApiErrorMessage(cause));

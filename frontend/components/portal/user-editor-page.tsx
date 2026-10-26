@@ -6,6 +6,7 @@ import { ArrowLeft, LoaderCircle, Save, UserRoundPlus } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { useAuth } from "@/components/auth/auth-provider";
+import { durableRequest } from "@/lib/backend2/durable-request";
 import { AdministrativeRecovery } from "./administrative-recovery";
 import {
   ErrorBanner,
@@ -164,22 +165,21 @@ export function UserEditorPage(props: Props) {
     };
 
     try {
-      const result = await apiRequest<ApiEnvelope<{ token?: string }>>(
+      const result = await durableRequest<ApiEnvelope<{ token?: string }>>(
+        user.id,
+        isEdit ? "user-update" : "invitation-create",
+        isEdit ? String(item?.id) : payload.email,
         isEdit ? `/api/users/${item?.id}` : "/api/invitations",
-        {
-          method: isEdit ? "PUT" : "POST",
-          body: JSON.stringify(
-            isEdit
-              ? payload
-              : {
-                  targetEmail: payload.email,
-                  role: payload.rol,
-                  sedeId,
-                  areaId,
-                  turnoId,
-                },
-          ),
-        },
+        isEdit ? "PUT" : "POST",
+        isEdit
+          ? payload
+          : {
+              targetEmail: payload.email,
+              role: payload.rol,
+              sedeId,
+              areaId,
+              turnoId,
+            },
       );
       if (!isEdit && result.data.token) {
         setInvitationLink(

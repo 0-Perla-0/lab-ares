@@ -1181,6 +1181,7 @@ const publicContentPaths = {
     post: {
       tags: ["Public Content"],
       security: cookieSecurity,
+      parameters: [publicContentIdempotencyParameter],
       description:
         "Explicitly classifies an owned, scanned JPG/PNG as public and copies it into the isolated public bucket.",
       requestBody: jsonBody({
@@ -1196,7 +1197,7 @@ const publicContentPaths = {
     post: {
       tags: ["Public Content"],
       security: cookieSecurity,
-      parameters: [publicContentIdParameter],
+      parameters: [publicContentIdParameter, publicContentIdempotencyParameter],
       description:
         "Administrator-only public-asset withdrawal. Assets used by a published page cannot be archived.",
       requestBody: jsonBody({

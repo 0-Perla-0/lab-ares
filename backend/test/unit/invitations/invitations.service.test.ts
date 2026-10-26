@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { InvitationsService } from "../../../src/invitations/invitations.service";
 import { RolUsuario } from "../../../src/generated/prisma/enums";
+import { operationFingerprint } from "../../../src/common/domain/canonical-operation";
+
+const KEY = "invitation-key-000001";
 
 const actor: any = {
   id: 1,
@@ -22,16 +25,27 @@ const invitation: any = {
 };
 function deps(overrides: any = {}) {
   const tx: any = {
+    // DomainTransaction revalidates the actor under the write barrier.
+    $queryRaw: vi.fn().mockResolvedValue([]),
+    recoveryWriteBarrier: {
+      findUnique: vi.fn().mockResolvedValue({ active: false, version: 1 }),
+    },
+    domainOperation: {
+      findUnique: vi.fn().mockResolvedValue(null),
+      create: vi.fn().mockResolvedValue(undefined),
+    },
     operationalHistory: {
       create: vi.fn(),
       findFirst: vi.fn().mockResolvedValue(null),
     },
     invitation: {
+      create: vi.fn().mockResolvedValue(invitation),
       findUnique: vi.fn().mockResolvedValue(invitation),
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       update: vi.fn().mockResolvedValue(invitation),
     },
     usuario: {
+      findUnique: vi.fn().mockResolvedValue({ ...actor, estado: "ACTIVA" }),
       findUniqueOrThrow: vi.fn().mockResolvedValue({
         id: 8,
         rol: "PRESTADOR",
@@ -60,7 +74,9 @@ function deps(overrides: any = {}) {
   const outbox: any = { enqueue: vi.fn().mockResolvedValue({}) };
   const audit: any = { append: vi.fn().mockResolvedValue({}) };
   return {
-    service: new InvitationsService(prisma, outbox, policy, audit),
+    service: new InvitationsService(prisma, outbox, policy, audit, {
+      get: () => "synthetic-session-secret-for-token-derivation",
+    } as any),
     prisma,
     tx,
     policy,
@@ -74,6 +90,7 @@ describe("InvitationsService security and transactions", () => {
     const { service } = deps();
     await expect(
       service.create({
+        key: KEY,
         targetEmail: "a@b.com",
         role: RolUsuario.PRESTADOR,
         actor,
@@ -82,6 +99,7 @@ describe("InvitationsService security and transactions", () => {
     ).rejects.toMatchObject({ code: "INVITATION_EXPIRY_INVALID" });
     await expect(
       service.create({
+        key: KEY,
         targetEmail: "a@b.com",
         role: RolUsuario.PRESTADOR,
         actor,
@@ -95,7 +113,12 @@ describe("InvitationsService security and transactions", () => {
       throw new Error("FORBIDDEN");
     });
     await expect(
-      service.create({ targetEmail: "a@b.com", role: RolUsuario.ADMIN, actor }),
+      service.create({
+        key: KEY,
+        targetEmail: "a@b.com",
+        role: RolUsuario.ADMIN,
+        actor,
+      }),
     ).rejects.toThrow("FORBIDDEN");
     expect(policy.requireCreation).toHaveBeenCalled();
   });
@@ -104,6 +127,7 @@ describe("InvitationsService security and transactions", () => {
     prisma.area.findUnique.mockResolvedValue({ id: 2, sedeId: 9 });
     await expect(
       service.create({
+        key: KEY,
         targetEmail: "a@b.com",
         role: RolUsuario.PRESTADOR,
         actor,
@@ -113,21 +137,21 @@ describe("InvitationsService security and transactions", () => {
     ).rejects.toMatchObject({ code: "INVITATION_PLACEMENT_INVALID" });
   });
   it("maps duplicate token/email conflicts but preserves infrastructure errors", async () => {
-    const duplicate = deps({
-      $transaction: vi.fn().mockRejectedValue({ code: "P2002" }),
-    });
+    const duplicate = deps();
+    duplicate.tx.invitation.create.mockRejectedValue({ code: "P2002" });
     await expect(
       duplicate.service.create({
+        key: KEY,
         targetEmail: "a@b.com",
         role: RolUsuario.PRESTADOR,
         actor,
       }),
     ).rejects.toMatchObject({ code: "INVITATION_DUPLICATE" });
-    const failure = deps({
-      $transaction: vi.fn().mockRejectedValue(new Error("db down")),
-    });
+    const failure = deps();
+    failure.tx.invitation.create.mockRejectedValue(new Error("db down"));
     await expect(
       failure.service.create({
+        key: KEY,
         targetEmail: "a@b.com",
         role: RolUsuario.PRESTADOR,
         actor,
@@ -184,6 +208,51 @@ describe("InvitationsService security and transactions", () => {
     policy.requireCreation.mockImplementation(() => {
       throw new Error("FORBIDDEN");
     });
-    await expect(service.revoke("inv-1", actor)).rejects.toThrow("FORBIDDEN");
+    await expect(service.revoke("inv-1", actor, KEY)).rejects.toThrow(
+      "FORBIDDEN",
+    );
+  });
+  it("keeps the raw token out of the durable receipt and re-derives it on replay", async () => {
+    const first = deps();
+    const created = await first.service.create({
+      key: KEY,
+      targetEmail: "New@Example.com",
+      role: RolUsuario.PRESTADOR,
+      actor,
+    });
+    const stored = first.tx.domainOperation.create.mock.calls[0][0].data;
+    expect(JSON.stringify(stored.response)).not.toContain(created.token);
+    expect(created.token).toBeTruthy();
+    // Replay: the stored receipt has no token, yet the same token comes back.
+    const replay = deps();
+    replay.tx.domainOperation.findUnique.mockResolvedValue({
+      fingerprint: operationFingerprint({
+        op: "invitations:create",
+        targetEmail: "new@example.com",
+        role: RolUsuario.PRESTADOR,
+        expiresAt: null,
+        sedeId: null,
+        areaId: null,
+        turnoId: null,
+      }),
+      response: stored.response,
+    });
+    const again = await replay.service.create({
+      key: KEY,
+      targetEmail: "New@Example.com",
+      role: RolUsuario.PRESTADOR,
+      actor,
+    });
+    expect(again.token).toBe(created.token);
+    expect(replay.tx.invitation.create).not.toHaveBeenCalled();
+    expect(replay.outbox.enqueue).not.toHaveBeenCalled();
+    // A different key yields a different token.
+    const other = await deps().service.create({
+      key: "invitation-key-000002",
+      targetEmail: "New@Example.com",
+      role: RolUsuario.PRESTADOR,
+      actor,
+    });
+    expect(other.token).not.toBe(created.token);
   });
 });

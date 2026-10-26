@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Clock3, Pencil, Trash2 } from "lucide-react";
 
 import { useAuth } from "@/components/auth/auth-provider";
+import { durableRequest } from "@/lib/backend2/durable-request";
 import {
   ConfirmDialog,
   EmptyState,
@@ -109,11 +110,15 @@ export function TurnosPage() {
 
     try {
       const isEdit = editor.mode === "edit";
-      await apiRequest(
+      await durableRequest(
+        user.id,
+        isEdit ? "org-turno-update" : "org-turno-create",
+        isEdit ? String(editor.item.id) : `${payload.areaId}:${payload.nombre}`,
         isEdit
           ? `/api/organization/turnos/${editor.item.id}`
           : "/api/organization/turnos",
-        { method: isEdit ? "PUT" : "POST", body: JSON.stringify(payload) },
+        isEdit ? "PUT" : "POST",
+        payload,
       );
       setEditor(null);
       setSuccess(
@@ -134,9 +139,13 @@ export function TurnosPage() {
     setDeleting(true);
     setSuccess("");
     try {
-      await apiRequest(`/api/organization/turnos/${deleteTarget.id}`, {
-        method: "DELETE",
-      });
+      await durableRequest(
+        user.id,
+        "org-turno-deactivate",
+        String(deleteTarget.id),
+        `/api/organization/turnos/${deleteTarget.id}`,
+        "DELETE",
+      );
       setDeleteTarget(null);
       setSuccess("El turno quedó inactivo.");
       await load();

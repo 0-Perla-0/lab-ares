@@ -122,10 +122,11 @@ export class PublicContentController {
   @RequirePermissions(Permission.PUBLIC_CONTENT_PUBLISH)
   classifyAsset(
     @Req() req: Request,
+    @IdempotencyKey() key: string,
     @Body(new ZodValidationPipe(classifyPublicAssetSchema)) body: any,
   ) {
     return this.content
-      .classifyAsset(getAuthenticatedUser(req), body)
+      .classifyAsset(getAuthenticatedUser(req), key, body)
       .then((data) => ({ data }));
   }
 
@@ -134,11 +135,12 @@ export class PublicContentController {
   @RequirePermissions(Permission.PUBLIC_CONTENT_ARCHIVE)
   archiveAsset(
     @Req() req: Request,
+    @IdempotencyKey() key: string,
     @Param("id") id: string,
     @Body(new ZodValidationPipe(archivePublicAssetSchema)) body: any,
   ) {
     return this.content
-      .archiveAsset(getAuthenticatedUser(req), id, body.motivo)
+      .archiveAsset(getAuthenticatedUser(req), key, id, body.motivo)
       .then((data) => ({ data }));
   }
 }

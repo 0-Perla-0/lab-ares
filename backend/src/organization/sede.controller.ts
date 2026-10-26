@@ -14,6 +14,7 @@ import { getAuthenticatedUser } from "../auth/authenticated-user";
 import { Permission } from "../auth/permissions";
 import { RequirePermissions } from "../auth/require-permissions.decorator";
 import { PositiveIntPipe } from "../common/validation/positive-int.pipe";
+import { IdempotencyKey } from "../common/http/idempotency-key.decorator";
 import { ZodValidationPipe } from "../common/validation/zod-validation.pipe";
 import {
   actualizarSedeSchema,
@@ -40,11 +41,14 @@ export class SedeController {
   @Post()
   @RequirePermissions(Permission.ORGANIZATION_MANAGE)
   async crear(
+    @IdempotencyKey() key: string,
     @Body(new ZodValidationPipe(crearSedeSchema)) input: CrearSedeInput,
     @Req() request: Request,
   ) {
     this.policy.requireSedeCreation(getAuthenticatedUser(request));
-    return { data: await this.sedes.crear(input) };
+    return {
+      data: await this.sedes.crear(getAuthenticatedUser(request), key, input),
+    };
   }
 
   @Get(":id")
@@ -56,22 +60,33 @@ export class SedeController {
   @Put(":id")
   @RequirePermissions(Permission.ORGANIZATION_MANAGE)
   async actualizar(
+    @IdempotencyKey() key: string,
     @Param("id", new PositiveIntPipe()) id: number,
     @Body(new ZodValidationPipe(actualizarSedeSchema))
     input: ActualizarSedeInput,
     @Req() request: Request,
   ) {
     this.policy.requireSedeManagement(getAuthenticatedUser(request), id);
-    return { data: await this.sedes.actualizar(id, input) };
+    return {
+      data: await this.sedes.actualizar(
+        getAuthenticatedUser(request),
+        key,
+        id,
+        input,
+      ),
+    };
   }
 
   @Delete(":id")
   @RequirePermissions(Permission.ORGANIZATION_MANAGE)
   async desactivar(
+    @IdempotencyKey() key: string,
     @Param("id", new PositiveIntPipe()) id: number,
     @Req() request: Request,
   ) {
     this.policy.requireSedeManagement(getAuthenticatedUser(request), id);
-    return { data: await this.sedes.desactivar(id) };
+    return {
+      data: await this.sedes.desactivar(getAuthenticatedUser(request), key, id),
+    };
   }
 }
