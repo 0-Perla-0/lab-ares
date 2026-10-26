@@ -159,27 +159,27 @@ export class DirectoryService {
       key,
       { op: "directory:preferences", data },
       async (tx) => {
-      const result = await tx.directorioPreferencia.upsert({
-        where: { usuarioId: actor.id },
-        create: { usuarioId: actor.id, ...data },
-        update: data,
-        select: {
-          visibleEnArea: true,
-          visibleEnProyectos: true,
-          mostrarEmail: true,
-        },
-      });
-      await this.audit.append(
-        {
-          actorId: actor.id,
-          subjectId: actor.id,
-          action: "DIRECTORY_PREFERENCES_UPDATED",
-          resource: "directory",
-          metadata: data,
-        },
-        tx,
-      );
-      return result;
+        const result = await tx.directorioPreferencia.upsert({
+          where: { usuarioId: actor.id },
+          create: { usuarioId: actor.id, ...data },
+          update: data,
+          select: {
+            visibleEnArea: true,
+            visibleEnProyectos: true,
+            mostrarEmail: true,
+          },
+        });
+        await this.audit.append(
+          {
+            actorId: actor.id,
+            subjectId: actor.id,
+            action: "DIRECTORY_PREFERENCES_UPDATED",
+            resource: "directory",
+            metadata: data,
+          },
+          tx,
+        );
+        return result;
       },
     );
   }
