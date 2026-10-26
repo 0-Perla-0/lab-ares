@@ -51,7 +51,15 @@ function serviceFixture(run?: Record<string, unknown>) {
     },
   };
   const audit = { append: vi.fn(async () => ({})) };
-  const deletion = { recoveryReady: vi.fn(async () => true) };
+  const deletion = {
+    recoveryReady: vi.fn(async () => true),
+    recoveryAssessment: vi.fn(async () => ({
+      ready: true,
+      unfinishedJobs: 0,
+      orphanIntents: [] as { ref: string; reason: string }[],
+      truncated: false,
+    })),
+  };
   const service = new RecoveryService(
     prisma as any,
     audit as any,
@@ -87,10 +95,24 @@ describe("RecoveryService state governance", () => {
       frozenById: 99,
       responsibleId: 98,
     });
-    h.deletion.recoveryReady.mockResolvedValue(false);
-    await expect(
-      h.service.approve(actor, "run-1", "deletion-readiness-0001"),
-    ).rejects.toMatchObject({ code: "RECOVERY_READINESS_FAILED" });
+    h.deletion.recoveryAssessment.mockResolvedValue({
+      ready: false,
+      unfinishedJobs: 0,
+      orphanIntents: [
+        { ref: "deletion-intents/a.json", reason: "NOT_IN_SQL" },
+        { ref: "deletion-intents/b.json", reason: "NOT_IN_SQL" },
+        { ref: "deletion-intents/c.json", reason: "VERSIONS_REMAINING" },
+      ],
+      truncated: false,
+    });
+    const failure = await h.service
+      .approve(actor, "run-1", "deletion-readiness-0001")
+      .catch((error) => error);
+    expect(failure).toMatchObject({ code: "RECOVERY_READINESS_FAILED" });
+    // Operators get counts by reason, never the external object references.
+    const body = JSON.stringify(failure.details ?? failure.response ?? failure);
+    expect(body).toContain("NOT_IN_SQL");
+    expect(body).not.toContain("deletion-intents/");
     expect(h.tx.recoveryRun.update).not.toHaveBeenCalled();
   });
   it.each([

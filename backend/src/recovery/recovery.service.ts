@@ -612,9 +612,10 @@ export class RecoveryService {
     if (actor.id === run.frozenById || actor.id === run.responsibleId)
       throw api("RECOVERY_SEPARATION_OF_DUTIES_REQUIRED", 403);
     const dependencies = await this.health.dependencies();
-    const deletionReady = this.objectDeletions
-      ? await this.objectDeletions.recoveryReady().catch(() => false)
-      : false;
+    const deletionAssessment = this.objectDeletions
+      ? await this.objectDeletions.recoveryAssessment().catch(() => null)
+      : null;
+    const deletionReady = deletionAssessment?.ready ?? false;
     const [outboxInFlight, journalUnresolved] = await Promise.all([
       this.prisma.outboxEvent.count({ where: { state: "PROCESSING" } }),
       this.prisma.suppressionJournalEntry.count({
@@ -656,6 +657,21 @@ export class RecoveryService {
         failed: checks
           .filter(([, passed]) => !passed)
           .map(([type, , code]) => ({ type, code })),
+        // Counts only: refs stay with the operator reading the intent bucket.
+        ...(deletionAssessment && !deletionAssessment.ready
+          ? {
+              objectDeletion: {
+                unfinishedJobs: deletionAssessment.unfinishedJobs,
+                truncated: deletionAssessment.truncated,
+                orphanIntents: deletionAssessment.orphanIntents.reduce<
+                  Record<string, number>
+                >((counts, row) => {
+                  counts[row.reason] = (counts[row.reason] ?? 0) + 1;
+                  return counts;
+                }, {}),
+              },
+            }
+          : {}),
       });
     return this.mutate(actor, key, "APPROVE_READY", id, {}, async (tx) => {
       for (const [type, passed, code] of checks)

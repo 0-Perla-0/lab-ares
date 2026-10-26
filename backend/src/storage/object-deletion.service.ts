@@ -62,6 +62,20 @@ const manifestSchema = z
   })
   .strict();
 type Guard = (tx: Prisma.TransactionClient) => Promise<void>;
+export type RecoveryAssessment = {
+  ready: boolean;
+  unfinishedJobs: number;
+  orphanIntents: Array<{
+    ref: string;
+    reason:
+      | "NOT_IN_SQL"
+      | "BODY_MISMATCH"
+      | "TOO_LARGE"
+      | "VERSIONS_REMAINING"
+      | "MISSING_EXTERNAL_PROOF";
+  }>;
+  truncated: boolean;
+};
 export type DeletionPurpose = z.infer<typeof manifestSchema>["purpose"];
 const hash = (value: unknown) =>
   createHash("sha256").update(canonicalOperation(value)).digest("hex");
@@ -684,13 +698,19 @@ export class ObjectDeletionService {
     });
     return "VERIFIED";
   }
-  async recoveryReady() {
-    if (
-      await this.db.objectDeletionJob.count({
+  /** Read-only, bounded comparison between SQL intents and the external intent
+   * store. It never imports, deletes or closes anything; it only explains why
+   * reopening is (not) safe. Caps fail closed through `truncated`. */
+  async recoveryAssessment(): Promise<RecoveryAssessment> {
+    const result: RecoveryAssessment = {
+      ready: false,
+      unfinishedJobs: await this.db.objectDeletionJob.count({
         where: { state: { not: "COMPLETE" } },
-      })
-    )
-      return false;
+      }),
+      orphanIntents: [],
+      truncated: false,
+    };
+    if (result.unfinishedJobs) return result;
     const known = new Map<
       string,
       Awaited<ReturnType<typeof this.db.objectDeletionJob.findMany>>[number]
@@ -703,7 +723,7 @@ export class ObjectDeletionService {
         take: 200,
       });
       for (const job of page) known.set(job.manifestRef, job);
-      if (known.size > 10000) return false;
+      if (known.size > 10000) return { ...result, truncated: true };
       if (page.length < 200) break;
       after = page.at(-1)!.id;
     }
@@ -712,9 +732,13 @@ export class ObjectDeletionService {
     do {
       const page = await this.storage.listDeletionIntents(cursor);
       for (const ref of page.keys) {
-        if (++seen > 10000) return false;
+        if (++seen > 10000) return { ...result, truncated: true };
         const job = known.get(ref);
-        if (!job) return false;
+        if (!job) {
+          // Written after the restored snapshot: SQL does not know this intent.
+          result.orphanIntents.push({ ref, reason: "NOT_IN_SQL" });
+          continue;
+        }
         const manifest = this.manifest(job),
           body = Buffer.from(canonicalOperation(manifest));
         const stream = await this.storage.getSuppressionJournal(
@@ -723,25 +747,44 @@ export class ObjectDeletionService {
         );
         const chunks: Buffer[] = [];
         let size = 0;
+        let tooLarge = false;
         for await (const chunk of stream) {
           size += chunk.length;
           if (size > 1048576) {
             stream.destroy();
-            return false;
+            tooLarge = true;
+            break;
           }
           chunks.push(Buffer.from(chunk));
         }
-        if (!Buffer.concat(chunks).equals(body)) return false;
+        if (tooLarge) {
+          result.orphanIntents.push({ ref, reason: "TOO_LARGE" });
+          continue;
+        }
+        if (!Buffer.concat(chunks).equals(body)) {
+          result.orphanIntents.push({ ref, reason: "BODY_MISMATCH" });
+          continue;
+        }
         if (
           (
             await this.inventory(manifest.targets, AbortSignal.timeout(10000))
           ).some((target) => target.versions.length)
-        )
-          return false;
+        ) {
+          result.orphanIntents.push({ ref, reason: "VERSIONS_REMAINING" });
+          continue;
+        }
         known.delete(ref);
       }
       cursor = page.nextCursor;
     } while (cursor);
-    return known.size === 0;
+    // SQL intents with no external proof also block reopening.
+    for (const ref of known.keys())
+      result.orphanIntents.push({ ref, reason: "MISSING_EXTERNAL_PROOF" });
+    result.ready = result.orphanIntents.length === 0;
+    return result;
+  }
+
+  async recoveryReady() {
+    return (await this.recoveryAssessment()).ready;
   }
 }

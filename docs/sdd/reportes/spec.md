@@ -1,6 +1,6 @@
 # Reportes operativos
 
-ID: `reportes` · Estado: parcial · Revisión: 2026-10-15
+ID: `reportes` · Estado: parcial · Revisión: 2026-10-26
 
 ## Objetivo y alcance
 
@@ -19,6 +19,7 @@ No reconstruye estados punto-en-el-tiempo de documentos/Kairos ni inventa organi
 
 - [Reportes](../../../backend/src/reports/), [UI](../../../frontend/app/portal/reportes/), [tests](../../../backend/test/reports.service.spec.ts).
 - [CSV real de 5001 filas](../../../frontend/fullstack/report-streaming.spec.ts), [integración de barrera](../../../backend/test/integration/remaining-closure.integration.test.ts).
+- Decisión (26/10): T2 no se implementa mientras la aceptación no exija estados históricos exactos de documentos/Kairos; hoy sólo hay cohortes con snapshot y `unknownHistoryExcluded`. Si se exige, primero se define qué eventos capturar y desde qué corte.
 - `REPORTS_MAX_BYTES` es techo técnico, no política institucional; dimensionar disco.
 - `S3_DOWNLOAD_ENDPOINT` firma host público permitido; HTTPS en producción. Limpieza terminal depende de [borrado durable](../borrado-objetos/spec.md).
 
