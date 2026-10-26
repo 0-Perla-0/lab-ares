@@ -98,6 +98,11 @@ export const notificationContracts = {
   IDENTITY_TEMPORARILY_THROTTLED: z
     .object({ temporarilyBlocked: z.literal(true) })
     .strict(),
+  // Identity notices carry no secret or free text: only that the effect happened.
+  PASSWORD_RECOVERED: z.object({ completed: z.literal(true) }).strict(),
+  PASSWORD_CHANGED: z.object({ sessionsRevoked: z.literal(true) }).strict(),
+  SESSION_REVOKED: z.object({ sessionId: z.string().min(1) }).strict(),
+  ACCOUNT_CHANGED: z.object({ sessionsRevoked: z.literal(true) }).strict(),
   EXPEDIENT_FORMALIZED: z
     .object({ formalizationId: z.string().min(1), inicio: z.iso.date() })
     .strict(),
@@ -140,7 +145,13 @@ export function notificationLink(type: string): string {
   if (type === "EXPEDIENT_FORMALIZED") return "/portal/expediente";
   if (type.startsWith("ABSENCE_")) return "/portal/asistencia/ausencias";
   if (type.startsWith("ATTENDANCE_")) return "/portal/asistencia";
-  if (type.startsWith("MFA_") || type.startsWith("IDENTITY_"))
+  if (
+    type.startsWith("MFA_") ||
+    type.startsWith("IDENTITY_") ||
+    type.startsWith("PASSWORD_") ||
+    type.startsWith("SESSION_") ||
+    type === "ACCOUNT_CHANGED"
+  )
     return "/portal/seguridad";
   return "/portal/notificaciones";
 }

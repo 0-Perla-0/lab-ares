@@ -1,4 +1,5 @@
 import { Injectable, Optional } from "@nestjs/common";
+import { notificationContracts } from "../common/domain/operational-notification";
 
 import { EstadoUsuario } from "../generated/prisma/enums";
 
@@ -134,7 +135,9 @@ export class AuthService {
           data: {
             userId: token.userId,
             type: "PASSWORD_RECOVERED",
-            payload: { completed: true },
+            payload: notificationContracts.PASSWORD_RECOVERED.parse({
+              completed: true,
+            }),
           },
         });
       if (this.outbox)
@@ -236,7 +239,9 @@ export class AuthService {
             data: {
               userId,
               type: "PASSWORD_CHANGED",
-              payload: { sessionsRevoked: true },
+              payload: notificationContracts.PASSWORD_CHANGED.parse({
+                sessionsRevoked: true,
+              }),
             },
           });
         if (this.outbox)
@@ -313,7 +318,13 @@ export class AuthService {
         );
       if (tx.notification)
         await tx.notification.create({
-          data: { userId, type: "SESSION_REVOKED", payload: { sessionId: id } },
+          data: {
+            userId,
+            type: "SESSION_REVOKED",
+            payload: notificationContracts.SESSION_REVOKED.parse({
+              sessionId: id,
+            }),
+          },
         });
       if (this.outbox)
         await this.outbox.enqueue(
