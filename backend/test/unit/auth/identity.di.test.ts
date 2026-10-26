@@ -4,6 +4,7 @@ import { InvitationsService } from "../../../src/invitations/invitations.service
 import { PrismaService } from "../../../src/database/prisma.service";
 import { OutboxService } from "../../../src/auth/outbox.service";
 import { AuditService } from "../../../src/auth/audit.service";
+import { ConfigService } from "@nestjs/config";
 import { UsersPolicy } from "../../../src/users/users.policy";
 
 describe("identity DI smoke", () => {
@@ -15,6 +16,7 @@ describe("identity DI smoke", () => {
         { provide: OutboxService, useValue: {} },
         { provide: UsersPolicy, useValue: {} },
         { provide: AuditService, useValue: {} },
+        { provide: ConfigService, useValue: {} },
       ],
     }).compile();
     expect(module.get(InvitationsService)).toBeInstanceOf(InvitationsService);

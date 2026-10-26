@@ -1,5 +1,8 @@
 import { Injectable } from "@nestjs/common";
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, createHmac, randomBytes } from "node:crypto";
+import { ConfigService } from "@nestjs/config";
+import type { Environment } from "../config/environment";
+import { DomainTransaction } from "../common/domain/domain-transaction";
 import { PrismaService } from "../database/prisma.service";
 import { ApiException } from "../common/errors/api.exception";
 import { OutboxService } from "../auth/outbox.service";
@@ -21,8 +24,18 @@ export class InvitationsService {
     private readonly outbox: OutboxService,
     private readonly usersPolicy: UsersPolicy,
     private readonly audit: AuditService,
+    private readonly config: ConfigService<Environment, true>,
   ) {}
+
+  /** The raw token never enters the durable receipt: replaying a key re-derives it. */
+  private deriveToken(actor: AuthUser, key: string) {
+    return createHmac("sha256", this.config.get("SESSION_SECRET"))
+      .update(`ares-invitation-token-v1:${actor.id}:${key}`)
+      .digest("base64url");
+  }
+
   async create(input: {
+    key: string;
     targetEmail: string;
     role: RolUsuario;
     actor: AuthUser;
@@ -57,53 +70,65 @@ export class InvitationsService {
       if (!turno || turno.areaId !== input.areaId)
         throw new ApiException("INVITATION_PLACEMENT_INVALID", 400);
     }
-    const raw = randomBytes(32).toString("base64url");
-    let invitation;
-    try {
-      invitation = await this.prisma.$transaction(async (tx) => {
-        const created = await tx.invitation.create({
-          data: {
-            tokenHash: hashToken(raw),
-            targetEmail: input.targetEmail.toLowerCase(),
-            role: input.role,
-            createdById: input.actor.id,
-            expiresAt,
-            sedeId: input.sedeId,
-            areaId: input.areaId,
-            turnoId: input.turnoId,
-          },
-        });
-        await this.outbox.enqueue(
-          {
-            type: "INVITATION_CREATED",
-            aggregateId: created.id,
-            payload: { token: raw, targetEmail: created.targetEmail },
-          },
-          tx,
-        );
-        await this.audit.append(
-          {
-            actorId: input.actor.id,
-            subjectId: input.actor.id,
-            action: "INVITATION_CREATED",
-            resource: "invitation",
-            metadata: { targetEmail: created.targetEmail },
-          },
-          tx,
-        );
-        return created;
-      });
-    } catch (error: any) {
-      if (error?.code === "P2002")
-        throw new ApiException("INVITATION_DUPLICATE", 409);
-      throw error;
-    }
-    return {
-      id: invitation.id,
-      targetEmail: invitation.targetEmail,
-      expiresAt: invitation.expiresAt,
-      token: raw,
-    };
+    const raw = this.deriveToken(input.actor, input.key);
+    const receipt = await new DomainTransaction(this.prisma).run(
+      input.actor,
+      input.key,
+      {
+        op: "invitations:create",
+        targetEmail: input.targetEmail.toLowerCase(),
+        role: input.role,
+        expiresAt: input.expiresAt?.toISOString() ?? null,
+        sedeId: input.sedeId ?? null,
+        areaId: input.areaId ?? null,
+        turnoId: input.turnoId ?? null,
+      },
+      async (tx) => {
+        try {
+          const created = await tx.invitation.create({
+            data: {
+              tokenHash: hashToken(raw),
+              targetEmail: input.targetEmail.toLowerCase(),
+              role: input.role,
+              createdById: input.actor.id,
+              expiresAt,
+              sedeId: input.sedeId,
+              areaId: input.areaId,
+              turnoId: input.turnoId,
+            },
+          });
+          await this.outbox.enqueue(
+            {
+              type: "INVITATION_CREATED",
+              aggregateId: created.id,
+              payload: { token: raw, targetEmail: created.targetEmail },
+            },
+            tx,
+          );
+          await this.audit.append(
+            {
+              actorId: input.actor.id,
+              subjectId: input.actor.id,
+              action: "INVITATION_CREATED",
+              resource: "invitation",
+              metadata: { targetEmail: created.targetEmail },
+            },
+            tx,
+          );
+          // Receipt without the secret: the token is re-derived from the key.
+          return {
+            id: created.id,
+            targetEmail: created.targetEmail,
+            expiresAt: created.expiresAt,
+          };
+        } catch (error: any) {
+          if (error?.code === "P2002")
+            throw new ApiException("INVITATION_DUPLICATE", 409);
+          throw error;
+        }
+      },
+    );
+    return { ...receipt, token: raw };
   }
   async list(actor: AuthUser) {
     const scope = this.usersPolicy.listScope(actor);
@@ -220,7 +245,7 @@ export class InvitationsService {
       codigo,
     );
   }
-  async revoke(id: string, actor: AuthUser) {
+  async revoke(id: string, actor: AuthUser, key: string) {
     const invitation = await this.prisma.invitation.findUnique({
       where: { id },
       select: { role: true, sedeId: true, areaId: true },
@@ -231,32 +256,37 @@ export class InvitationsService {
       sedeId: invitation.sedeId,
       areaId: invitation.areaId,
     });
-    return this.prisma.$transaction(async (tx) => {
-      const result = await tx.invitation.updateMany({
-        where: { id, usedAt: null, revokedAt: null },
-        data: { revokedAt: new Date() },
-      });
-      if (result.count) {
-        await this.audit.append(
-          {
-            actorId: actor.id,
-            action: "INVITATION_REVOKED",
-            resource: "invitation",
-            correlationId: id,
-            metadata: { revoked: true },
-          },
-          tx,
-        );
-        await this.outbox.enqueue(
-          {
-            type: "INVITATION_REVOKED",
-            aggregateId: id,
-            payload: { revoked: true },
-          },
-          tx,
-        );
-      }
-      return result;
-    });
+    return new DomainTransaction(this.prisma).run(
+      actor,
+      key,
+      { op: "invitations:revoke", id },
+      async (tx) => {
+        const result = await tx.invitation.updateMany({
+          where: { id, usedAt: null, revokedAt: null },
+          data: { revokedAt: new Date() },
+        });
+        if (result.count) {
+          await this.audit.append(
+            {
+              actorId: actor.id,
+              action: "INVITATION_REVOKED",
+              resource: "invitation",
+              correlationId: id,
+              metadata: { revoked: true },
+            },
+            tx,
+          );
+          await this.outbox.enqueue(
+            {
+              type: "INVITATION_REVOKED",
+              aggregateId: id,
+              payload: { revoked: true },
+            },
+            tx,
+          );
+        }
+        return result;
+      },
+    );
   }
 }

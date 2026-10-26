@@ -42,6 +42,7 @@ export class OperationIntentsController {
         UNION ALL SELECT 'retention', createdAt FROM OperacionRetencion WHERE actorId = ${actor.id} AND \`key\` = ${key} AND response IS NOT NULL
         UNION ALL SELECT 'printing', createdAt FROM OperacionImpresion3D WHERE actorId = ${actor.id} AND \`key\` = ${key}
         UNION ALL SELECT 'recovery', createdAt FROM RecoveryOperation WHERE actorId = ${actor.id} AND \`key\` = ${key} AND response IS NOT NULL
+        UNION ALL SELECT 'gamification', createdAt FROM EventoGamificacion WHERE actorId = ${actor.id} AND sourceKey IN (CONCAT('manual:', ${key}), CONCAT('manual-reversal:', ${key}))
       `;
         return {
           data: {

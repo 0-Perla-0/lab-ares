@@ -6,6 +6,12 @@ import type { AreaRepository } from "../../../src/organization/repositories/area
 import type { SedeRepository } from "../../../src/organization/repositories/sede.repository";
 import type { TurnoRepository } from "../../../src/organization/repositories/turno.repository";
 import type { UsersRepository } from "../../../src/users/users.repository";
+import {
+  passthroughDomain,
+  testActor,
+  tx,
+  withIdentity,
+} from "../support/domain";
 import { UsersService } from "../../../src/users/users.service";
 
 vi.mock("../../../src/auth/password", () => ({ hashPassword: vi.fn() }));
@@ -37,12 +43,14 @@ const users = {
 const sedes = { findById: vi.fn() };
 const areas = { findById: vi.fn() };
 const turnos = { findById: vi.fn() };
-const service = new UsersService(
+const base = new UsersService(
   users as unknown as UsersRepository,
   sedes as unknown as SedeRepository,
   areas as unknown as AreaRepository,
   turnos as unknown as TurnoRepository,
+  passthroughDomain,
 );
+const service = withIdentity(base, ["actualizar", "darDeBaja"]);
 const mockedHashPassword = vi.mocked(hashPassword);
 
 describe("UsersService", () => {
@@ -138,17 +146,22 @@ describe("UsersService", () => {
       email: "changed@ares.local",
       excludeId: user.id,
     });
-    expect(users.update).toHaveBeenCalledWith(user.id, {
-      email: "changed@ares.local",
-      passwordHash: "password-hash",
-    });
+    expect(users.update).toHaveBeenCalledWith(
+      user.id,
+      { email: "changed@ares.local", passwordHash: "password-hash" },
+      testActor.id,
+      tx,
+    );
   });
 
   it("performs an idempotent logical delete", async () => {
     await service.darDeBaja(user.id);
-    expect(users.update).toHaveBeenCalledWith(user.id, {
-      estado: EstadoUsuario.DESACTIVADA,
-    });
+    expect(users.update).toHaveBeenCalledWith(
+      user.id,
+      { estado: EstadoUsuario.DESACTIVADA },
+      testActor.id,
+      tx,
+    );
 
     users.findById.mockResolvedValue({
       ...user,

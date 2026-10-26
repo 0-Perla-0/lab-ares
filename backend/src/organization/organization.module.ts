@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 
+import { DomainTransaction } from "../common/domain/domain-transaction";
 import { AreaController } from "./area.controller";
 import { OrganizationPolicy } from "./organization.policy";
 import { AreaRepository } from "./repositories/area.repository";
@@ -21,6 +22,7 @@ import { TurnoController } from "./turno.controller";
     AreaService,
     TurnoService,
     OrganizationPolicy,
+    DomainTransaction,
   ],
   exports: [SedeRepository, AreaRepository, TurnoRepository],
 })

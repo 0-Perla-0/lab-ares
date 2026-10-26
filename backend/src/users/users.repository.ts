@@ -3,6 +3,7 @@ import { Injectable } from "@nestjs/common";
 import { Prisma } from "../generated/prisma/client";
 import { EstadoUsuario, type RolUsuario } from "../generated/prisma/enums";
 import { PrismaService } from "../database/prisma.service";
+import { transact } from "../common/domain/transact";
 import { translateUniqueViolation } from "../organization/repositories/prisma-errors";
 import { AuditService } from "../auth/audit.service";
 import { OutboxService } from "../auth/outbox.service";
@@ -103,9 +104,14 @@ export class UsersRepository {
     );
   }
 
-  update(id: number, data: UserWriteData, actorId?: number) {
+  update(
+    id: number,
+    data: UserWriteData,
+    actorId?: number,
+    client?: Prisma.TransactionClient,
+  ) {
     return translateUniqueViolation(() =>
-      this.prisma.$transaction(async (tx) => {
+      transact(this.prisma, client, async (tx) => {
         await tx.$executeRaw`SELECT id FROM Usuario WHERE id = ${id} FOR UPDATE`;
         const before = await tx.usuario.findUniqueOrThrow({ where: { id } });
         const changedFields = Object.entries(data)

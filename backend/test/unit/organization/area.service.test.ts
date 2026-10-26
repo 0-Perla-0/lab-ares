@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { UniqueConstraintError } from "../../../src/common/errors/unique-constraint-error";
 import type { AreaRepository } from "../../../src/organization/repositories/area.repository";
 import type { SedeRepository } from "../../../src/organization/repositories/sede.repository";
+import { passthroughDomain, tx, withIdentity } from "../support/domain";
 import { AreaService } from "../../../src/organization/services/area.service";
 
 const areas = {
@@ -15,9 +16,13 @@ const areas = {
   deactivateCascade: vi.fn(),
 };
 const sedes = { findById: vi.fn() };
-const service = new AreaService(
-  areas as unknown as AreaRepository,
-  sedes as unknown as SedeRepository,
+const service = withIdentity(
+  new AreaService(
+    areas as unknown as AreaRepository,
+    sedes as unknown as SedeRepository,
+    passthroughDomain,
+  ),
+  ["crear", "actualizar", "desactivar"],
 );
 const now = new Date("2026-01-01T00:00:00.000Z");
 const activeSede = {
@@ -79,10 +84,11 @@ describe("AreaService", () => {
     });
     areas.reactivate.mockResolvedValue(activeArea);
     await service.crear({ nombre: "Desarrollo", sedeId: 1 });
-    expect(areas.reactivate).toHaveBeenCalledWith(2, {
-      nombre: "Desarrollo",
-      sedeId: 1,
-    });
+    expect(areas.reactivate).toHaveBeenCalledWith(
+      2,
+      { nombre: "Desarrollo", sedeId: 1 },
+      tx,
+    );
   });
 
   it("maps a unique-index race to AREA_ALREADY_EXISTS", async () => {
@@ -114,6 +120,6 @@ describe("AreaService", () => {
     areas.findById.mockResolvedValue(activeArea);
     areas.deactivateCascade.mockResolvedValue({ ...activeArea, activa: false });
     await service.desactivar(2);
-    expect(areas.deactivateCascade).toHaveBeenCalledWith(2);
+    expect(areas.deactivateCascade).toHaveBeenCalledWith(2, tx);
   });
 });

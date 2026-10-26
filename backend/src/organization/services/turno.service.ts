@@ -1,5 +1,8 @@
 import { Injectable } from "@nestjs/common";
 
+import type { AuthUser } from "../../auth/auth-user";
+import { DomainTransaction } from "../../common/domain/domain-transaction";
+
 import {
   conflict,
   invalidInput,
@@ -22,6 +25,7 @@ export class TurnoService {
   constructor(
     private readonly turnos: TurnoRepository,
     private readonly areas: AreaRepository,
+    private readonly domain: DomainTransaction,
   ) {}
 
   async listar() {
@@ -32,66 +36,100 @@ export class TurnoService {
     return toPublicTurno(await this.find(id));
   }
 
-  async crear(input: CrearTurnoInput) {
-    await this.ensureAreaUsable(input.areaId);
-    const existing = await this.turnos.findByNombreEnArea(
-      input.areaId,
-      input.nombre,
-    );
-    if (existing?.activo) throw conflict("TURNO_ALREADY_EXISTS");
+  crear(actor: AuthUser, key: string, input: CrearTurnoInput) {
+    return this.domain.run(
+      actor,
+      key,
+      { op: "organization:turno:create", input },
+      async (tx) => {
+        await this.ensureAreaUsable(input.areaId);
+        const existing = await this.turnos.findByNombreEnArea(
+          input.areaId,
+          input.nombre,
+        );
+        if (existing?.activo) throw conflict("TURNO_ALREADY_EXISTS");
 
-    const data = {
-      nombre: input.nombre,
-      areaId: input.areaId,
-      horaInicio: toDate(input.horaInicio),
-      horaFin: toDate(input.horaFin),
-      dias: input.dias,
-    };
+        const data = {
+          nombre: input.nombre,
+          areaId: input.areaId,
+          horaInicio: toDate(input.horaInicio),
+          horaFin: toDate(input.horaFin),
+          dias: input.dias,
+        };
 
-    if (existing) {
-      return toPublicTurno(
-        await this.withUniqueName(() =>
-          this.turnos.reactivate(existing.id, data),
-        ),
-      );
-    }
+        if (existing) {
+          return toPublicTurno(
+            await this.withUniqueName(() =>
+              this.turnos.reactivate(existing.id, data, tx),
+            ),
+          );
+        }
 
-    return toPublicTurno(
-      await this.withUniqueName(() => this.turnos.create(data)),
+        return toPublicTurno(
+          await this.withUniqueName(() => this.turnos.create(data, tx)),
+        );
+      },
     );
   }
 
-  async actualizar(id: number, input: ActualizarTurnoInput) {
-    const turno = await this.find(id);
-    const areaId = input.areaId ?? turno.areaId;
-    const nombre = input.nombre ?? turno.nombre;
+  actualizar(
+    actor: AuthUser,
+    key: string,
+    id: number,
+    input: ActualizarTurnoInput,
+  ) {
+    return this.domain.run(
+      actor,
+      key,
+      { op: "organization:turno:update", id, input },
+      async (tx) => {
+        const turno = await this.find(id);
+        const areaId = input.areaId ?? turno.areaId;
+        const nombre = input.nombre ?? turno.nombre;
 
-    await this.ensureAreaUsable(areaId);
-    const duplicate = await this.turnos.findByNombreEnArea(areaId, nombre, id);
-    if (duplicate) throw conflict("TURNO_ALREADY_EXISTS");
-    ensureSchedule(turno, input);
+        await this.ensureAreaUsable(areaId);
+        const duplicate = await this.turnos.findByNombreEnArea(
+          areaId,
+          nombre,
+          id,
+        );
+        if (duplicate) throw conflict("TURNO_ALREADY_EXISTS");
+        ensureSchedule(turno, input);
 
-    const updated = await this.withUniqueName(() =>
-      this.turnos.update(id, {
-        ...(input.nombre === undefined ? {} : { nombre: input.nombre }),
-        ...(input.areaId === undefined ? {} : { areaId: input.areaId }),
-        ...(input.horaInicio === undefined
-          ? {}
-          : { horaInicio: toDate(input.horaInicio) }),
-        ...(input.horaFin === undefined
-          ? {}
-          : { horaFin: toDate(input.horaFin) }),
-        ...(input.dias === undefined ? {} : { dias: input.dias }),
-      }),
+        const updated = await this.withUniqueName(() =>
+          this.turnos.update(
+            id,
+            {
+              ...(input.nombre === undefined ? {} : { nombre: input.nombre }),
+              ...(input.areaId === undefined ? {} : { areaId: input.areaId }),
+              ...(input.horaInicio === undefined
+                ? {}
+                : { horaInicio: toDate(input.horaInicio) }),
+              ...(input.horaFin === undefined
+                ? {}
+                : { horaFin: toDate(input.horaFin) }),
+              ...(input.dias === undefined ? {} : { dias: input.dias }),
+            },
+            tx,
+          ),
+        );
+
+        return toPublicTurno(updated);
+      },
     );
-
-    return toPublicTurno(updated);
   }
 
-  async desactivar(id: number) {
-    const turno = await this.find(id);
-    if (!turno.activo) return toPublicTurno(turno);
-    return toPublicTurno(await this.turnos.deactivate(id));
+  desactivar(actor: AuthUser, key: string, id: number) {
+    return this.domain.run(
+      actor,
+      key,
+      { op: "organization:turno:deactivate", id },
+      async (tx) => {
+        const turno = await this.find(id);
+        if (!turno.activo) return toPublicTurno(turno);
+        return toPublicTurno(await this.turnos.deactivate(id, tx));
+      },
+    );
   }
 
   private async find(id: number) {

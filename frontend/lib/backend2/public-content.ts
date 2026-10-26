@@ -200,16 +200,22 @@ export const publicContentApi = {
       { motivo },
     );
   },
-  classifyAsset(archivoId: string) {
-    return apiRequest<ApiEnvelope<PublicAsset>>(
+  classifyAsset(userId: number, archivoId: string) {
+    return mutate<PublicAsset>(
+      userId,
+      "public-content:classify-asset",
+      archivoId,
       "/api/public-content/admin/assets",
-      body({ archivoId }),
-    ).then((result) => result.data);
+      { archivoId },
+    );
   },
-  archiveAsset(id: string, motivo: string) {
-    return apiRequest<ApiEnvelope<PublicAsset>>(
+  archiveAsset(userId: number, id: string, motivo: string) {
+    return mutate<PublicAsset>(
+      userId,
+      "public-content:archive-asset",
+      id,
       `/api/public-content/admin/assets/${encodeURIComponent(id)}/archive`,
-      body({ motivo }),
-    ).then((result) => result.data);
+      { motivo },
+    );
   },
 };

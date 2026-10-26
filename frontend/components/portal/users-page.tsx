@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Pencil, Search, Trash2, UserRound } from "lucide-react";
 
 import { useAuth } from "@/components/auth/auth-provider";
+import { durableRequest } from "@/lib/backend2/durable-request";
 import { UserEditorPage } from "@/components/portal/user-editor-page";
 import {
   ConfirmDialog,
@@ -97,7 +98,13 @@ export function UsersPage() {
     setActionError("");
     setSuccess("");
     try {
-      await apiRequest(`/api/users/${deleteTarget.id}`, { method: "DELETE" });
+      await durableRequest(
+        user.id,
+        "user-deactivate",
+        String(deleteTarget.id),
+        `/api/users/${deleteTarget.id}`,
+        "DELETE",
+      );
       setDeleteTarget(null);
       setSuccess(`${deleteTarget.codigo} fue dado de baja correctamente.`);
       await load();

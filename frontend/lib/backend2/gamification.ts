@@ -89,28 +89,52 @@ export const gamificationApi = {
       "/api/gamification/admin/badges",
     ).then((x) => x.data);
   },
-  createRule(body: {
-    codigo: string;
-    origen: "KAIROS_TERMINADA";
-    puntos: number;
-    motivo: string;
-  }) {
-    return apiRequest<ApiEnvelope<GamificationRule>>(
+  async createRule(
+    actorId: number,
+    body: {
+      codigo: string;
+      origen: "KAIROS_TERMINADA";
+      puntos: number;
+      motivo: string;
+    },
+  ) {
+    const action = "gamification-rule-version";
+    const key = actionIdempotencyKey({
+      userId: actorId,
+      action,
+      target: body.codigo,
+      payload: body,
+    });
+    const data = await apiRequest<ApiEnvelope<GamificationRule>>(
       "/api/gamification/admin/rules",
-      json("POST", body),
+      json("POST", body, { "Idempotency-Key": key }),
     ).then((x) => x.data);
+    clearActionIdempotencyKey({ userId: actorId, action, target: body.codigo });
+    return data;
   },
-  createBadge(body: {
-    codigo: string;
-    nombre: string;
-    descripcion: string;
-    umbralPuntos: number;
-    motivo: string;
-  }) {
-    return apiRequest<ApiEnvelope<GamificationBadge>>(
+  async createBadge(
+    actorId: number,
+    body: {
+      codigo: string;
+      nombre: string;
+      descripcion: string;
+      umbralPuntos: number;
+      motivo: string;
+    },
+  ) {
+    const action = "gamification-badge-version";
+    const key = actionIdempotencyKey({
+      userId: actorId,
+      action,
+      target: body.codigo,
+      payload: body,
+    });
+    const data = await apiRequest<ApiEnvelope<GamificationBadge>>(
       "/api/gamification/admin/badges",
-      json("POST", body),
+      json("POST", body, { "Idempotency-Key": key }),
     ).then((x) => x.data);
+    clearActionIdempotencyKey({ userId: actorId, action, target: body.codigo });
+    return data;
   },
   async recognize(
     actorId: number,

@@ -212,7 +212,7 @@ export function PublicContentAdminPage() {
             accept="image/png,image/jpeg,image/webp,image/avif"
             onFileReady={(id) =>
               void act(async () => {
-                const asset = await publicContentApi.classifyAsset(id);
+                const asset = await publicContentApi.classifyAsset(user.id, id);
                 setAssetId(asset.id);
               }, "Imagen clasificada como pública.")
             }
@@ -232,7 +232,12 @@ export function PublicContentAdminPage() {
                       ?.trim();
                     if (motivo)
                       void act(
-                        () => publicContentApi.archiveAsset(assetId, motivo),
+                        () =>
+                          publicContentApi.archiveAsset(
+                            user.id,
+                            assetId,
+                            motivo,
+                          ),
                         "Activo público archivado.",
                       ).then(() => setAssetId(""));
                   }}

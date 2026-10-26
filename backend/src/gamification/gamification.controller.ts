@@ -89,10 +89,15 @@ export class GamificationController {
   @RequirePermissions(Permission.GAMIFICATION_MANAGE)
   createRule(
     @Req() req: Request,
+    @Headers("idempotency-key") idempotencyKey: string | undefined,
     @Body(new ZodValidationPipe(gamificationRuleSchema)) body: any,
   ) {
     return this.gamification
-      .createRuleVersion(getAuthenticatedUser(req), body)
+      .createRuleVersion(
+        getAuthenticatedUser(req),
+        this.key(idempotencyKey),
+        body,
+      )
       .then((data) => ({ data }));
   }
 
@@ -108,10 +113,15 @@ export class GamificationController {
   @RequirePermissions(Permission.GAMIFICATION_MANAGE)
   createBadge(
     @Req() req: Request,
+    @Headers("idempotency-key") idempotencyKey: string | undefined,
     @Body(new ZodValidationPipe(gamificationBadgeSchema)) body: any,
   ) {
     return this.gamification
-      .createBadgeVersion(getAuthenticatedUser(req), body)
+      .createBadgeVersion(
+        getAuthenticatedUser(req),
+        this.key(idempotencyKey),
+        body,
+      )
       .then((data) => ({ data }));
   }
 

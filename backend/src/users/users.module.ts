@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 
+import { DomainTransaction } from "../common/domain/domain-transaction";
 import { OrganizationModule } from "../organization/organization.module";
 import { UsersController } from "./users.controller";
 import { UsersPolicy } from "./users.policy";
@@ -16,6 +17,7 @@ import { AdministrativeRecoveryService } from "./administrative-recovery.service
     UsersService,
     UsersPolicy,
     AdministrativeRecoveryService,
+    DomainTransaction,
   ],
   exports: [UsersPolicy],
 })

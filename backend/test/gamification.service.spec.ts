@@ -45,8 +45,24 @@ function make(enabled = true, overrides: any = {}) {
   };
   const tx: any = {
     $executeRaw: vi.fn().mockResolvedValue(undefined),
+    // DomainTransaction revalidates the acting user under the write barrier.
+    $queryRaw: vi.fn().mockResolvedValue([]),
+    recoveryWriteBarrier: {
+      findUnique: vi.fn().mockResolvedValue({ active: false, version: 1 }),
+    },
+    domainOperation: {
+      findUnique: vi.fn().mockResolvedValue(null),
+      create: vi.fn().mockResolvedValue(undefined),
+    },
     usuario: {
       findFirst: vi.fn().mockResolvedValue({ id: 7, codigo: "U7" }),
+      findUnique: vi
+        .fn()
+        .mockImplementation(({ where }: any) =>
+          Promise.resolve(
+            actor(where.id === 1 ? RolUsuario.ADMIN : RolUsuario.PRESTADOR),
+          ),
+        ),
     },
     eventoGamificacion: {
       aggregate: vi.fn().mockResolvedValue({
@@ -190,13 +206,13 @@ describe("GamificationService", () => {
   it("versions rules and badges instead of mutating historical rows", async () => {
     const { service, tx, audit } = make();
     const admin = actor(RolUsuario.ADMIN);
-    const rule = await service.createRuleVersion(admin, {
+    const rule = await service.createRuleVersion(admin, "rule-key-00000001", {
       codigo: "KAIROS_COMPLETADA",
       origen: "KAIROS_TERMINADA",
       puntos: 120,
       motivo: "Ajuste aprobado",
     });
-    const badge = await service.createBadgeVersion(admin, {
+    const badge = await service.createBadgeVersion(admin, "badge-key-0000001", {
       codigo: "EXPERTO",
       nombre: "Experto",
       descripcion: "Acumuló mil puntos",
@@ -215,19 +231,19 @@ describe("GamificationService", () => {
   });
 
   it("turns concurrent version collisions into a controlled conflict", async () => {
-    const { service, prisma } = make();
-    prisma.$transaction.mockRejectedValueOnce({ code: "P2002" });
+    const { service, tx } = make();
+    tx.reglaGamificacion.create.mockRejectedValueOnce({ code: "P2002" });
     await expect(
-      service.createRuleVersion(actor(RolUsuario.ADMIN), {
+      service.createRuleVersion(actor(RolUsuario.ADMIN), "rule-key-00000002", {
         codigo: "KAIROS_COMPLETADA",
         origen: "KAIROS_TERMINADA",
         puntos: 100,
         motivo: "Versión concurrente",
       }),
     ).rejects.toMatchObject({ status: 409 });
-    prisma.$transaction.mockRejectedValueOnce({ code: "P2002" });
+    tx.insigniaGamificacion.create.mockRejectedValueOnce({ code: "P2002" });
     await expect(
-      service.createBadgeVersion(actor(RolUsuario.ADMIN), {
+      service.createBadgeVersion(actor(RolUsuario.ADMIN), "badge-key-0000002", {
         codigo: "EXPERTO",
         nombre: "Experto",
         descripcion: "Umbral",

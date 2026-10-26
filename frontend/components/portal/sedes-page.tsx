@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { MapPin, Pencil, Trash2 } from "lucide-react";
 
 import { useAuth } from "@/components/auth/auth-provider";
+import { durableRequest } from "@/lib/backend2/durable-request";
 import {
   ConfirmDialog,
   EmptyState,
@@ -69,11 +70,15 @@ export function SedesPage() {
 
     try {
       const isEdit = editor.mode === "edit";
-      await apiRequest(
+      await durableRequest(
+        user.id,
+        isEdit ? "org-sede-update" : "org-sede-create",
+        isEdit ? String(editor.item.id) : payload.nombre,
         isEdit
           ? `/api/organization/sedes/${editor.item.id}`
           : "/api/organization/sedes",
-        { method: isEdit ? "PUT" : "POST", body: JSON.stringify(payload) },
+        isEdit ? "PUT" : "POST",
+        payload,
       );
       setEditor(null);
       setSuccess(
@@ -94,9 +99,13 @@ export function SedesPage() {
     setDeleting(true);
     setSuccess("");
     try {
-      await apiRequest(`/api/organization/sedes/${deleteTarget.id}`, {
-        method: "DELETE",
-      });
+      await durableRequest(
+        user.id,
+        "org-sede-deactivate",
+        String(deleteTarget.id),
+        `/api/organization/sedes/${deleteTarget.id}`,
+        "DELETE",
+      );
       setDeleteTarget(null);
       setSuccess("La sede y su estructura dependiente quedaron inactivas.");
       await load();

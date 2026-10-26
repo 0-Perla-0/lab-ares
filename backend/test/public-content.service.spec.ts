@@ -366,7 +366,7 @@ describe("public content contracts", () => {
     );
   });
 
-  it("copies a scanned owned image into a different public object key", async () => {
+  it("copies a scanned owned image into a deterministic public object key", async () => {
     const file = {
       id: fileId,
       propietarioId: 7,
@@ -387,10 +387,11 @@ describe("public content contracts", () => {
       },
     });
     await expect(
-      service.classifyAsset(actor(), { archivoId: fileId }),
+      service.classifyAsset(actor(), KEY, { archivoId: fileId }),
     ).rejects.toThrow();
     const result = await service.classifyAsset(
-      actor({ rol: RolUsuario.ADMIN }),
+      as(db, actor({ rol: RolUsuario.ADMIN })),
+      KEY,
       { archivoId: fileId },
     );
     expect(result.sizeBytes).toBe("25");
@@ -398,7 +399,7 @@ describe("public content contracts", () => {
       "available",
       "public",
       file.objectKey,
-      expect.stringMatching(/^public\//),
+      `public/${fileId}/equipo_ares.png`,
     );
     expect(audit.append).toHaveBeenCalledWith(
       expect.objectContaining({ action: "PUBLIC_ASSET_CLASSIFIED" }),
@@ -448,7 +449,7 @@ describe("public content contracts", () => {
         },
       });
       await expect(
-        service.classifyAsset(actor({ rol: RolUsuario.ADMIN }), {
+        service.classifyAsset(actor({ rol: RolUsuario.ADMIN }), KEY, {
           archivoId: fileId,
         }),
       ).rejects.toThrow();
@@ -478,7 +479,7 @@ describe("public content contracts", () => {
   });
 
   it("cannot withdraw a public asset referenced by a published page", async () => {
-    const { service } = make({
+    const { service, db } = make({
       db: {
         activoPublico: {
           findUnique: vi.fn().mockResolvedValue({ id: assetId, activo: true }),
@@ -488,7 +489,8 @@ describe("public content contracts", () => {
     });
     await expect(
       service.archiveAsset(
-        actor({ rol: RolUsuario.ADMIN }),
+        as(db, actor({ rol: RolUsuario.ADMIN })),
+        KEY,
         assetId,
         "Retiro autorizado",
       ),

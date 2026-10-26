@@ -185,6 +185,7 @@ describe("Nest API", () => {
   it("returns 401 before validating a protected request", async () => {
     const response = await request(server)
       .post("/api/organization/sedes")
+      .set("Idempotency-Key", "e2e-key-0000000001")
       .send({ nombre: "" })
       .expect(401);
     expect(response.body).toEqual({ error: "UNAUTHORIZED" });
@@ -232,6 +233,7 @@ describe("Nest API", () => {
     const agent = await loginAs(regular.email);
     await agent
       .post("/api/organization/sedes")
+      .set("Idempotency-Key", "e2e-key-0000000001")
       .send({ nombre: "Centro" })
       .expect(403)
       .expect({ error: "FORBIDDEN" });
@@ -241,14 +243,17 @@ describe("Nest API", () => {
     const agent = await loginAs(sedeManager.email);
     await agent
       .post("/api/organization/sedes")
+      .set("Idempotency-Key", "e2e-key-0000000001")
       .send({ nombre: "Nueva sede" })
       .expect(403);
     await agent
       .put("/api/organization/sedes/1")
+      .set("Idempotency-Key", "e2e-key-0000000001")
       .send({ direccion: "Propia" })
       .expect(200);
     await agent
       .put("/api/organization/sedes/2")
+      .set("Idempotency-Key", "e2e-key-0000000001")
       .send({ direccion: "Ajena" })
       .expect(403);
   });
@@ -261,19 +266,22 @@ describe("Nest API", () => {
       .expect({ data: [JSON.parse(JSON.stringify(sede))] });
     await agent
       .post("/api/organization/sedes")
+      .set("Idempotency-Key", "e2e-key-0000000001")
       .send({ nombre: " Centro ", direccion: "" })
       .expect(201)
       .expect(({ body }) => expect(body.data.nombre).toBe("Centro"));
-    expect(sedes.crear).toHaveBeenLastCalledWith({
-      nombre: "Centro",
-      direccion: null,
-    });
+    expect(sedes.crear).toHaveBeenLastCalledWith(
+      expect.objectContaining({ id: admin.id }),
+      "e2e-key-0000000001",
+      { nombre: "Centro", direccion: null },
+    );
   });
 
   it("maps validation and domain errors to the existing API contract", async () => {
     const agent = await loginAs(admin.email);
     await agent
       .put("/api/organization/sedes/1")
+      .set("Idempotency-Key", "e2e-key-0000000001")
       .send({})
       .expect(400)
       .expect(({ body }) => expect(body.error).toBe("VALIDATION_ERROR"));
@@ -297,13 +305,18 @@ describe("Nest API", () => {
       .expect({ data: [JSON.parse(JSON.stringify(area))] });
     await agent
       .post("/api/organization/areas")
+      .set("Idempotency-Key", "e2e-key-0000000001")
       .send({ nombre: " Desarrollo ", sedeId: 1 })
       .expect(201);
-    expect(areas.crear).toHaveBeenLastCalledWith({
-      nombre: "Desarrollo",
-      sedeId: 1,
-    });
-    await agent.delete("/api/organization/areas/2").expect(200);
+    expect(areas.crear).toHaveBeenLastCalledWith(
+      expect.objectContaining({ id: admin.id }),
+      "e2e-key-0000000001",
+      { nombre: "Desarrollo", sedeId: 1 },
+    );
+    await agent
+      .delete("/api/organization/areas/2")
+      .set("Idempotency-Key", "e2e-key-0000000001")
+      .expect(200);
   });
 
   it("exposes the migrated turno routes and transforms time input", async () => {
@@ -314,6 +327,7 @@ describe("Nest API", () => {
       .expect({ data: [JSON.parse(JSON.stringify(turno))] });
     await agent
       .post("/api/organization/turnos")
+      .set("Idempotency-Key", "e2e-key-0000000001")
       .send({
         nombre: " Matutino ",
         areaId: 2,
@@ -322,14 +336,21 @@ describe("Nest API", () => {
         dias: ["LUNES"],
       })
       .expect(201);
-    expect(turnos.crear).toHaveBeenLastCalledWith({
-      nombre: "Matutino",
-      areaId: 2,
-      horaInicio: 480,
-      horaFin: 720,
-      dias: ["LUNES"],
-    });
-    await agent.delete("/api/organization/turnos/3").expect(200);
+    expect(turnos.crear).toHaveBeenLastCalledWith(
+      expect.objectContaining({ id: admin.id }),
+      "e2e-key-0000000001",
+      {
+        nombre: "Matutino",
+        areaId: 2,
+        horaInicio: 480,
+        horaFin: 720,
+        dias: ["LUNES"],
+      },
+    );
+    await agent
+      .delete("/api/organization/turnos/3")
+      .set("Idempotency-Key", "e2e-key-0000000001")
+      .expect(200);
   });
 
   it("exposes the scoped user CRUD without password data", async () => {
@@ -343,6 +364,7 @@ describe("Nest API", () => {
 
     await agent
       .post("/api/users")
+      .set("Idempotency-Key", "e2e-key-0000000001")
       .send({
         codigo: " POSTMAN20 ",
         email: " POSTMAN20@ARES.LOCAL ",
@@ -358,17 +380,20 @@ describe("Nest API", () => {
     await agent.get("/api/users/20").expect(200);
     await agent
       .put("/api/users/20")
+      .set("Idempotency-Key", "e2e-key-0000000001")
       .send({ email: " UPDATED@ARES.LOCAL " })
       .expect(200);
     expect(managedUsers.actualizar).toHaveBeenLastCalledWith(
+      expect.objectContaining({ id: admin.id }),
+      "e2e-key-0000000001",
       20,
-      {
-        email: "updated@ares.local",
-      },
-      admin.id,
+      { email: "updated@ares.local" },
     );
 
-    const deleted = await agent.delete("/api/users/20").expect(200);
+    const deleted = await agent
+      .delete("/api/users/20")
+      .set("Idempotency-Key", "e2e-key-0000000001")
+      .expect(200);
     expect(deleted.body.data.estado).toBe(EstadoUsuario.DESACTIVADA);
     expect(deleted.body.data).not.toHaveProperty("passwordHash");
   });

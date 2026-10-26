@@ -6,6 +6,7 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from "@nestjs/common";
+import { DomainTransaction } from "../common/domain/domain-transaction";
 import { ConfigService } from "@nestjs/config";
 import { AuditService } from "../auth/audit.service";
 import type { AuthUser } from "../auth/auth-user";
@@ -26,6 +27,14 @@ import type {
 } from "./gamification.schemas";
 
 const CUID = /^c[a-z0-9]{20,30}$/;
+
+// A unique-index race inside a durable intent must surface as the domain conflict,
+// not as a retried transient error.
+const duplicateAs = (code: string) => (error: unknown) => {
+  if ((error as { code?: string }).code === "P2002")
+    throw new ConflictException(code);
+  throw error;
+};
 
 @Injectable()
 export class GamificationService {
@@ -148,46 +157,57 @@ export class GamificationService {
     });
   }
 
-  async createRuleVersion(actor: AuthUser, input: GamificationRuleInput) {
+  async createRuleVersion(
+    actor: AuthUser,
+    key: string,
+    input: GamificationRuleInput,
+  ) {
     this.enabledOrThrow();
     this.admin(actor);
     try {
-      return await this.prisma.$transaction(async (tx) => {
-        await tx.$executeRaw`SELECT id FROM ReglaGamificacion WHERE origen=${input.origen} FOR UPDATE`;
-        const latest = await tx.reglaGamificacion.aggregate({
-          where: { codigo: input.codigo },
-          _max: { version: true },
-        });
-        await tx.reglaGamificacion.updateMany({
-          where: { origen: input.origen, activa: true },
-          data: { activa: false },
-        });
-        const rule = await tx.reglaGamificacion.create({
-          data: {
-            ...input,
-            version: (latest._max.version ?? 0) + 1,
-            creadoPorId: actor.id,
-          },
-        });
-        await this.audit.append(
-          {
-            actorId: actor.id,
-            subjectId: actor.id,
-            action: "GAMIFICATION_RULE_VERSION_CREATED",
-            resource: "gamification_rule",
-            correlationId: rule.id,
-            metadata: {
-              code: rule.codigo,
-              version: rule.version,
-              origin: rule.origen,
-              points: rule.puntos,
-              reason: input.motivo,
+      return await new DomainTransaction(this.prisma).run(
+        actor,
+        key,
+        { op: "gamification:rule-version", input },
+        async (tx) => {
+          await tx.$executeRaw`SELECT id FROM ReglaGamificacion WHERE origen=${input.origen} FOR UPDATE`;
+          const latest = await tx.reglaGamificacion.aggregate({
+            where: { codigo: input.codigo },
+            _max: { version: true },
+          });
+          await tx.reglaGamificacion.updateMany({
+            where: { origen: input.origen, activa: true },
+            data: { activa: false },
+          });
+          const rule = await tx.reglaGamificacion
+            .create({
+              data: {
+                ...input,
+                version: (latest._max.version ?? 0) + 1,
+                creadoPorId: actor.id,
+              },
+            })
+            .catch(duplicateAs("GAMIFICATION_RULE_VERSION_CONFLICT"));
+          await this.audit.append(
+            {
+              actorId: actor.id,
+              subjectId: actor.id,
+              action: "GAMIFICATION_RULE_VERSION_CREATED",
+              resource: "gamification_rule",
+              correlationId: rule.id,
+              metadata: {
+                code: rule.codigo,
+                version: rule.version,
+                origin: rule.origen,
+                points: rule.puntos,
+                reason: input.motivo,
+              },
             },
-          },
-          tx,
-        );
-        return rule;
-      });
+            tx,
+          );
+          return rule;
+        },
+      );
     } catch (error) {
       if ((error as { code?: string }).code === "P2002")
         throw new ConflictException("GAMIFICATION_RULE_VERSION_CONFLICT");
@@ -203,45 +223,56 @@ export class GamificationService {
     });
   }
 
-  async createBadgeVersion(actor: AuthUser, input: GamificationBadgeInput) {
+  async createBadgeVersion(
+    actor: AuthUser,
+    key: string,
+    input: GamificationBadgeInput,
+  ) {
     this.enabledOrThrow();
     this.admin(actor);
     try {
-      return await this.prisma.$transaction(async (tx) => {
-        await tx.$executeRaw`SELECT id FROM InsigniaGamificacion WHERE codigo=${input.codigo} FOR UPDATE`;
-        const latest = await tx.insigniaGamificacion.aggregate({
-          where: { codigo: input.codigo },
-          _max: { version: true },
-        });
-        await tx.insigniaGamificacion.updateMany({
-          where: { codigo: input.codigo, activa: true },
-          data: { activa: false },
-        });
-        const badge = await tx.insigniaGamificacion.create({
-          data: {
-            ...input,
-            version: (latest._max.version ?? 0) + 1,
-            creadoPorId: actor.id,
-          },
-        });
-        await this.audit.append(
-          {
-            actorId: actor.id,
-            subjectId: actor.id,
-            action: "GAMIFICATION_BADGE_VERSION_CREATED",
-            resource: "gamification_badge",
-            correlationId: badge.id,
-            metadata: {
-              code: badge.codigo,
-              version: badge.version,
-              threshold: badge.umbralPuntos,
-              reason: input.motivo,
+      return await new DomainTransaction(this.prisma).run(
+        actor,
+        key,
+        { op: "gamification:badge-version", input },
+        async (tx) => {
+          await tx.$executeRaw`SELECT id FROM InsigniaGamificacion WHERE codigo=${input.codigo} FOR UPDATE`;
+          const latest = await tx.insigniaGamificacion.aggregate({
+            where: { codigo: input.codigo },
+            _max: { version: true },
+          });
+          await tx.insigniaGamificacion.updateMany({
+            where: { codigo: input.codigo, activa: true },
+            data: { activa: false },
+          });
+          const badge = await tx.insigniaGamificacion
+            .create({
+              data: {
+                ...input,
+                version: (latest._max.version ?? 0) + 1,
+                creadoPorId: actor.id,
+              },
+            })
+            .catch(duplicateAs("GAMIFICATION_BADGE_VERSION_CONFLICT"));
+          await this.audit.append(
+            {
+              actorId: actor.id,
+              subjectId: actor.id,
+              action: "GAMIFICATION_BADGE_VERSION_CREATED",
+              resource: "gamification_badge",
+              correlationId: badge.id,
+              metadata: {
+                code: badge.codigo,
+                version: badge.version,
+                threshold: badge.umbralPuntos,
+                reason: input.motivo,
+              },
             },
-          },
-          tx,
-        );
-        return badge;
-      });
+            tx,
+          );
+          return badge;
+        },
+      );
     } catch (error) {
       if ((error as { code?: string }).code === "P2002")
         throw new ConflictException("GAMIFICATION_BADGE_VERSION_CONFLICT");

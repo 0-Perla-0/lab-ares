@@ -479,7 +479,7 @@ describe("operational phases on real MariaDB", () => {
     ).rejects.toMatchObject({ response: { error: "JOB_NOT_RETRYABLE" } });
   });
   it("location/network warnings do not block real attendance writes or leak evidence", async () => {
-    await review.publishPolicy(admin, sedeId, {
+    await review.publishPolicy(admin, key(), sedeId, {
       rules: {
         redBelowSeconds: 300,
         greenFromSeconds: 1800,

@@ -5,7 +5,6 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { randomUUID } from "node:crypto";
 import { AuditService } from "../auth/audit.service";
 import { DomainTransaction } from "../common/domain/domain-transaction";
 import type { AuthUser } from "../auth/auth-user";
@@ -491,7 +490,11 @@ export class PublicContentService {
     );
   }
 
-  async classifyAsset(actor: AuthUser, input: ClassifyPublicAssetInput) {
+  async classifyAsset(
+    actor: AuthUser,
+    key: string,
+    input: ClassifyPublicAssetInput,
+  ) {
     this.requireAdmin(actor, Permission.PUBLIC_CONTENT_PUBLISH);
     const existing = await this.prisma.activoPublico.findUnique({
       where: { archivoOrigenId: input.archivoId },
@@ -514,74 +517,100 @@ export class PublicContentService {
       throw new BadRequestException("PUBLIC_ASSET_SOURCE_NOT_ALLOWED");
     const mime = file.detectedMime;
     const safeName = file.originalName.replace(/[^a-zA-Z0-9._-]/g, "_");
-    const objectKey = `public/${randomUUID()}-${safeName}`;
+    // Deterministic per source file: a retry or a race converges on the same
+    // public copy instead of leaving a random orphan per attempt.
+    const objectKey = `public/${file.id}/${safeName}`;
     await this.storage.copy("available", "public", file.objectKey, objectKey);
-    try {
-      const asset = await this.prisma.$transaction(async (tx) => {
-        const created = await tx.activoPublico.create({
+    {
+      const asset = await this.run<any>(
+        actor,
+        key,
+        { op: "public-content:classify-asset", archivoId: input.archivoId },
+        async (tx) => {
+          const raced = await tx.activoPublico.findUnique({
+            where: { archivoOrigenId: file.id },
+          });
+          if (raced) {
+            if (!raced.activo)
+              throw new ConflictException("PUBLIC_ASSET_ARCHIVED");
+            return { ...raced, sizeBytes: raced.sizeBytes.toString() };
+          }
+          const created = await tx.activoPublico.create({
+            data: {
+              archivoOrigenId: file.id,
+              objectKey,
+              nombre: file.originalName,
+              mime,
+              sizeBytes: file.sizeBytes,
+              publicadoPorId: actor.id,
+            },
+          });
+          await this.audit.append(
+            {
+              actorId: actor.id,
+              subjectId: actor.id,
+              action: "PUBLIC_ASSET_CLASSIFIED",
+              resource: "public_asset",
+              correlationId: created.id,
+              metadata: { sourceFileId: file.id, mime },
+            },
+            tx,
+          );
+          return { ...created, sizeBytes: created.sizeBytes.toString() };
+        },
+      );
+      return asset;
+    }
+  }
+
+  async archiveAsset(
+    actor: AuthUser,
+    key: string,
+    assetId: string,
+    motivo: string,
+  ) {
+    this.requireAdmin(actor, Permission.PUBLIC_CONTENT_ARCHIVE);
+    this.id(assetId);
+    return this.run<any>(
+      actor,
+      key,
+      { op: "public-content:archive-asset", assetId, motivo },
+      async (tx) => {
+        await tx.$executeRaw`SELECT id FROM ActivoPublico WHERE id = ${assetId} FOR UPDATE`;
+        const asset = await tx.activoPublico.findUnique({
+          where: { id: assetId },
+        });
+        if (!asset || !asset.activo)
+          throw new NotFoundException("PUBLIC_ASSET_NOT_FOUND");
+        const publishedReferences = await tx.bloqueContenidoPublico.count({
+          where: {
+            activoPublicoId: assetId,
+            version: { estado: EstadoContenidoPublico.PUBLICADO },
+          },
+        });
+        if (publishedReferences)
+          throw new ConflictException("PUBLIC_ASSET_IN_USE");
+        const archived = await tx.activoPublico.update({
+          where: { id: assetId },
           data: {
-            archivoOrigenId: file.id,
-            objectKey,
-            nombre: file.originalName,
-            mime,
-            sizeBytes: file.sizeBytes,
-            publicadoPorId: actor.id,
+            activo: false,
+            motivoArchivo: motivo,
+            archivadoAt: new Date(),
           },
         });
         await this.audit.append(
           {
             actorId: actor.id,
             subjectId: actor.id,
-            action: "PUBLIC_ASSET_CLASSIFIED",
+            action: "PUBLIC_ASSET_ARCHIVED",
             resource: "public_asset",
-            correlationId: created.id,
-            metadata: { sourceFileId: file.id, mime },
+            correlationId: assetId,
+            metadata: { reason: motivo },
           },
           tx,
         );
-        return created;
-      });
-      return { ...asset, sizeBytes: asset.sizeBytes.toString() };
-    } catch (error) {
-      await this.storage.delete("public", objectKey).catch(() => undefined);
-      throw error;
-    }
-  }
-
-  async archiveAsset(actor: AuthUser, assetId: string, motivo: string) {
-    this.requireAdmin(actor, Permission.PUBLIC_CONTENT_ARCHIVE);
-    this.id(assetId);
-    return this.prisma.$transaction(async (tx) => {
-      await tx.$executeRaw`SELECT id FROM ActivoPublico WHERE id = ${assetId} FOR UPDATE`;
-      const asset = await tx.activoPublico.findUnique({
-        where: { id: assetId },
-      });
-      if (!asset || !asset.activo)
-        throw new NotFoundException("PUBLIC_ASSET_NOT_FOUND");
-      const publishedReferences = await tx.bloqueContenidoPublico.count({
-        where: {
-          activoPublicoId: assetId,
-          version: { estado: EstadoContenidoPublico.PUBLICADO },
-        },
-      });
-      if (publishedReferences)
-        throw new ConflictException("PUBLIC_ASSET_IN_USE");
-      const archived = await tx.activoPublico.update({
-        where: { id: assetId },
-        data: { activo: false, motivoArchivo: motivo, archivadoAt: new Date() },
-      });
-      await this.audit.append(
-        {
-          actorId: actor.id,
-          subjectId: actor.id,
-          action: "PUBLIC_ASSET_ARCHIVED",
-          resource: "public_asset",
-          correlationId: assetId,
-          metadata: { reason: motivo },
-        },
-        tx,
-      );
-      return { ...archived, sizeBytes: archived.sizeBytes.toString() };
-    });
+        return { ...archived, sizeBytes: archived.sizeBytes.toString() };
+      },
+    );
   }
 }

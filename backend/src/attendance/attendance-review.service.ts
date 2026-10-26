@@ -9,6 +9,7 @@ import { AuditService } from "../auth/audit.service";
 import { AccessScope, getAccessScope, Permission } from "../auth/permissions";
 import { ApiException } from "../common/errors/api.exception";
 import { PrismaService } from "../database/prisma.service";
+import { DomainTransaction } from "../common/domain/domain-transaction";
 import { Prisma } from "../generated/prisma/client";
 import { AttendancePolicy } from "./attendance.policy";
 import { publicAttendance, signalRisk } from "./attendance-signals";
@@ -364,6 +365,7 @@ export class AttendanceReviewService {
 
   async publishPolicy(
     actor: AuthUser,
+    key: string,
     sedeId: number,
     input: z.infer<typeof attendancePolicySchema>,
   ) {
@@ -373,44 +375,43 @@ export class AttendanceReviewService {
       !(scope === AccessScope.SEDE && actor.sedeId === sedeId)
     )
       throw new ApiException("FORBIDDEN", 403);
-    return this.prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT id FROM RecoveryWriteBarrier WHERE id = 'global' LOCK IN SHARE MODE`;
-      const barrier = await tx.recoveryWriteBarrier.findUnique({
-        where: { id: "global" },
-      });
-      if (!barrier || barrier.active)
-        throw new ApiException("RECOVERY_WRITE_BARRIER_ACTIVE", 503);
-      await tx.$queryRaw`SELECT id FROM Sede WHERE id = ${sedeId} FOR UPDATE`;
-      if (!(await tx.sede.findUnique({ where: { id: sedeId } })))
-        throw new ApiException("SEDE_NOT_FOUND", 404);
-      const last = await tx.politicaAsistencia.findFirst({
-        where: { sedeId },
-        orderBy: { version: "desc" },
-      });
-      const row = await tx.politicaAsistencia.create({
-        data: {
-          sedeId,
-          version: (last?.version ?? 0) + 1,
-          rules: input.rules,
-          locationRules:
-            input.locationRules ?? last?.locationRules ?? Prisma.JsonNull,
-          actorId: actor.id,
-          reason: input.reason,
-        },
-      });
-      await this.audit.append(
-        {
-          actorId: actor.id,
-          action: "ATTENDANCE_POLICY_PUBLISHED",
-          resource: "attendance",
-          sedeId,
-          reason: input.reason,
-          metadata: { version: row.version, rules: input.rules },
-        },
-        tx,
-      );
-      return row;
-    });
+    return new DomainTransaction(this.prisma).run(
+      actor,
+      key,
+      { op: "attendance:policy", sedeId, input },
+      async (tx) => {
+        await tx.$queryRaw`SELECT id FROM Sede WHERE id = ${sedeId} FOR UPDATE`;
+        if (!(await tx.sede.findUnique({ where: { id: sedeId } })))
+          throw new ApiException("SEDE_NOT_FOUND", 404);
+        const last = await tx.politicaAsistencia.findFirst({
+          where: { sedeId },
+          orderBy: { version: "desc" },
+        });
+        const row = await tx.politicaAsistencia.create({
+          data: {
+            sedeId,
+            version: (last?.version ?? 0) + 1,
+            rules: input.rules,
+            locationRules:
+              input.locationRules ?? last?.locationRules ?? Prisma.JsonNull,
+            actorId: actor.id,
+            reason: input.reason,
+          },
+        });
+        await this.audit.append(
+          {
+            actorId: actor.id,
+            action: "ATTENDANCE_POLICY_PUBLISHED",
+            resource: "attendance",
+            sedeId,
+            reason: input.reason,
+            metadata: { version: row.version, rules: input.rules },
+          },
+          tx,
+        );
+        return row;
+      },
+    );
   }
 
   risk(

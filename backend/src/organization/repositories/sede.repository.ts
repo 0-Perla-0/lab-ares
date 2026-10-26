@@ -5,6 +5,8 @@ import type {
 } from "../../generated/prisma/models";
 
 import { PrismaService } from "../../database/prisma.service";
+import { transact } from "../../common/domain/transact";
+import type { Prisma } from "../../generated/prisma/client";
 import { translateUniqueViolation } from "./prisma-errors";
 import { recordOperationalHistory } from "../../common/domain/operational-history";
 
@@ -35,9 +37,9 @@ export class SedeRepository {
     });
   }
 
-  create(data: CreateData) {
+  create(data: CreateData, client?: Prisma.TransactionClient) {
     return translateUniqueViolation(() =>
-      this.prisma.$transaction(async (tx) => {
+      transact(this.prisma, client, async (tx) => {
         const row = await tx.sede.create({ data });
         await recordOperationalHistory(tx, "SEDE", row.id);
         return row;
@@ -45,9 +47,9 @@ export class SedeRepository {
     );
   }
 
-  update(id: number, data: UpdateData) {
+  update(id: number, data: UpdateData, client?: Prisma.TransactionClient) {
     return translateUniqueViolation(() =>
-      this.prisma.$transaction(async (tx) => {
+      transact(this.prisma, client, async (tx) => {
         await tx.$queryRaw`SELECT id FROM Sede WHERE id = ${id} FOR UPDATE`;
         const row = await tx.sede.update({ where: { id }, data });
         return row;
@@ -55,9 +57,9 @@ export class SedeRepository {
     );
   }
 
-  reactivate(id: number, data: CreateData) {
+  reactivate(id: number, data: CreateData, client?: Prisma.TransactionClient) {
     return translateUniqueViolation(() =>
-      this.prisma.$transaction(async (tx) => {
+      transact(this.prisma, client, async (tx) => {
         await tx.$queryRaw`SELECT id FROM Sede WHERE id = ${id} FOR UPDATE`;
         const row = await tx.sede.update({
           where: { id },
@@ -69,8 +71,8 @@ export class SedeRepository {
     );
   }
 
-  deactivateCascade(id: number) {
-    return this.prisma.$transaction(async (tx) => {
+  deactivateCascade(id: number, client?: Prisma.TransactionClient) {
+    return transact(this.prisma, client, async (tx) => {
       await tx.$queryRaw`SELECT id FROM Sede WHERE id = ${id} FOR UPDATE`;
       const shifts = await tx.turno.findMany({
         where: { area: { sedeId: id } },

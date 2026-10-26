@@ -14,6 +14,7 @@ import { getAuthenticatedUser } from "../auth/authenticated-user";
 import { Permission } from "../auth/permissions";
 import { RequirePermissions } from "../auth/require-permissions.decorator";
 import { PositiveIntPipe } from "../common/validation/positive-int.pipe";
+import { IdempotencyKey } from "../common/http/idempotency-key.decorator";
 import { ZodValidationPipe } from "../common/validation/zod-validation.pipe";
 import {
   actualizarTurnoSchema,
@@ -40,6 +41,7 @@ export class TurnoController {
   @Post()
   @RequirePermissions(Permission.ORGANIZATION_MANAGE)
   async crear(
+    @IdempotencyKey() key: string,
     @Body(new ZodValidationPipe(crearTurnoSchema)) input: CrearTurnoInput,
     @Req() request: Request,
   ) {
@@ -47,7 +49,9 @@ export class TurnoController {
       getAuthenticatedUser(request),
       input.areaId,
     );
-    return { data: await this.turnos.crear(input) };
+    return {
+      data: await this.turnos.crear(getAuthenticatedUser(request), key, input),
+    };
   }
 
   @Get(":id")
@@ -59,6 +63,7 @@ export class TurnoController {
   @Put(":id")
   @RequirePermissions(Permission.ORGANIZATION_MANAGE)
   async actualizar(
+    @IdempotencyKey() key: string,
     @Param("id", new PositiveIntPipe()) id: number,
     @Body(new ZodValidationPipe(actualizarTurnoSchema))
     input: ActualizarTurnoInput,
@@ -69,16 +74,30 @@ export class TurnoController {
       id,
       input.areaId,
     );
-    return { data: await this.turnos.actualizar(id, input) };
+    return {
+      data: await this.turnos.actualizar(
+        getAuthenticatedUser(request),
+        key,
+        id,
+        input,
+      ),
+    };
   }
 
   @Delete(":id")
   @RequirePermissions(Permission.ORGANIZATION_MANAGE)
   async desactivar(
+    @IdempotencyKey() key: string,
     @Param("id", new PositiveIntPipe()) id: number,
     @Req() request: Request,
   ) {
     await this.policy.requireTurnoManagement(getAuthenticatedUser(request), id);
-    return { data: await this.turnos.desactivar(id) };
+    return {
+      data: await this.turnos.desactivar(
+        getAuthenticatedUser(request),
+        key,
+        id,
+      ),
+    };
   }
 }
