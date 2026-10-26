@@ -130,7 +130,7 @@ export function KairosProjectsPage() {
               setOnlyFavorites((value) => !value);
             }}
             aria-pressed={onlyFavorites}
-            className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-xl border border-[var(--ares-border-strong)] px-4 text-sm font-extrabold"
+            className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-full border border-[var(--ares-border-strong)] px-4 text-sm font-bold"
           >
             <Star size={17} fill={onlyFavorites ? "currentColor" : "none"} />{" "}
             Favoritos
@@ -168,7 +168,7 @@ export function KairosProjectsPage() {
             {items.map((project) => (
               <ResponsiveListItem key={project.id}>
                 <div className="flex items-start justify-between gap-3">
-                  <div className="grid min-h-11 min-w-11 place-items-center rounded-xl bg-[#ffe0d0] text-[#c2410c]">
+                  <div className="grid min-h-11 min-w-11 place-items-center rounded-full bg-[var(--color-accent-soft)] text-[var(--color-accent-text)]">
                     <FolderKanban size={21} />
                   </div>
                   <button
@@ -180,7 +180,7 @@ export function KairosProjectsPage() {
                         ? `Quitar ${project.nombre} de favoritos`
                         : `Agregar ${project.nombre} a favoritos`
                     }
-                    className="focus-ring grid min-h-11 min-w-11 place-items-center rounded-xl hover:bg-[var(--ares-surface-soft)] disabled:cursor-not-allowed disabled:opacity-40"
+                    className="focus-ring grid min-h-11 min-w-11 place-items-center rounded-full hover:bg-[var(--ares-surface-soft)] disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <Star
                       size={19}
@@ -188,7 +188,7 @@ export function KairosProjectsPage() {
                     />
                   </button>
                 </div>
-                <h2 className="mt-3 text-lg font-black">{project.nombre}</h2>
+                <h2 className="mt-3 text-lg font-bold">{project.nombre}</h2>
                 <p className="mt-1 line-clamp-2 min-h-10 text-sm leading-5 text-[var(--ares-muted)]">
                   {project.descripcion || "Sin descripción"}
                 </p>
@@ -211,7 +211,7 @@ export function KairosProjectsPage() {
                 </div>
                 <Link
                   href={`/portal/kairos/${project.id}`}
-                  className="focus-ring mt-5 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-[var(--ares-ink)] px-4 text-sm font-black text-white"
+                  className="focus-ring mt-5 inline-flex min-h-11 w-full items-center justify-center rounded-full bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] px-4 text-sm font-bold text-[var(--color-on-primary)]"
                 >
                   Abrir proyecto
                 </Link>

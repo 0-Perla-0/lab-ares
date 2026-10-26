@@ -154,17 +154,17 @@ export function KairosProjectDetailPage({ projectId }: { projectId: string }) {
     <div className="space-y-6">
       <Link
         href="/portal/kairos"
-        className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-xl px-2 text-sm font-extrabold"
+        className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-full px-2 text-sm font-bold"
       >
         <ArrowLeft size={18} /> Volver a proyectos
       </Link>
-      <header className="rounded-3xl border border-[var(--ares-border)] bg-[var(--ares-surface)] p-5 shadow-sm sm:p-7">
+      <header className="rounded-[var(--radius-card-lg)] border border-[var(--ares-border)] bg-[var(--ares-surface)] p-5 sm:p-7">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <p className="text-xs font-black uppercase tracking-[.18em] text-[#ea580c]">
+            <p className="text-xs font-bold uppercase tracking-[var(--tracking-eyebrow)] text-[var(--color-accent-text)]">
               Proyecto Kairós
             </p>
-            <h1 className="mt-2 text-3xl font-black tracking-[-.04em]">
+            <h1 className="mt-2 text-3xl font-bold tracking-[-.04em]">
               {project.nombre}
             </h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--ares-muted)]">
@@ -204,7 +204,7 @@ export function KairosProjectDetailPage({ projectId }: { projectId: string }) {
                       setError(getApiErrorMessage(reason, "save")),
                     )
                 }
-                className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-xl border border-[var(--ares-border-strong)] px-4 text-sm font-black"
+                className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-full border border-[var(--ares-border-strong)] px-4 text-sm font-bold"
               >
                 <Star size={17} fill={favorite ? "currentColor" : "none"} />{" "}
                 {favorite ? "Favorito" : "Marcar favorito"}
@@ -214,7 +214,7 @@ export function KairosProjectDetailPage({ projectId }: { projectId: string }) {
               <button
                 type="button"
                 onClick={() => setProjectEdit(true)}
-                className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-xl border border-[var(--ares-border-strong)] px-4 text-sm font-black"
+                className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-full border border-[var(--ares-border-strong)] px-4 text-sm font-bold"
               >
                 <Pencil size={17} /> Editar
               </button>
@@ -223,7 +223,7 @@ export function KairosProjectDetailPage({ projectId }: { projectId: string }) {
               <button
                 type="button"
                 onClick={() => setArchiveOpen(true)}
-                className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-xl border border-red-200 px-4 text-sm font-black text-red-700"
+                className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-full border border-[var(--color-danger-border)] px-4 text-sm font-bold text-[var(--color-danger)]"
               >
                 <Archive size={17} /> Archivar
               </button>
@@ -243,7 +243,7 @@ export function KairosProjectDetailPage({ projectId }: { projectId: string }) {
                 setSelectedActivity(null);
                 setActivityOpen(true);
               }}
-              className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-xl bg-[var(--ares-ink)] px-4 text-sm font-black text-white"
+              className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-full bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] px-4 text-sm font-bold text-[var(--color-on-primary)]"
             >
               <Plus size={17} /> Nueva actividad
             </button>
@@ -317,14 +317,14 @@ export function KairosProjectDetailPage({ projectId }: { projectId: string }) {
             {board.lanes.map((lane) => (
               <section
                 key={lane.state}
-                className="min-w-0 rounded-2xl bg-[var(--ares-surface-soft)] p-3"
+                className="min-w-0 rounded-[var(--radius-card)] bg-[var(--ares-surface-soft)] p-3"
                 aria-labelledby={`lane-${lane.state}`}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <h3 id={`lane-${lane.state}`} className="text-sm font-black">
+                  <h3 id={`lane-${lane.state}`} className="text-sm font-bold">
                     {activityStateLabel[lane.state]}
                   </h3>
-                  <span className="rounded-full bg-white px-2 py-1 text-xs font-black">
+                  <span className="rounded-full bg-[var(--color-surface)] px-2 py-1 text-xs font-bold">
                     {lane.total}
                   </span>
                 </div>
@@ -340,7 +340,7 @@ export function KairosProjectDetailPage({ projectId }: { projectId: string }) {
                     />
                   ))}
                   {lane.items.length === 0 && (
-                    <p className="rounded-xl border border-dashed border-[var(--ares-border)] p-4 text-center text-xs text-[var(--ares-muted)]">
+                    <p className="rounded-[var(--radius-card)] border border-dashed border-[var(--ares-border)] p-4 text-center text-xs text-[var(--ares-muted)]">
                       Sin actividades
                     </p>
                   )}
@@ -450,7 +450,7 @@ function ActivityCard({
     <button
       type="button"
       onClick={onOpen}
-      className="focus-ring min-h-11 w-full rounded-xl border border-[var(--ares-border)] bg-white p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+      className="focus-ring min-h-11 w-full rounded-[var(--radius-card)] border border-[var(--ares-border)] bg-[var(--color-surface)] p-3 text-left transition hover:-translate-y-0.5 hover:shadow-md"
     >
       <div className="flex items-start justify-between gap-2">
         <strong className="text-sm leading-5">{card.title}</strong>
@@ -528,7 +528,7 @@ function MembersPanel({
       {canManage && (
         <form
           onSubmit={(event) => void add(event)}
-          className="mb-5 grid gap-3 rounded-2xl bg-[var(--ares-surface-soft)] p-4 sm:grid-cols-[1fr_1fr_auto]"
+          className="mb-5 grid gap-3 rounded-[var(--radius-card)] bg-[var(--ares-surface-soft)] p-4 sm:grid-cols-[1fr_1fr_auto]"
         >
           <Field label="ID de usuario" required>
             <input
@@ -548,7 +548,7 @@ function MembersPanel({
           </Field>
           <button
             disabled={busy}
-            className="focus-ring mt-2 min-h-11 self-end rounded-xl bg-[var(--ares-ink)] px-4 text-sm font-black text-white disabled:opacity-50"
+            className="focus-ring mt-2 min-h-11 self-end rounded-full bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] px-4 text-sm font-bold text-[var(--color-on-primary)] disabled:opacity-50"
           >
             Agregar
           </button>
@@ -564,7 +564,7 @@ function MembersPanel({
           {project.miembros.map((member) => (
             <div
               key={member.usuarioId}
-              className="flex flex-col gap-3 rounded-xl border border-[var(--ares-border)] p-3 sm:flex-row sm:items-center sm:justify-between"
+              className="flex flex-col gap-3 rounded-[var(--radius-card)] border border-[var(--ares-border)] p-3 sm:flex-row sm:items-center sm:justify-between"
             >
               <div>
                 <strong>{member.usuario.codigo}</strong>
@@ -620,7 +620,7 @@ function MembersPanel({
                           `¿Transferir la propiedad a ${member.usuario.codigo}?`,
                         )
                       }
-                      className="focus-ring min-h-11 rounded-xl border border-amber-200 px-3 text-xs font-black text-amber-800"
+                      className="focus-ring min-h-11 rounded-full border border-[var(--color-warning-border)] px-3 text-xs font-bold text-[var(--color-warning-text)]"
                     >
                       Transferir
                     </button>
@@ -637,7 +637,7 @@ function MembersPanel({
                           `¿Quitar a ${member.usuario.codigo} del proyecto?`,
                         )
                       }
-                      className="focus-ring min-h-11 rounded-xl border border-red-200 px-3 text-xs font-black text-red-700"
+                      className="focus-ring min-h-11 rounded-full border border-[var(--color-danger-border)] px-3 text-xs font-bold text-[var(--color-danger)]"
                     >
                       Quitar
                     </button>
@@ -958,7 +958,7 @@ function ActivityModal({
                               ),
                             );
                         }}
-                        className="focus-ring min-h-11 rounded-xl border border-[var(--ares-border-strong)] px-3 text-sm font-black disabled:opacity-40"
+                        className="focus-ring min-h-11 rounded-full border border-[var(--ares-border-strong)] px-3 text-sm font-bold disabled:opacity-40"
                       >
                         {activityStateLabel[state]}
                       </button>
@@ -976,7 +976,7 @@ function ActivityModal({
                               kairosApi.reopen(projectId, activityId, reason),
                             );
                         }}
-                        className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-xl border border-amber-200 px-3 text-sm font-black text-amber-800"
+                        className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-full border border-[var(--color-warning-border)] px-3 text-sm font-bold text-[var(--color-warning-text)]"
                       >
                         <RefreshCw size={16} /> Reabrir
                       </button>
@@ -1017,7 +1017,7 @@ function ActivityModal({
                         ),
                       );
                     }}
-                    className="focus-ring mt-4 min-h-11 rounded-xl bg-[var(--ares-ink)] px-4 text-sm font-black text-white disabled:opacity-45"
+                    className="focus-ring mt-4 min-h-11 rounded-full bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] px-4 text-sm font-bold text-[var(--color-on-primary)] disabled:opacity-45"
                   >
                     Enviar a revisión
                   </button>
@@ -1041,7 +1041,7 @@ function ActivityModal({
                           ),
                         )
                       }
-                      className="focus-ring min-h-11 rounded-xl bg-emerald-700 px-4 text-sm font-black text-white"
+                      className="focus-ring min-h-11 rounded-full bg-emerald-700 px-4 text-sm font-bold text-white"
                     >
                       Aprobar
                     </button>
@@ -1062,7 +1062,7 @@ function ActivityModal({
                             ),
                           );
                       }}
-                      className="focus-ring min-h-11 rounded-xl bg-red-700 px-4 text-sm font-black text-white"
+                      className="focus-ring min-h-11 rounded-full bg-[var(--color-danger-solid)] px-4 text-sm font-bold text-white"
                     >
                       Solicitar corrección
                     </button>
@@ -1079,7 +1079,7 @@ function ActivityModal({
                     {evidence.map((item) => (
                       <div
                         key={item.id}
-                        className="flex flex-col gap-2 rounded-xl border border-[var(--ares-border)] p-3 sm:flex-row sm:items-center sm:justify-between"
+                        className="flex flex-col gap-2 rounded-[var(--radius-card)] border border-[var(--ares-border)] p-3 sm:flex-row sm:items-center sm:justify-between"
                       >
                         <div>
                           <strong className="text-sm">
@@ -1092,7 +1092,7 @@ function ActivityModal({
                         <button
                           type="button"
                           onClick={() => void download(item)}
-                          className="focus-ring min-h-11 rounded-xl border border-[var(--ares-border-strong)] px-3 text-sm font-black"
+                          className="focus-ring min-h-11 rounded-full border border-[var(--ares-border-strong)] px-3 text-sm font-bold"
                         >
                           Descargar
                         </button>
@@ -1117,7 +1117,7 @@ function ActivityModal({
                     </Field>
                     <button
                       disabled={busy}
-                      className="focus-ring mt-2 min-h-11 self-end rounded-xl bg-[var(--ares-ink)] px-4 text-sm font-black text-white"
+                      className="focus-ring mt-2 min-h-11 self-end rounded-full bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] px-4 text-sm font-bold text-[var(--color-on-primary)]"
                     >
                       Publicar
                     </button>
@@ -1127,7 +1127,7 @@ function ActivityModal({
                   {comments.map((item) => (
                     <article
                       key={item.id}
-                      className="rounded-xl bg-[var(--ares-surface-soft)] p-3"
+                      className="rounded-[var(--radius-card)] bg-[var(--ares-surface-soft)] p-3"
                     >
                       <p className="text-sm">{item.body}</p>
                       <p className="mt-1 text-xs text-[var(--ares-muted)]">
@@ -1142,7 +1142,7 @@ function ActivityModal({
                   {history.map((item) => (
                     <li
                       key={item.id}
-                      className="border-l-2 border-[#f97316] pl-3"
+                      className="border-l-2 border-[var(--color-accent)] pl-3"
                     >
                       <div className="flex flex-wrap gap-2">
                         <strong className="text-sm">{item.type}</strong>

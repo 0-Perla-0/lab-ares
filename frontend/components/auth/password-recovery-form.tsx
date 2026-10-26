@@ -67,18 +67,21 @@ export function PasswordRecoveryForm() {
   if (step === "complete") {
     return (
       <div className="mt-10" role="status" aria-live="polite">
-        <div className="rounded-3xl border border-[#769a27]/25 bg-[#eff7dc] p-6">
-          <CheckCircle2 className="text-[#668721]" aria-hidden="true" />
-          <h3 className="mt-4 text-xl font-black text-[#12221b]">
+        <div className="rounded-[var(--radius-card-lg)] border border-[var(--color-success-border)] bg-[var(--color-success-soft)] p-6">
+          <CheckCircle2
+            className="text-[var(--color-success-text)]"
+            aria-hidden="true"
+          />
+          <h3 className="mt-4 text-xl font-bold text-[var(--color-ink)]">
             Contraseña actualizada
           </h3>
-          <p className="mt-2 text-sm leading-6 text-[#52615a]">
+          <p className="mt-2 text-sm leading-6 text-[var(--color-muted)]">
             Ya puedes entrar con tu correo y la contraseña nueva.
           </p>
         </div>
         <Link
           href="/login"
-          className="focus-ring group mt-5 flex h-13 w-full items-center justify-center gap-3 rounded-2xl bg-[#12221b] px-5 text-sm font-black text-white transition hover:bg-[#243d32]"
+          className="focus-ring group mt-5 flex h-13 w-full items-center justify-center gap-3 rounded-full bg-[var(--color-primary)] px-5 text-sm font-bold text-[var(--color-on-primary)] shadow-[var(--shadow-button)] transition hover:bg-[var(--color-primary-hover)]"
         >
           Ir a iniciar sesión
           <ArrowRight size={18} aria-hidden="true" />
@@ -96,7 +99,7 @@ export function PasswordRecoveryForm() {
         <div>
           <label
             htmlFor="recovery-email"
-            className="text-sm font-extrabold text-[#243d32]"
+            className="text-sm font-medium text-[var(--color-ink)]"
           >
             Correo electrónico
           </label>
@@ -107,9 +110,9 @@ export function PasswordRecoveryForm() {
             autoComplete="email"
             required
             placeholder="inventor@ejemplo.com"
-            className="mt-2 h-13 w-full rounded-2xl border border-[#12221b]/15 bg-white px-4 text-sm outline-none transition placeholder:text-[#9ba59f] focus:border-[#769a27] focus:ring-4 focus:ring-[#c8f169]/25"
+            className="mt-2 h-13 w-full rounded-[var(--radius-input)] border border-[var(--color-control-border)] bg-[var(--color-surface)] px-4 text-sm outline-none transition placeholder:text-[var(--color-muted)] focus:border-[var(--color-focus)] focus:ring-4 focus:ring-[var(--color-accent-soft)]"
           />
-          <p className="mt-3 text-xs leading-5 text-[#7a8580]">
+          <p className="mt-3 text-xs leading-5 text-[var(--color-muted)]">
             Si existe una cuenta con ese correo, enviaremos un token de uso
             único.
           </p>
@@ -117,7 +120,7 @@ export function PasswordRecoveryForm() {
       ) : (
         <>
           <div
-            className="rounded-2xl border border-[#769a27]/20 bg-[#eff7dc] px-4 py-3 text-sm leading-6 text-[#40552a]"
+            className="rounded-[var(--radius-card)] border border-[var(--color-success-border)] bg-[var(--color-success-soft)] px-4 py-3 text-sm leading-6 text-[var(--color-success-text)]"
             role="status"
             aria-live="polite"
           >
@@ -127,7 +130,7 @@ export function PasswordRecoveryForm() {
           <div>
             <label
               htmlFor="recovery-token"
-              className="text-sm font-extrabold text-[#243d32]"
+              className="text-sm font-medium text-[var(--color-ink)]"
             >
               Token de recuperación
             </label>
@@ -138,13 +141,13 @@ export function PasswordRecoveryForm() {
               autoComplete="one-time-code"
               minLength={20}
               required
-              className="mt-2 h-13 w-full rounded-2xl border border-[#12221b]/15 bg-white px-4 font-mono text-sm outline-none transition focus:border-[#769a27] focus:ring-4 focus:ring-[#c8f169]/25"
+              className="mt-2 h-13 w-full rounded-[var(--radius-input)] border border-[var(--color-control-border)] bg-[var(--color-surface)] px-4 font-mono text-sm outline-none transition focus:border-[var(--color-focus)] focus:ring-4 focus:ring-[var(--color-accent-soft)]"
             />
           </div>
           <div>
             <label
               htmlFor="recovery-password"
-              className="text-sm font-extrabold text-[#243d32]"
+              className="text-sm font-medium text-[var(--color-ink)]"
             >
               Nueva contraseña
             </label>
@@ -156,14 +159,16 @@ export function PasswordRecoveryForm() {
               minLength={15}
               maxLength={128}
               required
-              className="mt-2 h-13 w-full rounded-2xl border border-[#12221b]/15 bg-white px-4 text-sm outline-none transition focus:border-[#769a27] focus:ring-4 focus:ring-[#c8f169]/25"
+              className="mt-2 h-13 w-full rounded-[var(--radius-input)] border border-[var(--color-control-border)] bg-[var(--color-surface)] px-4 text-sm outline-none transition focus:border-[var(--color-focus)] focus:ring-4 focus:ring-[var(--color-accent-soft)]"
             />
-            <p className="mt-2 text-xs text-[#7a8580]">Mínimo 15 caracteres.</p>
+            <p className="mt-2 text-xs text-[var(--color-muted)]">
+              Mínimo 15 caracteres.
+            </p>
           </div>
           <div>
             <label
               htmlFor="recovery-confirmation"
-              className="text-sm font-extrabold text-[#243d32]"
+              className="text-sm font-medium text-[var(--color-ink)]"
             >
               Confirmar contraseña
             </label>
@@ -175,7 +180,7 @@ export function PasswordRecoveryForm() {
               minLength={15}
               maxLength={128}
               required
-              className="mt-2 h-13 w-full rounded-2xl border border-[#12221b]/15 bg-white px-4 text-sm outline-none transition focus:border-[#769a27] focus:ring-4 focus:ring-[#c8f169]/25"
+              className="mt-2 h-13 w-full rounded-[var(--radius-input)] border border-[var(--color-control-border)] bg-[var(--color-surface)] px-4 text-sm outline-none transition focus:border-[var(--color-focus)] focus:ring-4 focus:ring-[var(--color-accent-soft)]"
             />
           </div>
         </>
@@ -185,7 +190,7 @@ export function PasswordRecoveryForm() {
         <div
           role="alert"
           aria-live="polite"
-          className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700"
+          className="rounded-[var(--radius-card)] border border-[var(--color-danger-border)] bg-[var(--color-danger-soft)] px-4 py-3 text-sm font-semibold text-[var(--color-danger)]"
         >
           {error}
         </div>
@@ -194,7 +199,7 @@ export function PasswordRecoveryForm() {
       <button
         type="submit"
         disabled={loading}
-        className="focus-ring group flex h-13 w-full items-center justify-center gap-3 rounded-2xl bg-[#12221b] px-5 text-sm font-black text-white transition hover:bg-[#243d32] disabled:cursor-wait disabled:opacity-70"
+        className="focus-ring group flex h-13 w-full items-center justify-center gap-3 rounded-full bg-[var(--color-primary)] px-5 text-sm font-bold text-[var(--color-on-primary)] shadow-[var(--shadow-button)] transition hover:bg-[var(--color-primary-hover)] disabled:cursor-wait disabled:opacity-70"
       >
         {loading ? (
           <>
@@ -220,7 +225,7 @@ export function PasswordRecoveryForm() {
             setError("");
             setStep("request");
           }}
-          className="focus-ring w-full rounded-md text-sm font-bold text-[#668721] hover:text-[#486217]"
+          className="focus-ring w-full rounded-md text-sm font-bold text-[var(--color-accent-text)] hover:text-[var(--color-primary-hover)]"
         >
           Solicitar otro token
         </button>

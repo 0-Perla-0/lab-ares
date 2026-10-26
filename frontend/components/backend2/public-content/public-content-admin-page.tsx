@@ -197,7 +197,7 @@ export function PublicContentAdminPage() {
       {notice && (
         <p
           role="status"
-          className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-900"
+          className="rounded-[var(--radius-card)] border border-[var(--color-success-border)] bg-[var(--color-success-soft)] p-4 text-sm font-bold text-[var(--color-success-text)]"
         >
           {notice}
         </p>
@@ -224,7 +224,7 @@ export function PublicContentAdminPage() {
               {canArchive && (
                 <button
                   type="button"
-                  className="focus-ring min-h-11 rounded-xl border border-red-300 px-4 text-sm font-black text-red-700"
+                  className="focus-ring min-h-11 rounded-full border border-[var(--color-danger-border)] px-4 text-sm font-bold text-[var(--color-danger)]"
                   onClick={() => {
                     const motivo = window
                       .prompt("Motivo para archivar el activo")
@@ -251,10 +251,10 @@ export function PublicContentAdminPage() {
                 key={item.id}
                 type="button"
                 onClick={() => void openDetail(item.id)}
-                className="focus-ring min-h-24 rounded-2xl border border-[var(--ares-border)] p-4 text-left"
+                className="focus-ring min-h-24 rounded-[var(--radius-card)] border border-[var(--ares-border)] p-4 text-left"
               >
                 <div className="flex justify-between gap-2">
-                  <h2 className="font-black">/{item.slug}</h2>
+                  <h2 className="font-bold">/{item.slug}</h2>
                   <StatusBadge
                     label={item.estado}
                     tone={stateTone[item.estado]}
@@ -355,7 +355,7 @@ export function PublicContentAdminPage() {
           {version.bloques.map((block, index) => (
             <div
               key={`${block.tipo}-${index}`}
-              className="rounded-2xl border border-[var(--ares-border)] p-4"
+              className="rounded-[var(--radius-card)] border border-[var(--ares-border)] p-4"
             >
               <div className="flex items-center justify-between gap-2">
                 <strong>
@@ -363,7 +363,7 @@ export function PublicContentAdminPage() {
                 </strong>
                 <button
                   type="button"
-                  className="focus-ring min-h-11 px-3 text-sm font-bold text-red-700"
+                  className="focus-ring min-h-11 px-3 text-sm font-bold text-[var(--color-danger)]"
                   onClick={() =>
                     setVersion((old) => ({
                       ...old,
@@ -435,7 +435,7 @@ export function PublicContentAdminPage() {
                     ],
                   }))
                 }
-                className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-xl border border-[var(--ares-border-strong)] px-3 text-sm font-black disabled:cursor-not-allowed disabled:opacity-45"
+                className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-full border border-[var(--ares-border-strong)] px-3 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-45"
               >
                 <Plus size={15} /> {type}
               </button>
@@ -443,7 +443,7 @@ export function PublicContentAdminPage() {
           </div>
           <button
             disabled={busy || version.bloques.length === 0}
-            className="focus-ring min-h-11 w-full rounded-xl bg-[#17174a] px-4 text-sm font-black text-white disabled:opacity-50"
+            className="focus-ring min-h-11 w-full rounded-full bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] px-4 text-sm font-bold text-[var(--color-on-primary)] disabled:opacity-50"
           >
             {busy ? "Guardando…" : "Guardar borrador"}
           </button>
@@ -459,7 +459,7 @@ export function PublicContentAdminPage() {
             {selected.versiones.map((item) => (
               <article
                 key={item.id}
-                className="rounded-2xl border border-[var(--ares-border)] p-4"
+                className="rounded-[var(--radius-card)] border border-[var(--ares-border)] p-4"
               >
                 <div className="flex flex-wrap justify-between gap-2">
                   <strong>
@@ -482,7 +482,7 @@ export function PublicContentAdminPage() {
                         "Versión publicada.",
                       )
                     }
-                    className="focus-ring mt-3 inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#ea580c] px-4 text-sm font-black text-[#17174a]"
+                    className="focus-ring mt-3 inline-flex min-h-11 items-center gap-2 rounded-full bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] px-4 text-sm font-bold text-[var(--color-on-primary)]"
                   >
                     <Send size={16} /> Publicar
                   </button>
@@ -496,7 +496,7 @@ export function PublicContentAdminPage() {
                 setSelected(null);
                 setVersion(initialVersion);
               }}
-              className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#17174a] px-4 text-sm font-black text-white"
+              className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-full bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] px-4 text-sm font-bold text-[var(--color-on-primary)]"
             >
               <Plus size={16} /> Nueva versión
             </button>
@@ -514,7 +514,7 @@ export function PublicContentAdminPage() {
                       "Página archivada.",
                     );
                 }}
-                className="focus-ring ml-2 inline-flex min-h-11 items-center gap-2 rounded-xl bg-red-700 px-4 text-sm font-black text-white"
+                className="focus-ring ml-2 inline-flex min-h-11 items-center gap-2 rounded-[var(--radius-card)] bg-[var(--color-danger-solid)] px-4 text-sm font-bold text-white"
               >
                 <Archive size={16} /> Archivar
               </button>

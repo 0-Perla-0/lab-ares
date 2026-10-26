@@ -31,11 +31,11 @@ import type {
 type Catalogs = { sedes: Sede[]; areas: Area[]; turnos: Turno[] };
 
 const stateStyles: Record<UserState, string> = {
-  INVITADA: "bg-amber-50 text-amber-700",
-  ACTIVA: "bg-emerald-50 text-emerald-700",
-  SUSPENDIDA: "bg-orange-50 text-orange-700",
-  DESACTIVADA: "bg-slate-100 text-slate-600",
-  BLOQUEADA: "bg-red-50 text-red-700",
+  INVITADA: "bg-[var(--color-warning-soft)] text-[var(--color-warning-text)]",
+  ACTIVA: "bg-[var(--color-success-soft)] text-[var(--color-success-text)]",
+  SUSPENDIDA: "bg-[var(--color-accent-soft)] text-[var(--color-accent-text)]",
+  DESACTIVADA: "bg-[var(--color-surface-inset)] text-[var(--color-muted)]",
+  BLOQUEADA: "bg-[var(--color-danger-soft)] text-[var(--color-danger)]",
 };
 
 export function UsersPage() {
@@ -137,7 +137,7 @@ export function UsersPage() {
       />
 
       {success && (
-        <div className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
+        <div className="mt-6 rounded-full border border-[var(--color-success-border)] bg-[var(--color-success-soft)] px-4 py-3 text-sm font-semibold text-[var(--color-success-text)]">
           {success}
         </div>
       )}
@@ -147,18 +147,18 @@ export function UsersPage() {
         </div>
       )}
 
-      <div className="mt-7 flex items-center rounded-2xl border border-[#dde1ea] bg-white px-4 shadow-[0_8px_30px_rgba(23,23,74,0.025)]">
-        <Search size={18} className="shrink-0 text-[#858ca0]" />
+      <div className="mt-7 flex items-center rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] px-4">
+        <Search size={18} className="shrink-0 text-[var(--color-muted)]" />
         <input
           type="search"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Buscar por código, correo, rol o estado…"
-          className="h-12 w-full bg-transparent px-3 text-sm outline-none placeholder:text-[#98a2b3]"
+          className="h-12 w-full bg-transparent px-3 text-sm outline-none placeholder:text-[var(--color-muted)]"
           aria-label="Buscar usuarios"
         />
         {items && (
-          <span className="shrink-0 text-[11px] font-black text-[#858ca0]">
+          <span className="shrink-0 text-xs font-bold text-[var(--color-muted)]">
             {filteredItems.length} de {items.length}
           </span>
         )}
@@ -181,9 +181,9 @@ export function UsersPage() {
             }
           />
         ) : (
-          <div className="table-scroll overflow-x-auto rounded-2xl border border-[#dde1ea] bg-white shadow-[0_8px_30px_rgba(23,23,74,0.035)]">
+          <div className="table-scroll overflow-x-auto rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)]">
             <table className="w-full min-w-[980px] text-left">
-              <thead className="border-b border-[#dde1ea] bg-[#f0f1f7] text-[10px] font-black uppercase tracking-[0.16em] text-[#667085]">
+              <thead className="border-b border-[var(--color-border)] bg-[var(--color-surface-inset)] text-xs font-bold uppercase tracking-[var(--tracking-eyebrow)] text-[var(--color-muted)]">
                 <tr>
                   <th className="px-5 py-4">Persona</th>
                   <th className="px-5 py-4">Rol</th>
@@ -192,18 +192,21 @@ export function UsersPage() {
                   <th className="px-5 py-4 text-right">Acciones</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#dde1ea]">
+              <tbody className="divide-y divide-[var(--color-border)]">
                 {filteredItems.map((item) => (
-                  <tr key={item.id} className="transition hover:bg-[#fafaff]">
+                  <tr
+                    key={item.id}
+                    className="transition hover:bg-[var(--color-surface-inset)]"
+                  >
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-3">
-                        <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#eef0f6] text-[#667085]">
+                        <span className="grid h-10 w-10 place-items-center rounded-full bg-[var(--color-surface-inset)] text-[var(--color-muted)]">
                           <UserRound size={18} />
                         </span>
                         <div className="min-w-0">
-                          <p className="text-sm font-black">{item.codigo}</p>
+                          <p className="text-sm font-bold">{item.codigo}</p>
                           <p
-                            className="mt-0.5 max-w-64 truncate text-[11px] text-[#667085]"
+                            className="mt-0.5 max-w-64 truncate text-xs text-[var(--color-muted)]"
                             title={item.email}
                           >
                             {item.email}
@@ -211,20 +214,20 @@ export function UsersPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-5 py-4 text-sm font-extrabold text-[#667085]">
+                    <td className="px-5 py-4 text-sm font-bold text-[var(--color-muted)]">
                       {roleLabels[item.rol]}
                     </td>
                     <td className="px-5 py-4">
-                      <p className="text-xs font-bold text-[#667085]">
+                      <p className="text-xs font-bold text-[var(--color-muted)]">
                         {sedeName(item.sedeId)}
                       </p>
-                      <p className="mt-1 text-[11px] text-[#858ca0]">
+                      <p className="mt-1 text-xs text-[var(--color-muted)]">
                         {areaName(item.areaId)}
                       </p>
                     </td>
                     <td className="px-5 py-4">
                       <span
-                        className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-black ${stateStyles[item.estado]}`}
+                        className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${stateStyles[item.estado]}`}
                       >
                         {stateLabels[item.estado]}
                       </span>
@@ -234,14 +237,14 @@ export function UsersPage() {
                         {roleRank[item.rol] <= roleRank[user.rol] ? (
                           <Link
                             href={`/portal/usuarios/${item.id}`}
-                            className="focus-ring rounded-lg p-2 text-[#667085] hover:bg-[#fff1e8] hover:text-[#c2410c]"
+                            className="focus-ring rounded-lg p-2 text-[var(--color-muted)] hover:bg-[var(--color-accent-soft)] hover:text-[var(--color-accent-text)]"
                             aria-label={`Editar ${item.codigo}`}
                           >
                             <Pencil size={17} />
                           </Link>
                         ) : (
                           <span
-                            className="cursor-not-allowed rounded-lg p-2 text-[#667085] opacity-25"
+                            className="cursor-not-allowed rounded-lg p-2 text-[var(--color-muted)] opacity-25"
                             title="No puedes administrar un rol superior al tuyo"
                           >
                             <Pencil size={17} />
@@ -254,7 +257,7 @@ export function UsersPage() {
                             roleRank[item.rol] > roleRank[user.rol]
                           }
                           onClick={() => setDeleteTarget(item)}
-                          className="focus-ring rounded-lg p-2 text-[#667085] hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-25"
+                          className="focus-ring rounded-lg p-2 text-[var(--color-muted)] hover:bg-[var(--color-danger-soft)] hover:text-[var(--color-danger)] disabled:cursor-not-allowed disabled:opacity-25"
                           aria-label={
                             item.id === user.id
                               ? "No puedes darte de baja"

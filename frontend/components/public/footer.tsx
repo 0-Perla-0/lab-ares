@@ -2,50 +2,51 @@ import Link from "next/link";
 
 import { Brand } from "./brand";
 
+const exploreLinkClassName =
+  "focus-ring w-fit rounded-md hover:text-[var(--color-ink)]";
+const headingClassName =
+  "text-xs font-medium uppercase tracking-[var(--tracking-eyebrow)] text-[var(--color-accent-text)]";
+
 export function PublicFooter() {
   return (
-    <footer className="bg-[#17174a] text-white">
-      <div className="mx-auto max-w-7xl px-5 py-14 sm:px-8 lg:px-10">
-        <div className="grid gap-10 border-b border-white/10 pb-10 md:grid-cols-[1.4fr_1fr_1fr]">
+    <footer className="border-t border-[var(--color-border)] bg-[var(--color-canvas)] text-[var(--color-ink)]">
+      <div className="mx-auto max-w-6xl px-5 py-14 sm:px-8">
+        <div className="grid gap-10 border-b border-[var(--color-border)] pb-10 md:grid-cols-[1.4fr_1fr_1fr]">
           <div>
-            <Brand inverse />
-            <p className="mt-5 max-w-sm text-sm leading-7 text-white/55">
+            <Brand />
+            <p className="mt-5 max-w-sm text-sm leading-7 text-[var(--color-muted)]">
               El espacio operativo del Laboratorio de Inventores para organizar
               equipos, sedes y horarios con claridad.
             </p>
           </div>
           <div>
-            <h2 className="text-xs font-black uppercase tracking-[0.2em] text-[#f97316]">
-              Explorar
-            </h2>
-            <div className="mt-5 grid gap-3 text-sm text-white/65">
-              <Link href="/#plataforma" className="hover:text-white">
+            <h2 className={headingClassName}>Explorar</h2>
+            <div className="mt-5 grid gap-3 text-sm text-[var(--color-muted)]">
+              <Link href="/#plataforma" className={exploreLinkClassName}>
                 Plataforma
               </Link>
-              <Link href="/#como-funciona" className="hover:text-white">
+              <Link href="/#como-funciona" className={exploreLinkClassName}>
                 Cómo funciona
               </Link>
-              <Link href="/#nosotros" className="hover:text-white">
+              <Link href="/#nosotros" className={exploreLinkClassName}>
                 Nosotros
               </Link>
             </div>
           </div>
           <div>
-            <h2 className="text-xs font-black uppercase tracking-[0.2em] text-[#f97316]">
-              Acceso
-            </h2>
-            <p className="mt-5 text-sm leading-7 text-white/55">
+            <h2 className={headingClassName}>Acceso</h2>
+            <p className="mt-5 text-sm leading-7 text-[var(--color-muted)]">
               ¿Ya formas parte del equipo?
             </p>
             <Link
               href="/login"
-              className="mt-3 inline-flex text-sm font-extrabold text-white hover:text-[#f97316]"
+              className="focus-ring mt-3 inline-flex rounded-md text-sm font-bold text-[var(--color-ink)] hover:text-[var(--color-accent-text)]"
             >
               Inicia sesión →
             </Link>
           </div>
         </div>
-        <p className="pt-7 text-xs text-white/35">
+        <p className="pt-7 text-xs text-[var(--color-muted)]">
           © {new Date().getFullYear()} Laboratorio de Inventores. Todos los
           derechos reservados.
         </p>

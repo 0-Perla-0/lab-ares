@@ -10,8 +10,8 @@ const links = [
 
 export function PublicHeader() {
   return (
-    <header className="sticky top-0 z-30 border-b border-[#dde1ea] bg-[#ffffff]/90 backdrop-blur-xl">
-      <div className="mx-auto flex h-20 max-w-7xl items-center justify-between px-5 sm:px-8 lg:px-10">
+    <header className="sticky top-3 z-30 px-3 sm:px-5">
+      <div className="mx-auto flex min-h-16 max-w-6xl items-center justify-between gap-4 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-4 shadow-[var(--shadow-inset-highlight)] sm:px-6">
         <Brand />
 
         <nav
@@ -22,7 +22,7 @@ export function PublicHeader() {
             <Link
               key={link.href}
               href={link.href}
-              className="focus-ring rounded-md text-sm font-bold text-[#667085] transition hover:text-[#17174a]"
+              className="focus-ring rounded-md text-sm font-medium text-[var(--color-muted)] transition hover:text-[var(--color-ink)]"
             >
               {link.label}
             </Link>
@@ -31,7 +31,7 @@ export function PublicHeader() {
 
         <Link
           href="/login"
-          className="focus-ring rounded-full bg-[#17174a] px-5 py-2.5 text-sm font-extrabold text-white transition hover:-translate-y-0.5 hover:bg-[#25256d]"
+          className="focus-ring inline-flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-full bg-[var(--color-primary)] px-4 sm:px-5 text-sm font-bold text-[var(--color-on-primary)] shadow-[var(--shadow-button)] transition hover:bg-[var(--color-primary-hover)]"
         >
           Entrar al portal
         </Link>

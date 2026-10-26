@@ -61,13 +61,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <main className="grid min-h-screen place-items-center bg-[#f6f7fb]">
+      <main className="grid min-h-screen place-items-center bg-[var(--color-surface-inset)]">
         <div className="text-center">
           <LoaderCircle
-            className="mx-auto animate-spin text-[#ea580c]"
+            className="mx-auto animate-spin text-[var(--color-accent-text)]"
             size={30}
           />
-          <p className="mt-4 text-sm font-bold text-[#667085]">
+          <p className="mt-4 text-sm font-bold text-[var(--color-muted)]">
             Preparando tu espacio…
           </p>
         </div>
@@ -77,14 +77,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   if (error || !value) {
     return (
-      <main className="grid min-h-screen place-items-center bg-[#f6f7fb] px-5">
+      <main className="grid min-h-screen place-items-center bg-[var(--color-surface-inset)] px-5">
         <div className="max-w-sm text-center">
-          <h1 className="text-2xl font-black">No pudimos abrir el portal</h1>
-          <p className="mt-3 text-sm leading-6 text-[#667085]">{error}</p>
+          <h1 className="text-2xl font-bold">No pudimos abrir el portal</h1>
+          <p className="mt-3 text-sm leading-6 text-[var(--color-muted)]">
+            {error}
+          </p>
           <button
             type="button"
             onClick={() => void loadUser()}
-            className="focus-ring mt-6 inline-flex items-center gap-2 rounded-full bg-[#17174a] px-5 py-3 text-sm font-black text-white"
+            className="focus-ring mt-6 inline-flex items-center gap-2 rounded-full bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] px-5 py-3 text-sm font-bold text-[var(--color-on-primary)]"
           >
             <RefreshCw size={16} /> Reintentar
           </button>

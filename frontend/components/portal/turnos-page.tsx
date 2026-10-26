@@ -167,7 +167,7 @@ export function TurnosPage() {
       />
 
       {success && (
-        <div className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
+        <div className="mt-6 rounded-full border border-[var(--color-success-border)] bg-[var(--color-success-soft)] px-4 py-3 text-sm font-semibold text-[var(--color-success-text)]">
           {success}
         </div>
       )}
@@ -188,9 +188,9 @@ export function TurnosPage() {
             description="Los horarios registrados aparecerán en esta sección."
           />
         ) : (
-          <div className="table-scroll overflow-x-auto rounded-2xl border border-[#dde1ea] bg-white shadow-[0_8px_30px_rgba(23,23,74,0.035)]">
+          <div className="table-scroll overflow-x-auto rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)]">
             <table className="w-full min-w-[840px] text-left">
-              <thead className="border-b border-[#dde1ea] bg-[#f0f1f7] text-[10px] font-black uppercase tracking-[0.16em] text-[#667085]">
+              <thead className="border-b border-[var(--color-border)] bg-[var(--color-surface-inset)] text-xs font-bold uppercase tracking-[var(--tracking-eyebrow)] text-[var(--color-muted)]">
                 <tr>
                   <th className="px-5 py-4">Turno</th>
                   <th className="px-5 py-4">Área y sede</th>
@@ -201,31 +201,34 @@ export function TurnosPage() {
                   )}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#dde1ea]">
+              <tbody className="divide-y divide-[var(--color-border)]">
                 {turnos.map((item) => {
                   const area = areaById(item.areaId);
                   const manageable = area
                     ? canManageSede(user, area.sedeId)
                     : false;
                   return (
-                    <tr key={item.id} className="transition hover:bg-[#fafaff]">
+                    <tr
+                      key={item.id}
+                      className="transition hover:bg-[var(--color-surface-inset)]"
+                    >
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-3">
-                          <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#eef0f6] text-[#5b6481]">
+                          <span className="grid h-10 w-10 place-items-center rounded-full bg-[var(--color-surface-inset)] text-[var(--color-muted)]">
                             <Clock3 size={18} />
                           </span>
                           <div>
-                            <p className="text-sm font-black">{item.nombre}</p>
-                            <p className="mt-0.5 text-[11px] text-[#858ca0]">
+                            <p className="text-sm font-bold">{item.nombre}</p>
+                            <p className="mt-0.5 text-xs text-[var(--color-muted)]">
                               ID {item.id}
                             </p>
                           </div>
                         </div>
                       </td>
-                      <td className="px-5 py-4 text-sm font-semibold text-[#667085]">
+                      <td className="px-5 py-4 text-sm font-semibold text-[var(--color-muted)]">
                         {areaLabel(item.areaId)}
                       </td>
-                      <td className="px-5 py-4 text-sm font-black tabular-nums">
+                      <td className="px-5 py-4 text-sm font-bold tabular-nums">
                         {item.horaInicio} – {item.horaFin}
                       </td>
                       <td className="px-5 py-4">
@@ -233,7 +236,7 @@ export function TurnosPage() {
                           {item.dias.map((day) => (
                             <span
                               key={day}
-                              className="rounded-md bg-[#eef0f6] px-2 py-1 text-[10px] font-black text-[#5f6882]"
+                              className="rounded-md bg-[var(--color-surface-inset)] px-2 py-1 text-xs font-bold text-[var(--color-muted)]"
                             >
                               {dayLabels[day]}
                             </span>
@@ -247,7 +250,7 @@ export function TurnosPage() {
                               type="button"
                               disabled={!manageable}
                               onClick={() => openEditor({ mode: "edit", item })}
-                              className="focus-ring rounded-lg p-2 text-[#667085] hover:bg-[#fff1e8] hover:text-[#c2410c] disabled:cursor-not-allowed disabled:opacity-25"
+                              className="focus-ring rounded-lg p-2 text-[var(--color-muted)] hover:bg-[var(--color-accent-soft)] hover:text-[var(--color-accent-text)] disabled:cursor-not-allowed disabled:opacity-25"
                               aria-label={`Editar ${item.nombre}`}
                             >
                               <Pencil size={17} />
@@ -256,7 +259,7 @@ export function TurnosPage() {
                               type="button"
                               disabled={!manageable}
                               onClick={() => setDeleteTarget(item)}
-                              className="focus-ring rounded-lg p-2 text-[#667085] hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-25"
+                              className="focus-ring rounded-lg p-2 text-[var(--color-muted)] hover:bg-[var(--color-danger-soft)] hover:text-[var(--color-danger)] disabled:cursor-not-allowed disabled:opacity-25"
                               aria-label={`Dar de baja ${item.nombre}`}
                             >
                               <Trash2 size={17} />
@@ -335,14 +338,15 @@ export function TurnosPage() {
                 />
               </Field>
               <fieldset className="sm:col-span-2">
-                <legend className="text-sm font-extrabold text-[#25256d]">
-                  Días de la semana <span className="text-[#ea580c]">*</span>
+                <legend className="text-sm font-bold text-[var(--color-ink)]">
+                  Días de la semana{" "}
+                  <span className="text-[var(--color-accent-text)]">*</span>
                 </legend>
                 <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
                   {weekDays.map((day) => (
                     <label
                       key={day}
-                      className="flex cursor-pointer items-center gap-2 rounded-xl border border-[#dde1ea] bg-white px-3 py-2.5 text-xs font-bold hover:bg-[#f6f7fb]"
+                      className="flex cursor-pointer items-center gap-2 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 text-xs font-bold hover:bg-[var(--color-surface-inset)]"
                     >
                       <input
                         type="checkbox"
@@ -353,7 +357,7 @@ export function TurnosPage() {
                             ? editor.item.dias.includes(day)
                             : !["SABADO", "DOMINGO"].includes(day)
                         }
-                        className="h-4 w-4 accent-[#ea580c]"
+                        className="h-4 w-4 accent-[var(--color-primary)]"
                       />
                       {dayLabels[day]}
                     </label>

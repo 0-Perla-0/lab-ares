@@ -22,23 +22,20 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const params = await searchParams;
 
   return (
-    <main className="grid-texture relative isolate flex min-h-screen min-h-[100svh] items-center justify-center overflow-hidden bg-[#17174a] px-5 py-28 sm:px-10 lg:py-10">
-      <div className="pointer-events-none absolute -bottom-40 -left-32 h-[28rem] w-[28rem] rounded-full bg-[#f97316]/18 blur-3xl" />
-      <div className="pointer-events-none absolute -right-40 -top-44 h-[32rem] w-[32rem] rounded-full bg-[#25256d] blur-3xl" />
-
+    <main className="portal-background relative isolate flex min-h-screen min-h-[100svh] items-center justify-center overflow-hidden px-5 py-28 sm:px-10 lg:py-10">
       <div className="absolute left-5 top-5 z-20 sm:left-10 sm:top-10 xl:left-14 xl:top-14">
-        <Brand inverse />
+        <Brand />
       </div>
 
       <section
         aria-labelledby="login-title"
-        className="relative z-10 w-full max-w-[30rem] animate-fade-up rounded-[2rem] border border-white/25 bg-white p-6 shadow-[0_32px_90px_rgba(5,5,35,0.42)] sm:p-9"
+        className="relative z-10 w-full max-w-[30rem] animate-fade-up rounded-[var(--radius-card-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-[var(--shadow-float)] sm:p-9"
       >
-        <div className="mx-auto h-1.5 w-40 rounded-full bg-[#f97316]" />
+        <div className="mx-auto h-1.5 w-24 rounded-full bg-[var(--color-accent)]" />
         <div className="mt-7">
           <h1
             id="login-title"
-            className="text-center text-4xl font-black tracking-[-0.055em] text-[#17174a] sm:text-5xl"
+            className="text-center text-4xl font-bold tracking-[-0.03em] text-[var(--color-ink)] sm:text-5xl"
           >
             Bienvenido
           </h1>

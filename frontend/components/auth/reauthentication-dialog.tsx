@@ -57,7 +57,7 @@ export function ReauthenticationDialog() {
       {notice && (
         <p
           role="status"
-          className="m-4 rounded-xl bg-emerald-50 p-4 text-emerald-900"
+          className="m-4 rounded-[var(--radius-card)] bg-[var(--color-success-soft)] p-4 text-[var(--color-success-text)]"
         >
           {notice}
         </p>

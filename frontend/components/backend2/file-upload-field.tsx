@@ -115,21 +115,24 @@ export function FileUploadField({
     <div>
       <label
         htmlFor={inputId}
-        className="text-sm font-extrabold text-[#25256d]"
+        className="text-sm font-bold text-[var(--color-ink)]"
       >
         {label}
         {required && (
-          <span className="ml-1 text-[#ea580c]" aria-hidden="true">
+          <span
+            className="ml-1 text-[var(--color-accent-text)]"
+            aria-hidden="true"
+          >
             *
           </span>
         )}
         {required && <span className="sr-only"> (obligatorio)</span>}
       </label>
-      <div className="mt-2 rounded-2xl border border-[var(--ares-border-strong)] bg-[var(--ares-surface)] p-3">
+      <div className="mt-2 rounded-[var(--radius-card)] border border-[var(--ares-border-strong)] bg-[var(--ares-surface)] p-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <label
             htmlFor={inputId}
-            className={`file-upload-trigger inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-[var(--ares-ink)] px-4 text-sm font-black text-white transition hover:bg-[var(--ares-ink-soft)] ${
+            className={`file-upload-trigger inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-full bg-[var(--color-primary)] px-4 text-sm font-bold text-[var(--color-on-primary)] transition hover:bg-[var(--ares-ink-soft)] ${
               disabled || busy ? "pointer-events-none opacity-55" : ""
             }`}
           >
@@ -156,7 +159,7 @@ export function FileUploadField({
             <button
               type="button"
               onClick={() => controller.current?.abort()}
-              className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[var(--ares-border-strong)] px-3 text-sm font-extrabold"
+              className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-[var(--ares-border-strong)] px-3 text-sm font-bold"
             >
               <X size={16} aria-hidden="true" /> Cancelar
             </button>
@@ -200,7 +203,10 @@ export function FileUploadField({
         )}
       </div>
       {hint && (
-        <p id={hintId} className="mt-1.5 text-xs font-medium text-[#667085]">
+        <p
+          id={hintId}
+          className="mt-1.5 text-xs font-medium text-[var(--color-muted)]"
+        >
           {hint}
         </p>
       )}
@@ -208,7 +214,7 @@ export function FileUploadField({
         <p
           id={`${inputId}-error`}
           role="alert"
-          className="mt-1.5 text-xs font-bold text-red-700"
+          className="mt-1.5 text-xs font-bold text-[var(--color-danger)]"
         >
           {error}
         </p>

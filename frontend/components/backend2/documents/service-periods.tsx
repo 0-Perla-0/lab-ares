@@ -81,7 +81,7 @@ export function ServicePeriods({ userId }: { userId: number }) {
       />
       <ul aria-label="Periodos registrados" className="space-y-3">
         {(periods.data?.items ?? []).map((row) => (
-          <li key={row.id} className="rounded-xl border p-3">
+          <li key={row.id} className="rounded-[var(--radius-card)] border p-3">
             <p>
               {row.inicio.slice(0, 10)} – {row.fin.slice(0, 10)} ·{" "}
               <strong>{row.estado}</strong> · versión {row.version}

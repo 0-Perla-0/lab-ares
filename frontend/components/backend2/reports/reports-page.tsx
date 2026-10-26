@@ -158,7 +158,7 @@ export function ReportsPage() {
       {notice && (
         <div
           role="status"
-          className="rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm font-bold text-sky-900"
+          className="rounded-[var(--radius-card)] border border-[var(--color-info-border)] bg-[var(--color-info-soft)] p-4 text-sm font-bold text-[var(--color-info-text)]"
         >
           {notice}
         </div>
@@ -192,7 +192,7 @@ export function ReportsPage() {
           </Field>
           <button
             disabled={loading}
-            className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#17174a] px-5 text-sm font-black text-white sm:self-end"
+            className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] px-5 text-sm font-bold text-[var(--color-on-primary)] sm:self-end"
           >
             <RefreshCw size={16} />{" "}
             {loading ? "Actualizando…" : "Actualizar métricas"}
@@ -289,17 +289,17 @@ export function ReportsPage() {
             type="button"
             disabled={exporting}
             onClick={() => void exportReport()}
-            className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#17174a] px-5 text-sm font-black text-white"
+            className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] px-5 text-sm font-bold text-[var(--color-on-primary)]"
           >
             <FileSpreadsheet size={17} />{" "}
             {exporting ? "Solicitando…" : "Generar CSV"}
           </button>
         </div>
         {job && (
-          <div className="mt-5 flex flex-col gap-4 rounded-2xl border border-[var(--ares-border)] bg-[#f6f7fb] p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="mt-5 flex flex-col gap-4 rounded-[var(--radius-card)] border border-[var(--ares-border)] bg-[var(--color-surface-inset)] p-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <p className="font-black">Exportación {job.id}</p>
+                <p className="font-bold">Exportación {job.id}</p>
                 <StatusBadge label={job.status} tone={jobTone[job.status]} />
               </div>
               <p className="mt-1 text-sm text-[var(--ares-muted)]">
@@ -311,7 +311,7 @@ export function ReportsPage() {
               <button
                 type="button"
                 onClick={() => void downloadJob()}
-                className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 text-sm font-black text-white"
+                className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-emerald-700 px-4 text-sm font-bold text-white"
               >
                 <Download size={16} /> Descargar resultado
               </button>
@@ -333,11 +333,11 @@ function Metric({
   detail: string;
 }) {
   return (
-    <article className="rounded-2xl border border-[var(--ares-border)] bg-white p-5 shadow-sm">
-      <p className="text-xs font-black uppercase tracking-wide text-[var(--ares-muted)]">
+    <article className="rounded-[var(--radius-card)] border border-[var(--ares-border)] bg-[var(--color-surface)] p-5">
+      <p className="text-xs font-bold uppercase tracking-wide text-[var(--ares-muted)]">
         {label}
       </p>
-      <p className="mt-2 text-4xl font-black tracking-tight">{value}</p>
+      <p className="mt-2 text-4xl font-bold tracking-tight">{value}</p>
       <p className="mt-3 text-xs leading-5 text-[var(--ares-muted)]">
         {detail}
       </p>

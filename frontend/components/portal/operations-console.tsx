@@ -313,7 +313,10 @@ export function OperationsConsole() {
       )}
       <ul>
         {jobs.data?.items.map((job) => (
-          <li key={job.id} className="space-y-2 rounded-xl border bg-white p-4">
+          <li
+            key={job.id}
+            className="space-y-2 rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4"
+          >
             <p>
               {job.name} · {job.state} · intentos {job.attempts}/
               {job.maxAttempts} · {job.errorCode}
@@ -439,7 +442,10 @@ export function OperationsConsole() {
       )}
       <ul className="space-y-3">
         {incidents.data?.map((incident) => (
-          <li key={incident.id} className="rounded-xl border bg-white p-4">
+          <li
+            key={incident.id}
+            className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4"
+          >
             <h3 className="font-bold">
               {incident.externalTicketRef} · {incident.severity} ·{" "}
               {incident.state}

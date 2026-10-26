@@ -147,7 +147,7 @@ function DelayedTooltip({
           <div
             id={tooltipId}
             role="tooltip"
-            className="pointer-events-none fixed z-[120] rounded-xl border border-white/15 bg-[#25256d] px-3 py-2.5 text-xs font-semibold leading-5 text-white shadow-2xl"
+            className="pointer-events-none fixed z-[120] rounded-lg bg-[var(--color-ink)] px-3 py-2.5 text-xs font-medium leading-5 text-[var(--color-canvas)] shadow-[var(--shadow-float)]"
             style={position}
           >
             {description}
@@ -441,19 +441,19 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
     return (
       <>
         <div
-          className={`safe-area-top flex min-h-20 items-center border-b border-white/10 ${
+          className={`safe-area-top flex min-h-20 items-center border-b border-[var(--color-border)] ${
             collapsed
               ? "justify-center gap-1 px-2"
               : "justify-between gap-2 px-3"
           }`}
         >
-          <Brand inverse compact={collapsed} />
+          <Brand compact={collapsed} />
           {mobile ? (
             <button
               ref={closeButtonRef}
               type="button"
               onClick={() => setMenuOpen(false)}
-              className="focus-ring grid min-h-11 min-w-11 place-items-center rounded-xl text-white/70 hover:bg-white/10 hover:text-white"
+              className="focus-ring grid min-h-11 min-w-11 place-items-center rounded-full text-[var(--color-muted)] hover:bg-[var(--color-surface-inset)] hover:text-[var(--color-ink)]"
               aria-label="Cerrar menú"
             >
               <X size={20} aria-hidden="true" />
@@ -463,7 +463,7 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
               <button
                 type="button"
                 onClick={() => setSidebarCollapsed((current) => !current)}
-                className="focus-ring grid min-h-10 min-w-10 place-items-center rounded-xl border border-white/30 bg-white/5 text-white transition hover:border-white/60 hover:bg-white/15"
+                className="focus-ring grid min-h-10 min-w-10 place-items-center rounded-full border border-[var(--color-border)] text-[var(--color-ink)] transition hover:bg-[var(--color-surface-inset)]"
                 aria-label={toggleLabel}
                 aria-expanded={!collapsed}
               >
@@ -495,12 +495,12 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
                           }
                           aria-expanded={expanded}
                           aria-controls={contentId}
-                          className={`focus-ring flex min-h-11 w-full items-center justify-between gap-3 rounded-xl border px-3 text-left text-sm font-extrabold tracking-normal transition hover:border-[#f97316] hover:bg-[#f97316]/10 hover:text-[#fb923c] ${
+                          className={`focus-ring flex min-h-11 w-full items-center justify-between gap-3 rounded-full px-4 text-left text-sm font-medium tracking-normal transition hover:bg-[var(--color-surface-inset)] ${
                             expanded
-                              ? "border-white/15 bg-white/10 text-white shadow-sm"
+                              ? "bg-[var(--color-surface-inset)] text-[var(--color-ink)]"
                               : groupHasActiveItem
-                                ? "border-white/10 bg-white/5 text-white"
-                                : "border-transparent text-white/80"
+                                ? "font-bold text-[var(--color-ink)]"
+                                : "text-[var(--color-muted)]"
                           }`}
                         >
                           <span>{group.label}</span>
@@ -547,10 +547,10 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
                                       href={href}
                                       aria-current={active ? "page" : undefined}
                                       onClick={() => setMenuOpen(false)}
-                                      className={`focus-ring flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-extrabold transition ${
+                                      className={`focus-ring flex min-h-11 items-center gap-3 rounded-full px-4 text-sm font-medium transition ${
                                         active
-                                          ? "bg-[#f97316] text-[#17174a]"
-                                          : "text-white/70 hover:bg-white/10 hover:text-white"
+                                          ? "bg-[var(--color-accent-soft)] font-bold text-[var(--color-accent-text)]"
+                                          : "text-[var(--color-muted)] hover:bg-[var(--color-surface-inset)] hover:text-[var(--color-ink)]"
                                       }`}
                                     >
                                       <Icon
@@ -572,16 +572,16 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
                 })}
             </nav>
 
-            <div className="mt-7 rounded-2xl border border-white/15 bg-white/5 p-3 lg:mt-auto">
+            <div className="mt-7 rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-3 lg:mt-auto">
               <div className="flex items-center gap-3">
-                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#fb923c] text-xs font-black text-[#17174a]">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[var(--color-primary)] text-xs font-bold text-[var(--color-on-primary)]">
                   {initials(user.codigo || user.email)}
                 </span>
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-black text-white">
+                  <p className="truncate text-sm font-bold text-[var(--color-ink)]">
                     {user.codigo}
                   </p>
-                  <p className="truncate text-[11px] font-semibold text-white/65">
+                  <p className="truncate text-xs font-medium text-[var(--color-muted)]">
                     {roleLabels[user.rol]}
                   </p>
                 </div>
@@ -590,7 +590,7 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
                 type="button"
                 onClick={() => void logout()}
                 disabled={loggingOut}
-                className="focus-ring mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/15 px-3 text-xs font-extrabold text-white/70 hover:bg-white/10 hover:text-white disabled:opacity-50"
+                className="focus-ring mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-full border border-[var(--color-border)] px-3 text-xs font-medium text-[var(--color-muted)] hover:bg-[var(--color-surface-inset)] hover:text-[var(--color-ink)] disabled:opacity-50"
               >
                 <LogOut size={15} aria-hidden="true" />
                 {loggingOut ? "Saliendo…" : "Cerrar sesión"}
@@ -612,14 +612,12 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
     >
       <a
         href="#portal-main"
-        className="focus-ring fixed left-4 top-4 z-[60] -translate-y-24 rounded-xl bg-white px-4 py-3 font-black text-[#17174a] shadow-xl transition focus:translate-y-0"
+        className="focus-ring fixed left-4 top-4 z-[60] -translate-y-24 rounded-full bg-[var(--color-surface)] px-4 py-3 font-bold text-[var(--color-ink)] shadow-[var(--shadow-float)] transition focus:translate-y-0"
       >
         Saltar al contenido
       </a>
       <aside
-        className={`sticky top-0 hidden h-screen flex-col bg-[#17174a] lg:flex ${
-          sidebarCollapsed ? "border-r border-white/40" : ""
-        }`}
+        className={`sticky top-0 hidden h-screen flex-col border-r border-[var(--color-border)] bg-[var(--color-surface)] lg:flex`}
       >
         {sidebar()}
       </aside>
@@ -629,7 +627,7 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
           <button
             type="button"
             aria-label="Cerrar menú"
-            className="absolute inset-0 bg-black/55 backdrop-blur-sm"
+            className="absolute inset-0 bg-[var(--color-scrim)]"
             onClick={() => setMenuOpen(false)}
           />
           <aside
@@ -637,7 +635,7 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
             role="dialog"
             aria-modal="true"
             aria-label="Menú del portal"
-            className="relative flex h-full w-[min(86vw,19rem)] flex-col bg-[#17174a] shadow-2xl"
+            className="relative flex h-full w-[min(86vw,19rem)] flex-col bg-[var(--color-surface)] shadow-[var(--shadow-float)]"
           >
             {sidebar(true)}
           </aside>
@@ -645,12 +643,12 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
       )}
 
       <div className="min-w-0">
-        <header className="safe-area-top sticky top-0 z-30 flex min-h-17 items-center justify-between border-b border-[#dde1ea] bg-[#f6f7fb]/95 px-4 backdrop-blur-xl sm:px-7 lg:justify-end">
+        <header className="safe-area-top sticky top-0 z-30 flex min-h-17 items-center justify-between border-b border-[var(--color-border)] bg-[var(--color-canvas)]/95 px-4 backdrop-blur-xl sm:px-7 lg:justify-end">
           <button
             ref={menuButtonRef}
             type="button"
             onClick={() => setMenuOpen(true)}
-            className="focus-ring grid min-h-11 min-w-11 place-items-center rounded-xl border border-[#dde1ea] bg-white lg:hidden"
+            className="focus-ring grid min-h-11 min-w-11 place-items-center rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] lg:hidden"
             aria-label="Abrir menú"
             aria-expanded={menuOpen}
           >
@@ -658,12 +656,12 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
           </button>
           <div className="flex items-center gap-3">
             <div className="hidden text-right sm:block">
-              <p className="text-xs font-black">{user.codigo}</p>
-              <p className="text-[11px] font-semibold text-[#667085]">
+              <p className="text-xs font-bold">{user.codigo}</p>
+              <p className="text-xs font-medium text-[var(--color-muted)]">
                 {user.email}
               </p>
             </div>
-            <span className="grid h-11 w-11 place-items-center rounded-xl bg-[#f97316] text-[11px] font-black">
+            <span className="grid h-11 w-11 place-items-center rounded-full bg-[var(--color-primary)] text-xs font-bold text-[var(--color-on-primary)]">
               {initials(user.codigo || user.email)}
             </span>
           </div>

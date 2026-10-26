@@ -62,12 +62,12 @@ export function TermsAndConditions() {
 
   return (
     <>
-      <p className="mt-8 text-center text-xs leading-5 text-[#667085]">
+      <p className="mt-8 text-center text-xs leading-5 text-[var(--color-muted)]">
         Al ingresar aceptas los{" "}
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="focus-ring rounded font-extrabold text-[#ea580c] underline decoration-[#f97316]/45 underline-offset-4 hover:text-[#c2410c]"
+          className="focus-ring rounded font-medium text-[var(--color-accent-text)] underline decoration-[var(--color-accent)] underline-offset-4 hover:text-[var(--color-primary-hover)]"
         >
           Términos y condiciones
         </button>
@@ -80,8 +80,8 @@ export function TermsAndConditions() {
         title="Términos y condiciones de uso"
         description="Última actualización: 6 de octubre de 2026"
       >
-        <article className="space-y-6 text-sm leading-7 text-[#475467]">
-          <div className="rounded-2xl border border-[#fed7aa] bg-[#fff1e8] p-4 text-[#7c2d12]">
+        <article className="space-y-6 text-sm leading-7 text-[var(--color-muted)]">
+          <div className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-accent-soft)] p-4 text-[var(--color-ink)]">
             Estos términos regulan el uso del portal Ares. La organización
             responsable debe complementarlos con su identidad legal, datos de
             contacto, aviso de privacidad y políticas institucionales
@@ -90,13 +90,15 @@ export function TermsAndConditions() {
 
           {terms.map((term) => (
             <section key={term.title}>
-              <h3 className="font-black text-[#17174a]">{term.title}</h3>
+              <h3 className="font-bold text-[var(--color-ink)]">
+                {term.title}
+              </h3>
               <p className="mt-1">{term.content}</p>
             </section>
           ))}
 
           <section>
-            <h3 className="font-black text-[#17174a]">11. Contacto</h3>
+            <h3 className="font-bold text-[var(--color-ink)]">11. Contacto</h3>
             <p className="mt-1">
               Para solicitar ayuda, reportar un incidente, aclarar estos
               términos o ejercer derechos relacionados con tus datos, utiliza
@@ -105,11 +107,11 @@ export function TermsAndConditions() {
             </p>
           </section>
 
-          <div className="flex justify-end border-t border-[#dde1ea] pt-5">
+          <div className="flex justify-end border-t border-[var(--color-border)] pt-5">
             <button
               type="button"
               onClick={() => setOpen(false)}
-              className="focus-ring min-h-11 rounded-xl bg-[#f97316] px-5 text-sm font-black text-[#17174a] hover:bg-[#ea580c]"
+              className="focus-ring min-h-11 rounded-full bg-[var(--color-primary)] px-5 text-sm font-bold text-[var(--color-on-primary)] hover:bg-[var(--color-primary-hover)]"
             >
               Entendido
             </button>

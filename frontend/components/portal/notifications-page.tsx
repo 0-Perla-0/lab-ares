@@ -72,7 +72,7 @@ export function NotificationsPage() {
       {!items.length && <p>No hay notificaciones en esta página.</p>}
       <ul className="space-y-4">
         {items.map((item) => (
-          <li key={item.id} className="rounded-xl border p-4">
+          <li key={item.id} className="rounded-[var(--radius-card)] border p-4">
             <h2 className="font-bold">{item.type.replaceAll("_", " ")}</h2>
             <time dateTime={item.createdAt}>
               {new Date(item.createdAt).toLocaleString("es-MX")}

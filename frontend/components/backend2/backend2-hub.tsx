@@ -60,7 +60,7 @@ export function Backend2Hub() {
               <Boxes size={18} aria-hidden="true" />
               <h2
                 id={headingId}
-                className="text-sm font-black uppercase tracking-[0.12em] text-[var(--ares-muted)]"
+                className="text-sm font-bold uppercase tracking-[var(--tracking-eyebrow)] text-[var(--ares-muted)]"
               >
                 {group.label}
               </h2>
@@ -72,14 +72,14 @@ export function Backend2Hub() {
                   <Link
                     key={item.href}
                     href={item.href}
-                    className="focus-ring group min-h-32 rounded-2xl border border-[var(--ares-border)] bg-[var(--ares-surface)] p-5 shadow-sm transition hover:border-[var(--ares-border-strong)] hover:shadow-md"
+                    className="focus-ring group min-h-32 rounded-[var(--radius-card)] border border-[var(--ares-border)] bg-[var(--ares-surface)] p-5 transition hover:border-[var(--ares-border-strong)] hover:shadow-md"
                   >
                     <Icon
                       size={22}
                       className="text-[var(--ares-focus)]"
                       aria-hidden="true"
                     />
-                    <h3 className="mt-4 font-black">{item.label}</h3>
+                    <h3 className="mt-4 font-bold">{item.label}</h3>
                     <p className="mt-1 text-sm leading-6 text-[var(--ares-muted)]">
                       {item.description}
                     </p>

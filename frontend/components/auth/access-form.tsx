@@ -49,8 +49,8 @@ export function AccessForm({
     }
   }
   return (
-    <main className="mx-auto max-w-lg space-y-6 px-5 py-12">
-      <h1 className="text-3xl font-black">
+    <main className="mx-4 my-12 max-w-lg space-y-6 rounded-[var(--radius-card-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-6 sm:mx-auto sm:p-9">
+      <h1 className="text-3xl font-bold tracking-[-0.02em]">
         {invitation
           ? "Activar cuenta"
           : token
@@ -58,7 +58,7 @@ export function AccessForm({
             : "Recuperar acceso"}
       </h1>
       {error && (
-        <p role="alert" className="text-red-700">
+        <p role="alert" className="text-[var(--color-danger)]">
           {error}
         </p>
       )}
@@ -110,13 +110,16 @@ export function AccessForm({
           )}
           <button
             disabled={busy || (invitation && !token)}
-            className="focus-ring min-h-11 rounded-xl bg-[#17174a] px-5 text-white disabled:opacity-50"
+            className="focus-ring min-h-11 rounded-full bg-[var(--color-primary)] px-5 text-sm font-bold text-[var(--color-on-primary)] shadow-[var(--shadow-button)] hover:bg-[var(--color-primary-hover)] disabled:opacity-50"
           >
             {busy ? "Procesando…" : "Continuar"}
           </button>
         </form>
       )}
-      <Link href="/login" className="focus-ring inline-block underline">
+      <Link
+        href="/login"
+        className="focus-ring inline-block rounded-md text-sm font-medium text-[var(--color-accent-text)] underline underline-offset-4 hover:text-[var(--color-primary-hover)]"
+      >
         Volver al inicio de sesión
       </Link>
     </main>

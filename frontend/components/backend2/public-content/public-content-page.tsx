@@ -44,7 +44,7 @@ export function PublicContentPage({
   return (
     <>
       <PublicHeader />
-      <main className="min-h-[70vh] bg-[#f6f7fb] px-5 py-14 sm:px-8 sm:py-20">
+      <main className="min-h-[70vh] bg-[var(--color-surface-inset)] px-5 py-14 sm:px-8 sm:py-20">
         <div className="mx-auto max-w-4xl">
           {loading && !page ? (
             <LoadingTable />
@@ -52,13 +52,13 @@ export function PublicContentPage({
             <LoadError message={error} onRetry={() => void load()} />
           ) : page ? (
             <article>
-              <p className="text-xs font-black uppercase tracking-[0.2em] text-[#ea580c]">
+              <p className="text-xs font-bold uppercase tracking-[var(--tracking-eyebrow)] text-[var(--color-accent-text)]">
                 Información institucional
               </p>
-              <h1 className="mt-3 text-4xl font-black tracking-[-0.05em] sm:text-6xl">
+              <h1 className="mt-3 text-4xl font-bold tracking-[-0.05em] sm:text-6xl">
                 {page.titulo}
               </h1>
-              <p className="mt-4 text-sm text-[#667085]">
+              <p className="mt-4 text-sm text-[var(--color-muted)]">
                 Versión {page.metadata.version} · contenido publicado
               </p>
               <div className="mt-10 space-y-5">
@@ -81,12 +81,12 @@ export function PublicContentPage({
 function SafeBlock({ block }: { block: PublicBlock }) {
   if (block.tipo === "TEXTO")
     return (
-      <p className="whitespace-pre-line text-base leading-8 text-[#667085]">
+      <p className="whitespace-pre-line text-base leading-8 text-[var(--color-muted)]">
         {block.contenido.texto}
       </p>
     );
   if (block.tipo === "ENCABEZADO") {
-    const className = "font-black tracking-[-0.035em] text-[#17174a]";
+    const className = "font-bold tracking-[-0.035em] text-[var(--color-ink)]";
     if (block.contenido.nivel <= 2)
       return (
         <h2 className={`${className} pt-4 text-3xl`}>
@@ -107,7 +107,7 @@ function SafeBlock({ block }: { block: PublicBlock }) {
     const Tag = block.contenido.ordenada ? "ol" : "ul";
     return (
       <Tag
-        className={`space-y-2 pl-6 leading-7 text-[#667085] ${block.contenido.ordenada ? "list-decimal" : "list-disc"}`}
+        className={`space-y-2 pl-6 leading-7 text-[var(--color-muted)] ${block.contenido.ordenada ? "list-decimal" : "list-disc"}`}
       >
         {block.contenido.elementos.map((item) => (
           <li key={item}>{item}</li>
@@ -121,7 +121,7 @@ function SafeBlock({ block }: { block: PublicBlock }) {
         href={block.contenido.url}
         target={block.contenido.nuevaVentana ? "_blank" : undefined}
         rel={block.contenido.nuevaVentana ? "noreferrer" : undefined}
-        className="focus-ring inline-flex min-h-11 items-center rounded-xl bg-[#17174a] px-5 text-sm font-black text-white"
+        className="focus-ring inline-flex min-h-11 items-center rounded-full bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] px-5 text-sm font-bold text-[var(--color-on-primary)]"
       >
         {block.contenido.etiqueta}
       </Link>
@@ -129,14 +129,14 @@ function SafeBlock({ block }: { block: PublicBlock }) {
   if (block.tipo === "AVISO") {
     const tone =
       block.contenido.tono === "ADVERTENCIA"
-        ? "border-amber-200 bg-amber-50 text-amber-900"
+        ? "border-[var(--color-warning-border)] bg-[var(--color-warning-soft)] text-[var(--color-warning-text)]"
         : block.contenido.tono === "EXITO"
-          ? "border-emerald-200 bg-emerald-50 text-emerald-900"
-          : "border-sky-200 bg-sky-50 text-sky-900";
+          ? "border-[var(--color-success-border)] bg-[var(--color-success-soft)] text-[var(--color-success-text)]"
+          : "border-[var(--color-info-border)] bg-[var(--color-info-soft)] text-[var(--color-info-text)]";
     return (
-      <aside className={`rounded-2xl border p-5 ${tone}`}>
+      <aside className={`rounded-[var(--radius-card)] border p-5 ${tone}`}>
         {block.contenido.titulo && (
-          <h2 className="font-black">{block.contenido.titulo}</h2>
+          <h2 className="font-bold">{block.contenido.titulo}</h2>
         )}
         <p className="mt-1 whitespace-pre-line text-sm leading-6">
           {block.contenido.texto}
@@ -146,11 +146,11 @@ function SafeBlock({ block }: { block: PublicBlock }) {
   }
   if (block.tipo === "FAQ")
     return (
-      <details className="rounded-2xl border border-[#dde1ea] bg-white p-5">
-        <summary className="focus-ring cursor-pointer rounded-lg font-black">
+      <details className="rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
+        <summary className="focus-ring cursor-pointer rounded-lg font-bold">
           {block.contenido.pregunta}
         </summary>
-        <p className="mt-4 whitespace-pre-line text-sm leading-7 text-[#667085]">
+        <p className="mt-4 whitespace-pre-line text-sm leading-7 text-[var(--color-muted)]">
           {block.contenido.respuesta}
         </p>
       </details>
@@ -174,23 +174,23 @@ function PublicAssetImage({
         .catch(() => setUrl(""));
   }, [block.activo]);
   return (
-    <figure className="overflow-hidden rounded-2xl border border-[#dde1ea] bg-white p-3">
+    <figure className="overflow-hidden rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
       {url ? (
         <img
           src={url}
           alt={block.contenido.alt}
-          className="h-auto w-full rounded-xl object-cover"
+          className="h-auto w-full rounded-[var(--radius-card)] object-cover"
         />
       ) : (
         <div
           role="status"
-          className="grid min-h-48 place-items-center text-sm font-bold text-[#667085]"
+          className="grid min-h-48 place-items-center text-sm font-bold text-[var(--color-muted)]"
         >
           Cargando imagen…
         </div>
       )}
       {block.contenido.pie && (
-        <figcaption className="px-2 pb-1 pt-3 text-sm text-[#667085]">
+        <figcaption className="px-2 pb-1 pt-3 text-sm text-[var(--color-muted)]">
           {block.contenido.pie}
         </figcaption>
       )}

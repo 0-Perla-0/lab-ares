@@ -190,14 +190,14 @@ export function GamificationPage() {
                 className={inputClassName}
               />
             </Field>
-            <button className="focus-ring min-h-11 rounded-xl bg-[var(--ares-ink)] px-4 text-sm font-black text-white">
+            <button className="focus-ring min-h-11 rounded-full bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] px-4 text-sm font-bold text-[var(--color-on-primary)]">
               Consultar
             </button>
             {adminUserId && (
               <button
                 type="button"
                 onClick={() => setAdminUserId(undefined)}
-                className="focus-ring min-h-11 rounded-xl border border-[var(--ares-border-strong)] px-4 text-sm font-black"
+                className="focus-ring min-h-11 rounded-full border border-[var(--ares-border-strong)] px-4 text-sm font-bold"
               >
                 Volver a mi perfil
               </button>
@@ -231,7 +231,7 @@ export function GamificationPage() {
           aria-valuenow={profile.puntos % profile.puntosPorNivel}
         >
           <div
-            className="h-full rounded-full bg-[#ea580c] transition-[width]"
+            className="h-full rounded-full bg-[var(--color-primary)] transition-[width]"
             style={{ width: `${progress}%` }}
           />
         </div>
@@ -250,16 +250,16 @@ export function GamificationPage() {
             {profile.insignias.map((badge) => (
               <article
                 key={`${badge.codigo}-${badge.version}`}
-                className="rounded-2xl border border-amber-200 bg-amber-50 p-4"
+                className="rounded-[var(--radius-card)] border border-[var(--color-warning-border)] bg-[var(--color-warning-soft)] p-4"
               >
-                <Award className="text-amber-700" />
-                <h3 className="mt-3 font-black text-amber-950">
+                <Award className="text-[var(--color-warning-text)]" />
+                <h3 className="mt-3 font-bold text-[var(--color-warning-text)]">
                   {badge.nombre}
                 </h3>
-                <p className="mt-1 text-sm text-amber-900">
+                <p className="mt-1 text-sm text-[var(--color-warning-text)]">
                   {badge.descripcion}
                 </p>
-                <p className="mt-3 text-xs font-black text-amber-800">
+                <p className="mt-3 text-xs font-bold text-[var(--color-warning-text)]">
                   {badge.umbralPuntos} XP
                 </p>
               </article>
@@ -308,15 +308,15 @@ function Metric({
   value: string;
 }) {
   return (
-    <article className="rounded-2xl border border-[var(--ares-border)] bg-[var(--ares-surface)] p-5 shadow-sm">
+    <article className="rounded-[var(--radius-card)] border border-[var(--ares-border)] bg-[var(--ares-surface)] p-5">
       <div
-        className="grid h-11 w-11 place-items-center rounded-xl bg-[#ffe0d0] text-[#c2410c]"
+        className="grid h-11 w-11 place-items-center rounded-full bg-[var(--color-accent-soft)] text-[var(--color-accent-text)]"
         aria-hidden="true"
       >
         {icon}
       </div>
       <p className="mt-4 text-sm font-bold text-[var(--ares-muted)]">{label}</p>
-      <strong className="mt-1 block text-3xl font-black">{value}</strong>
+      <strong className="mt-1 block text-3xl font-bold">{value}</strong>
     </article>
   );
 }
@@ -347,13 +347,15 @@ function EventList({
       {events.map((event) => (
         <li
           key={event.id}
-          className="flex flex-col gap-3 rounded-xl border border-[var(--ares-border)] p-4 sm:flex-row sm:items-center sm:justify-between"
+          className="flex flex-col gap-3 rounded-[var(--radius-card)] border border-[var(--ares-border)] p-4 sm:flex-row sm:items-center sm:justify-between"
         >
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <strong
                 className={
-                  event.puntos >= 0 ? "text-emerald-800" : "text-red-700"
+                  event.puntos >= 0
+                    ? "text-[var(--color-success-text)]"
+                    : "text-[var(--color-danger)]"
                 }
               >
                 {event.puntos >= 0 ? "+" : ""}
@@ -383,7 +385,7 @@ function EventList({
                 type="button"
                 disabled={busy}
                 onClick={() => onReverse(event)}
-                className="focus-ring min-h-11 rounded-xl border border-red-200 px-3 text-sm font-black text-red-700 disabled:opacity-45"
+                className="focus-ring min-h-11 rounded-full border border-[var(--color-danger-border)] px-3 text-sm font-bold text-[var(--color-danger)] disabled:opacity-45"
               >
                 Revertir
               </button>
@@ -412,33 +414,33 @@ function AdminPanel({
         <button
           type="button"
           onClick={() => onOpen("rule")}
-          className="focus-ring min-h-11 rounded-xl bg-[var(--ares-ink)] px-4 text-sm font-black text-white"
+          className="focus-ring min-h-11 rounded-full bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] px-4 text-sm font-bold text-[var(--color-on-primary)]"
         >
           Nueva regla
         </button>
         <button
           type="button"
           onClick={() => onOpen("badge")}
-          className="focus-ring min-h-11 rounded-xl border border-[var(--ares-border-strong)] px-4 text-sm font-black"
+          className="focus-ring min-h-11 rounded-full border border-[var(--ares-border-strong)] px-4 text-sm font-bold"
         >
           Nueva insignia
         </button>
         <button
           type="button"
           onClick={() => onOpen("recognition")}
-          className="focus-ring min-h-11 rounded-xl border border-[var(--ares-border-strong)] px-4 text-sm font-black"
+          className="focus-ring min-h-11 rounded-full border border-[var(--ares-border-strong)] px-4 text-sm font-bold"
         >
           Reconocimiento manual
         </button>
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
         <div>
-          <h3 className="font-black">Reglas ({rules.length})</h3>
+          <h3 className="font-bold">Reglas ({rules.length})</h3>
           <div className="mt-3 space-y-2">
             {rules.map((rule) => (
               <div
                 key={rule.id}
-                className="rounded-xl bg-[var(--ares-surface-soft)] p-3 text-sm"
+                className="rounded-[var(--radius-card)] bg-[var(--ares-surface-soft)] p-3 text-sm"
               >
                 <strong>
                   {rule.codigo} v{rule.version}
@@ -452,12 +454,12 @@ function AdminPanel({
           </div>
         </div>
         <div>
-          <h3 className="font-black">Insignias ({badges.length})</h3>
+          <h3 className="font-bold">Insignias ({badges.length})</h3>
           <div className="mt-3 space-y-2">
             {badges.map((badge) => (
               <div
                 key={`${badge.codigo}-${badge.version}`}
-                className="rounded-xl bg-[var(--ares-surface-soft)] p-3 text-sm"
+                className="rounded-[var(--radius-card)] bg-[var(--ares-surface-soft)] p-3 text-sm"
               >
                 <strong>
                   {badge.nombre} · v{badge.version}
@@ -591,10 +593,13 @@ function AdminFormModal({
 function Unavailable() {
   return (
     <div className="grid min-h-[55vh] place-items-center text-center">
-      <div className="max-w-lg rounded-3xl border border-amber-200 bg-amber-50 p-8">
-        <ShieldCheck size={38} className="mx-auto text-amber-700" />
-        <h1 className="mt-4 text-3xl font-black">Gamificación no disponible</h1>
-        <p className="mt-3 text-sm leading-6 text-amber-900">
+      <div className="max-w-lg rounded-[var(--radius-card-lg)] border border-[var(--color-warning-border)] bg-[var(--color-warning-soft)] p-8">
+        <ShieldCheck
+          size={38}
+          className="mx-auto text-[var(--color-warning-text)]"
+        />
+        <h1 className="mt-4 text-3xl font-bold">Gamificación no disponible</h1>
+        <p className="mt-3 text-sm leading-6 text-[var(--color-warning-text)]">
           La función está desactivada por configuración institucional. Tu
           actividad sigue operando normalmente y no se publica ningún ranking.
         </p>

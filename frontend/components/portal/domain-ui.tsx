@@ -5,7 +5,7 @@ import { socialError, socialMutation } from "@/lib/service-social";
 import { Field, inputClassName } from "@/components/ui/primitives";
 import { pendingIdempotencyKey } from "@/lib/attendance";
 export const actionClass =
-  "focus-ring min-h-11 rounded-xl border px-4 py-2 disabled:opacity-50";
+  "focus-ring min-h-11 rounded-full border px-4 py-2 disabled:opacity-50";
 export function DomainInput({
   name,
   label,

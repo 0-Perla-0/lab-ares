@@ -51,7 +51,7 @@ export function SessionExpirationWarning() {
   return (
     <section
       aria-label="Caducidad de sesión"
-      className="m-4 rounded-xl border border-amber-300 bg-amber-50 p-4"
+      className="m-4 rounded-[var(--radius-card)] border border-[var(--color-warning-border)] bg-[var(--color-warning-soft)] p-4"
     >
       <p role="status">
         {remaining

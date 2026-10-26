@@ -108,7 +108,7 @@ export function DirectoryPage() {
       {notice && (
         <div
           role="status"
-          className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-900"
+          className="rounded-[var(--radius-card)] border border-[var(--color-success-border)] bg-[var(--color-success-soft)] p-4 text-sm font-bold text-[var(--color-success-text)]"
         >
           {notice}
         </div>
@@ -154,7 +154,7 @@ export function DirectoryPage() {
                 placeholder="Buscar…"
               />
             </Field>
-            <button className="focus-ring inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#17174a] px-5 text-sm font-black text-white">
+            <button className="focus-ring inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] px-5 text-sm font-bold text-[var(--color-on-primary)]">
               <Search size={17} /> Buscar
             </button>
           </form>
@@ -199,7 +199,7 @@ export function DirectoryPage() {
               type="button"
               disabled={saving}
               onClick={() => void savePreferences()}
-              className="focus-ring mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#17174a] px-5 text-sm font-black text-white"
+              className="focus-ring mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] px-5 text-sm font-bold text-[var(--color-on-primary)]"
             >
               <ShieldCheck size={17} />{" "}
               {saving ? "Guardando…" : "Guardar privacidad"}
@@ -216,7 +216,7 @@ export function DirectoryPage() {
               <button
                 type="button"
                 onClick={() => setResultsOpen(true)}
-                className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[#dde1ea] px-4 text-sm font-black text-[#17174a] transition hover:border-[#f97316] hover:bg-[#fff1e8]"
+                className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-[var(--color-border)] px-4 text-sm font-bold text-[var(--color-ink)] transition hover:border-[var(--color-accent)] hover:bg-[var(--color-accent-soft)]"
               >
                 <Maximize2 size={16} aria-hidden="true" /> Expandir
               </button>
@@ -271,14 +271,14 @@ export function DirectoryPage() {
 
 function DirectoryEntryCard({ entry }: { entry: DirectoryEntry }) {
   return (
-    <article className="rounded-2xl border border-[var(--ares-border)] p-4">
+    <article className="rounded-[var(--radius-card)] border border-[var(--ares-border)] p-4">
       <div
-        className="grid h-11 w-11 place-items-center rounded-full bg-[#f97316] font-black text-[#17174a]"
+        className="grid h-11 w-11 place-items-center rounded-full bg-[var(--color-primary)] font-bold text-[var(--color-on-primary)]"
         aria-hidden="true"
       >
         {entry.codigo.slice(0, 2).toUpperCase()}
       </div>
-      <h3 className="mt-3 font-black">{entry.codigo}</h3>
+      <h3 className="mt-3 font-bold">{entry.codigo}</h3>
       <p className="mt-1 text-xs font-bold uppercase tracking-wide text-[var(--ares-muted)]">
         {entry.rol.replaceAll("_", " ")}
       </p>
@@ -288,7 +288,7 @@ function DirectoryEntryCard({ entry }: { entry: DirectoryEntry }) {
       {entry.email ? (
         <a
           href={`mailto:${entry.email}`}
-          className="focus-ring mt-3 inline-flex min-h-11 max-w-full items-center gap-2 break-all rounded-xl border border-[var(--ares-border-strong)] px-3 text-sm font-black"
+          className="focus-ring mt-3 inline-flex min-h-11 max-w-full items-center gap-2 break-all rounded-[var(--radius-card)] border border-[var(--ares-border-strong)] px-3 text-sm font-bold"
         >
           <Mail size={16} className="shrink-0" aria-hidden="true" />
           {entry.email}
@@ -312,7 +312,7 @@ function Toggle({
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <label className="flex min-h-14 cursor-pointer items-center gap-3 rounded-xl border border-[var(--ares-border)] p-3 text-sm font-black">
+    <label className="flex min-h-14 cursor-pointer items-center gap-3 rounded-[var(--radius-card)] border border-[var(--ares-border)] p-3 text-sm font-bold">
       <input
         type="checkbox"
         checked={checked}

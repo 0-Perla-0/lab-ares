@@ -206,13 +206,13 @@ export function UserEditorPage(props: Props) {
       className={
         isModal
           ? ""
-          : "mt-8 rounded-[1.6rem] border border-[#dde1ea] bg-white p-5 shadow-[0_8px_30px_rgba(23,23,74,0.035)] sm:p-8"
+          : "mt-8 rounded-[var(--radius-card-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5 sm:p-8"
       }
     >
       {invitationLink && (
         <section
           aria-label="Invitación creada"
-          className="mb-6 space-y-3 rounded-xl border p-4"
+          className="mb-6 space-y-3 rounded-[var(--radius-card)] border p-4"
         >
           <p role="status">
             Invitación creada. Comparte el enlace privado sólo con la persona
@@ -239,8 +239,8 @@ export function UserEditorPage(props: Props) {
         </section>
       )}
       <fieldset>
-        <legend className="text-base font-black">Identidad y acceso</legend>
-        <p className="mt-1 text-xs text-[#667085]">
+        <legend className="text-base font-bold">Identidad y acceso</legend>
+        <p className="mt-1 text-xs text-[var(--color-muted)]">
           Datos utilizados para identificar e iniciar sesión.
         </p>
         <div className="mt-5 grid gap-5 md:grid-cols-2">
@@ -291,13 +291,13 @@ export function UserEditorPage(props: Props) {
         </div>
       </fieldset>
 
-      <div className="my-8 border-t border-[#dde1ea]" />
+      <div className="my-8 border-t border-[var(--color-border)]" />
 
       <fieldset>
-        <legend className="text-base font-black">
+        <legend className="text-base font-bold">
           Responsabilidad y ubicación
         </legend>
-        <p className="mt-1 text-xs text-[#667085]">
+        <p className="mt-1 text-xs text-[var(--color-muted)]">
           La jerarquía limita los roles y asignaciones que puedes administrar.
         </p>
         <div className="mt-5 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
@@ -374,20 +374,20 @@ export function UserEditorPage(props: Props) {
       <div className="mt-7">
         <ErrorBanner message={formError} />
       </div>
-      <div className="mt-8 flex flex-col-reverse gap-3 border-t border-[#dde1ea] pt-6 sm:flex-row sm:justify-end">
+      <div className="mt-8 flex flex-col-reverse gap-3 border-t border-[var(--color-border)] pt-6 sm:flex-row sm:justify-end">
         {isModal && props.mode === "create" ? (
           <button
             type="button"
             onClick={props.onCancel}
             disabled={saving}
-            className="focus-ring rounded-xl border border-[#dde1ea] px-5 py-2.5 text-center text-sm font-extrabold hover:bg-[#eef0f6] disabled:opacity-50"
+            className="focus-ring rounded-full border border-[var(--color-border)] px-5 py-2.5 text-center text-sm font-bold hover:bg-[var(--color-surface-inset)] disabled:opacity-50"
           >
             Cancelar
           </button>
         ) : (
           <Link
             href="/portal/usuarios"
-            className="focus-ring rounded-xl border border-[#dde1ea] px-5 py-2.5 text-center text-sm font-extrabold hover:bg-[#eef0f6]"
+            className="focus-ring rounded-full border border-[var(--color-border)] px-5 py-2.5 text-center text-sm font-bold hover:bg-[var(--color-surface-inset)]"
           >
             Cancelar
           </Link>
@@ -395,7 +395,7 @@ export function UserEditorPage(props: Props) {
         <button
           type="submit"
           disabled={saving || !!invitationLink}
-          className="focus-ring inline-flex items-center justify-center gap-2 rounded-xl bg-[#17174a] px-5 py-2.5 text-sm font-black text-white hover:bg-[#25256d] disabled:cursor-wait disabled:opacity-65"
+          className="focus-ring inline-flex items-center justify-center gap-2 rounded-full bg-[var(--color-primary)] px-5 py-2.5 text-sm font-bold text-[var(--color-on-primary)] hover:bg-[var(--color-primary-hover)] disabled:cursor-wait disabled:opacity-65"
         >
           {saving ? (
             <LoaderCircle size={16} className="animate-spin" />
@@ -418,23 +418,23 @@ export function UserEditorPage(props: Props) {
     <div className="animate-fade-up">
       <Link
         href="/portal/usuarios"
-        className="focus-ring inline-flex items-center gap-2 rounded-lg text-xs font-black text-[#667085] hover:text-[#17174a]"
+        className="focus-ring inline-flex items-center gap-2 rounded-lg text-xs font-bold text-[var(--color-muted)] hover:text-[var(--color-ink)]"
       >
         <ArrowLeft size={15} /> Volver a usuarios
       </Link>
 
       <div className="mt-6 flex items-start gap-4">
-        <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#f97316]">
+        <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-[var(--color-primary)]">
           <UserRoundPlus size={22} />
         </span>
         <div>
-          <p className="text-[11px] font-black uppercase tracking-[0.19em] text-[#ea580c]">
+          <p className="text-xs font-bold uppercase tracking-[var(--tracking-eyebrow)] text-[var(--color-accent-text)]">
             Equipo
           </p>
-          <h1 className="mt-1 text-3xl font-black tracking-[-0.045em] sm:text-4xl">
+          <h1 className="mt-1 text-3xl font-bold tracking-[-0.045em] sm:text-4xl">
             {isEdit ? `Editar ${item?.codigo}` : "Registrar usuario"}
           </h1>
-          <p className="mt-2 text-sm leading-6 text-[#667085]">
+          <p className="mt-2 text-sm leading-6 text-[var(--color-muted)]">
             {isEdit
               ? "Actualiza identidad, acceso y ubicación dentro de la organización."
               : "Crea un acceso nuevo dentro del alcance permitido por tu rol."}

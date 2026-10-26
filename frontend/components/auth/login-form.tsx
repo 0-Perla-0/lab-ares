@@ -59,7 +59,7 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
     <form onSubmit={submit} className="mt-10 space-y-5">
       {challenge ? (
         <div className="space-y-4">
-          <label htmlFor="mfa-code" className="text-sm font-extrabold">
+          <label htmlFor="mfa-code" className="text-sm font-medium">
             {recovery
               ? "Código de recuperación"
               : "Código de tu aplicación autenticadora"}
@@ -72,7 +72,7 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
             inputMode={recovery ? "text" : "numeric"}
             pattern={recovery ? undefined : "[0-9]{6}"}
             maxLength={recovery ? 32 : 6}
-            className="mt-2 h-13 w-full rounded-2xl border px-4"
+            className="mt-2 h-13 w-full rounded-[var(--radius-input)] border border-[var(--color-control-border)] bg-[var(--color-surface)] px-4"
           />
           <button
             type="button"
@@ -99,7 +99,7 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
           <div>
             <label
               htmlFor="email"
-              className="text-sm font-extrabold text-[#25256d]"
+              className="text-sm font-medium text-[var(--color-ink)]"
             >
               Correo electrónico
             </label>
@@ -110,7 +110,7 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
               autoComplete="email"
               required
               placeholder="inventor@ejemplo.com"
-              className="mt-2 h-13 w-full rounded-2xl border border-[#dde1ea] bg-white px-4 text-sm outline-none transition placeholder:text-[#98a2b3] focus:border-[#ea580c] focus:ring-4 focus:ring-[#f97316]/25"
+              className="mt-2 h-13 w-full rounded-[var(--radius-input)] border border-[var(--color-control-border)] bg-[var(--color-surface)] px-4 text-sm outline-none transition placeholder:text-[var(--color-muted)] focus:border-[var(--color-focus)] focus:ring-4 focus:ring-[var(--color-accent-soft)]"
             />
           </div>
           <Link
@@ -123,13 +123,13 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
             <div className="flex items-center justify-between">
               <label
                 htmlFor="password"
-                className="text-sm font-extrabold text-[#25256d]"
+                className="text-sm font-medium text-[var(--color-ink)]"
               >
                 Contraseña
               </label>
               <Link
                 href="/recuperar-contrasena"
-                className="focus-ring rounded-md text-xs font-bold text-[#667085] underline hover:text-[#17174a]"
+                className="focus-ring rounded-md text-xs font-bold text-[var(--color-muted)] underline hover:text-[var(--color-ink)]"
               >
                 ¿Olvidaste tu contraseña?
               </Link>
@@ -143,12 +143,12 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
                 required
                 maxLength={128}
                 placeholder="Tu contraseña"
-                className="h-13 w-full rounded-2xl border border-[#dde1ea] bg-white px-4 pr-12 text-sm outline-none transition placeholder:text-[#98a2b3] focus:border-[#ea580c] focus:ring-4 focus:ring-[#f97316]/25"
+                className="h-13 w-full rounded-[var(--radius-input)] border border-[var(--color-control-border)] bg-[var(--color-surface)] px-4 pr-12 text-sm outline-none transition placeholder:text-[var(--color-muted)] focus:border-[var(--color-focus)] focus:ring-4 focus:ring-[var(--color-accent-soft)]"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword((visible) => !visible)}
-                className="focus-ring absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-2 text-[#667085] hover:bg-[#f6f7fb]"
+                className="focus-ring absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-2 text-[var(--color-muted)] hover:bg-[var(--color-surface-inset)]"
                 aria-label={
                   showPassword ? "Ocultar contraseña" : "Mostrar contraseña"
                 }
@@ -164,7 +164,7 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
         <div
           role="alert"
           aria-live="polite"
-          className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700"
+          className="rounded-[var(--radius-card)] border border-[var(--color-danger-border)] bg-[var(--color-danger-soft)] px-4 py-3 text-sm font-semibold text-[var(--color-danger)]"
         >
           {error}
         </div>
@@ -173,7 +173,7 @@ export function LoginForm({ redirectTo }: { redirectTo: string }) {
       <button
         type="submit"
         disabled={loading}
-        className="focus-ring flex h-13 w-full items-center justify-center gap-2 rounded-2xl bg-[#f97316] px-5 text-base font-black tracking-[-0.035em] text-[#17174a] transition hover:bg-[#ea580c] disabled:cursor-wait disabled:opacity-70 sm:text-lg"
+        className="focus-ring flex h-13 w-full items-center justify-center gap-2 rounded-full bg-[var(--color-primary)] px-5 text-base font-bold text-[var(--color-on-primary)] shadow-[var(--shadow-button)] transition hover:bg-[var(--color-primary-hover)] disabled:cursor-wait disabled:opacity-70 sm:text-lg"
       >
         {loading ? (
           <>
