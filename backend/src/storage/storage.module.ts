@@ -7,6 +7,7 @@ import { StorageWorker } from "./storage.worker";
 import { StorageReconciler } from "./storage.reconciler";
 import { FilesController } from "./files.controller";
 import { ObjectDeletionService } from "./object-deletion.service";
+import { UploadAdmissionService } from "./upload-admission.service";
 import { OrphanObjectDeletionService } from "./orphan-object-deletion.service";
 
 @Module({
@@ -18,6 +19,7 @@ import { OrphanObjectDeletionService } from "./orphan-object-deletion.service";
     StorageService,
     ObjectDeletionService,
     OrphanObjectDeletionService,
+    UploadAdmissionService,
     StorageWorker,
     StorageReconciler,
     { provide: "MALWARE_SCANNER", useExisting: ClamAvScanner },

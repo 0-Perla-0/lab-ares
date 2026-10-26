@@ -2359,3 +2359,19 @@ model ObjectDeletionAcknowledgement {
   recoveryRunId String? @db.VarChar(30)
   createdAt DateTime @default(now()) @db.DateTime(3)
 }
+
+// Cross-replica upload admission: a counted, leased reservation per in-flight upload.
+// The gate row serializes admission decisions; expired leases free themselves.
+model UploadAdmissionGate {
+  id String @id @db.VarChar(20)
+}
+
+model UploadAdmission {
+  id String @id @default(cuid()) @db.VarChar(30)
+  actorId Int
+  owner String @db.VarChar(80)
+  leaseUntil DateTime @db.DateTime(3)
+  createdAt DateTime @default(now()) @db.DateTime(3)
+  @@index([leaseUntil])
+  @@index([actorId, leaseUntil])
+}

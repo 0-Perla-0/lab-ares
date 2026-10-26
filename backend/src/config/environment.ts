@@ -221,6 +221,25 @@ const environmentSchema = z
       .min(1)
       .max(32)
       .default(4),
+    // Cross-replica admission (0 disables a ceiling). Bounds concurrency, not disk.
+    STORAGE_GLOBAL_UPLOAD_CEILING: z.coerce
+      .number()
+      .int()
+      .min(0)
+      .max(1000)
+      .default(16),
+    STORAGE_USER_UPLOAD_CEILING: z.coerce
+      .number()
+      .int()
+      .min(0)
+      .max(100)
+      .default(3),
+    STORAGE_UPLOAD_LEASE_MS: z.coerce
+      .number()
+      .int()
+      .min(10000)
+      .max(3600000)
+      .default(600000),
     LIBRARY_MAX_BYTES: z.coerce.number().int().positive().default(26214400),
     GAMIFICATION_ENABLED: z
       .union([z.boolean(), z.enum(["true", "false", "1", "0"])])
