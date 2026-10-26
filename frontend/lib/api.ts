@@ -102,6 +102,10 @@ async function parseJson<T>(response: Response): Promise<T | undefined> {
 }
 
 const apiMessages: Record<string, string> = {
+  UPLOAD_CAPACITY_EXCEEDED:
+    "El servicio está recibiendo demasiados archivos. Reintenta en unos minutos.",
+  UPLOAD_USER_CAPACITY_EXCEEDED:
+    "Ya tienes varias cargas en curso. Espera a que terminen antes de subir otra.",
   OBJECT_CLEANUP_DISABLED:
     "La limpieza de objetos está deshabilitada hasta que se apruebe el tratamiento institucional.",
   OBJECT_CLEANUP_OBJECT_REFERENCED:

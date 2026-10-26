@@ -21,13 +21,13 @@ No usar servicios públicos para analizar justificantes/expedientes ni exponer r
 - [Storage](../../../backend/src/storage/), [worker](../../../backend/src/storage/storage.worker.ts), [presupuesto local](../../../backend/src/storage/upload-budget.ts).
 - [Tests](../../../backend/test/unit/storage/), [scanner real](../../../frontend/fullstack/operational.spec.ts), [upload controller](../../../backend/src/storage/files.controller.ts).
 - Desde el 26/10 el worker fija la época en su primera escritura (recuperar leases vencidos) y exige la misma en el reclamo, el resultado del escaneo y el agotamiento; una época movida termina el ciclo sin registrar un falso `ERROR` del scanner y deja el lease expirar.
-- `UploadBudget` usa un Set local por proceso; no impone cuota global. Escaneo/promoción conservan copias; reconciliador rechaza DELETE general.
+- `UploadBudget` sigue siendo el techo local por proceso; la cuota entre réplicas es la admisión arrendada de T3. Escaneo/promoción conservan copias; reconciliador rechaza DELETE general.
 - Dependencias: [borrado](../borrado-objetos/spec.md), [operación](../operacion/spec.md).
 
 ## Tareas y pendientes
 
 - [x] **T1 · código · AC-1/2/3:** Pipeline y descargas autorizadas existentes.
 - [x] **T2 · código · AC-4:** Lifecycle por época y lease en [worker](../../../backend/src/storage/storage.worker.ts) y [análisis](../../../backend/src/storage/storage.service.ts); [pruebas](../../../backend/test/unit/storage/storage.regressions.test.ts) con mocks. El ABA con dos conexiones reales sigue en T5.
-- [ ] **T3 · código · AC-5:** Diseño (26/10): admisión con reserva en MariaDB (fila por usuario/global con contador y lease, liberada al terminar o expirar), no un Set por proceso; requiere migración y límites aprobados. Pendiente de implementar.
+- [x] **T3 · código · AC-5:** Admisión entre réplicas con reservas arrendadas en MariaDB, techo global (`STORAGE_GLOBAL_UPLOAD_CEILING`, 16) y por persona (`STORAGE_USER_UPLOAD_CEILING`, 3), decididas bajo un candado de compuerta; un lease vencido libera solo ([servicio](../../../backend/src/storage/upload-admission.service.ts), [integración con dos conexiones](../../../backend/test/integration/upload-admission.integration.test.ts)). Acota concurrencia, no disco: la cuota de disco y de proxy sigue siendo de despliegue.
 - [x] **T4 · código · AC-6:** Limpieza por fases de copias y huérfanos sin romper referencias ni holds ([borrado](../borrado-objetos/spec.md)); candidatos de sólo lectura en `GET /api/retention/object-cleanup/candidates`.
 - [ ] **T5 · validación · AC-1/4/5:** Scanner caído/lento, disco lleno, subidas concurrentes y límites de proxy.

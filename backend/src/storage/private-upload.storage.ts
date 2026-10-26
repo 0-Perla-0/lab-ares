@@ -5,7 +5,9 @@ import { join } from "node:path";
 import { pipeline } from "node:stream/promises";
 import type { Readable } from "node:stream";
 import type { Request } from "express";
+import { getAuthenticatedUser } from "../auth/authenticated-user";
 import { UploadBudget } from "./upload-budget";
+import { uploadAdmission } from "./upload-admission";
 const budget = new UploadBudget();
 
 export type PrivateUpload = {
@@ -15,12 +17,14 @@ export type PrivateUpload = {
   path: string;
   directory: string;
   reservation?: symbol;
+  admissionSlot?: string;
 };
 export async function cleanupPrivateUpload(file: PrivateUpload) {
   try {
     await rm(file.directory, { recursive: true, force: true });
   } finally {
     budget.release(file.reservation);
+    await uploadAdmission()?.release(file.admissionSlot);
   }
 }
 // Multer's storage-engine protocol. No user-controlled names enter a disk path.
@@ -37,22 +41,32 @@ export const privateUploadStorage = {
         Number(process.env.STORAGE_MAX_CONCURRENT_UPLOADS ?? 4),
       );
       let directory: string | undefined;
+      let admissionSlot: string | undefined;
       try {
+        // Cross-replica ceiling (global and per user) on top of the local one.
+        const admission = uploadAdmission();
+        if (admission) {
+          const actor = getAuthenticatedUser(_req);
+          admissionSlot = await admission.reserve(actor.id);
+        }
         directory = await mkdtemp(join(tmpdir(), "ares-http-upload-"));
         const path = join(directory, "payload");
         const output = createWriteStream(path, { mode: 0o600 });
         await pipeline(file.stream, output);
+        await uploadAdmission()?.renew(admissionSlot);
         callback(null, {
           path,
           directory,
           size: output.bytesWritten,
           reservation,
+          admissionSlot,
         });
       } catch (error) {
         try {
           if (directory) await rm(directory, { recursive: true, force: true });
         } finally {
           budget.release(reservation);
+          await uploadAdmission()?.release(admissionSlot);
         }
         callback(error);
       }
