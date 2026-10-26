@@ -13,7 +13,7 @@ const user = {
 };
 function deps() {
   const tx: any = {
-    $queryRaw: vi.fn(),
+    $queryRaw: vi.fn().mockResolvedValue([]),
     operationalHistory: {
       findFirst: vi.fn(async ({ where }: any) => {
         if (where.recordedAt.gt) return null;
@@ -30,7 +30,7 @@ function deps() {
     },
     absenceEvaluationIssue: { upsert: vi.fn(), deleteMany: vi.fn() },
     recoveryWriteBarrier: {
-      findUnique: vi.fn().mockResolvedValue({ active: false }),
+      findUnique: vi.fn().mockResolvedValue({ active: false, version: 4 }),
     },
     calendarRevision: { findUnique: vi.fn().mockResolvedValue({ version: 0 }) },
     absenceEvaluationProgress: {
@@ -213,5 +213,23 @@ describe("durable absence evaluation", () => {
       "audit unavailable",
     );
     expect(d.tx.absenceEvaluationProgress.update).not.toHaveBeenCalled();
+  });
+  it("does not evaluate in a new epoch after the expiry phase", async () => {
+    const d = deps();
+    d.tx.recoveryWriteBarrier.findUnique
+      .mockResolvedValueOnce({ active: false, version: 4 }) // worker check
+      .mockResolvedValueOnce({ active: false, version: 4 }) // expiry fixes epoch 4
+      .mockResolvedValue({ active: false, version: 5 }); // unfreeze opened epoch 5
+    expect(await d.worker.processDue(100, now)).toBe(0);
+    expect(d.tx.ausencia.create).not.toHaveBeenCalled();
+  });
+  it("mutates nothing when the barrier freezes before the first effect", async () => {
+    const d = deps();
+    d.tx.recoveryWriteBarrier.findUnique
+      .mockResolvedValueOnce({ active: false, version: 4 }) // worker check
+      .mockResolvedValue({ active: true, version: 5 });
+    expect(await d.worker.processDue(100, now)).toBe(0);
+    expect(d.tx.ausencia.create).not.toHaveBeenCalled();
+    expect(d.tx.ausencia.update).not.toHaveBeenCalled();
   });
 });

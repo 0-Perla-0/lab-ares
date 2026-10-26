@@ -5,6 +5,8 @@ import type { Environment } from "../config/environment";
 import { OperationalJobState } from "../generated/prisma/enums";
 import { PrismaService } from "../database/prisma.service";
 import { workersMayMutate } from "../recovery/barrier";
+import { withWorkerWriteBarrier } from "../common/domain/worker-write-barrier";
+import { ApiException } from "../common/errors/api.exception";
 import { AuditQueryService } from "./audit-query.service";
 import { OperationsService } from "./operations.service";
 import { TechnicalLogger } from "./technical-logger.service";
@@ -46,6 +48,22 @@ export class AuditManifestWorker implements OnModuleInit, OnModuleDestroy {
     this.running = true;
     try {
       if (this.prisma && !(await workersMayMutate(this.prisma))) return;
+      // Every durable step of this cycle commits in the epoch read here.
+      let epoch: number | undefined;
+      if (this.prisma)
+        try {
+          epoch = await withWorkerWriteBarrier(
+            this.prisma,
+            async (_tx, v) => v,
+          );
+        } catch (error) {
+          if (
+            error instanceof ApiException &&
+            error.code === "RECOVERY_WRITE_BARRIER_ACTIVE"
+          )
+            return;
+          throw error;
+        }
       const previous = new Date(
         Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 1),
       )
@@ -55,11 +73,15 @@ export class AuditManifestWorker implements OnModuleInit, OnModuleDestroy {
       let claimed = false;
       let jobId: string | undefined;
       try {
-        const job = await this.operations.createJob({
-          name: "AUDIT_DAILY_MANIFEST",
-          idempotencyKey: `audit-manifest:${previous}`,
-          maxAttempts: this.config.get("OPERATIONS_JOB_MAX_ATTEMPTS"),
-        });
+        const job = await this.operations.createJob(
+          {
+            name: "AUDIT_DAILY_MANIFEST",
+            idempotencyKey: `audit-manifest:${previous}`,
+            maxAttempts: this.config.get("OPERATIONS_JOB_MAX_ATTEMPTS"),
+          },
+          undefined,
+          epoch,
+        );
         jobId = job.id;
         if (
           job.state === OperationalJobState.SUCCEEDED ||
@@ -68,13 +90,15 @@ export class AuditManifestWorker implements OnModuleInit, OnModuleDestroy {
           job.state === OperationalJobState.CANCELLED
         )
           return;
-        await this.operations.claimJob(job.id, { owner });
+        await this.operations.claimJob(job.id, { owner }, undefined, epoch);
         claimed = true;
-        await this.audit.createSystemManifest(previous);
-        await this.operations.completeJob(job.id, {
-          owner,
-          result: { period: previous, verified: true },
-        });
+        await this.audit.createSystemManifest(previous, epoch);
+        await this.operations.completeJob(
+          job.id,
+          { owner, result: { period: previous, verified: true } },
+          undefined,
+          epoch,
+        );
         this.logger.write("log", "audit_manifest_created", {
           period: previous,
         });
@@ -85,10 +109,12 @@ export class AuditManifestWorker implements OnModuleInit, OnModuleDestroy {
         });
         if (claimed && jobId)
           try {
-            await this.operations.failJob(jobId, {
-              owner,
-              errorCode: "AUDIT_MANIFEST_FAILED",
-            });
+            await this.operations.failJob(
+              jobId,
+              { owner, errorCode: "AUDIT_MANIFEST_FAILED" },
+              undefined,
+              epoch,
+            );
           } catch (failureError) {
             this.logger.write("error", "audit_manifest_job_failure_failed", {
               error:

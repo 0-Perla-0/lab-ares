@@ -11,6 +11,7 @@ import { AuditService } from "../auth/audit.service";
 import { ApiException } from "../common/errors/api.exception";
 import type { Environment } from "../config/environment";
 import { PrismaService } from "../database/prisma.service";
+import { withWorkerWriteBarrier } from "../common/domain/worker-write-barrier";
 import type { Prisma } from "../generated/prisma/client";
 import {
   OperationalAlertState,
@@ -326,8 +327,18 @@ export class OperationsService {
     );
   }
 
-  createJob(input: CreateJob, actor?: AuthUser) {
-    return this.prisma.$transaction(async (tx) => {
+  /** Worker callers pass the epoch they claimed; HTTP callers keep a plain transaction. */
+  private fenced<T>(
+    barrierVersion: number | undefined,
+    apply: (tx: Prisma.TransactionClient) => Promise<T>,
+  ): Promise<T> {
+    return barrierVersion === undefined
+      ? this.prisma.$transaction(apply)
+      : withWorkerWriteBarrier(this.prisma, apply, barrierVersion);
+  }
+
+  createJob(input: CreateJob, actor?: AuthUser, barrierVersion?: number) {
+    return this.fenced(barrierVersion, async (tx) => {
       const job = await tx.operationalJobExecution.upsert({
         where: { idempotencyKey: input.idempotencyKey },
         update: {},
@@ -359,12 +370,17 @@ export class OperationsService {
     });
   }
 
-  async claimJob(id: string, input: ClaimJob, actor?: AuthUser) {
+  async claimJob(
+    id: string,
+    input: ClaimJob,
+    actor?: AuthUser,
+    barrierVersion?: number,
+  ) {
     const leaseMs =
       input.leaseMs ?? this.config.get("OPERATIONS_JOB_LEASE_MS") ?? 120_000;
     const now = new Date();
     const leaseUntil = new Date(now.getTime() + leaseMs);
-    return this.prisma.$transaction(async (tx) => {
+    return this.fenced(barrierVersion, async (tx) => {
       const job = await tx.operationalJobExecution.findFirst({
         where: {
           id,
@@ -434,8 +450,13 @@ export class OperationsService {
     });
   }
 
-  async completeJob(id: string, input: CompleteJob, actor?: AuthUser) {
-    return this.prisma.$transaction(async (tx) => {
+  async completeJob(
+    id: string,
+    input: CompleteJob,
+    actor?: AuthUser,
+    barrierVersion?: number,
+  ) {
+    return this.fenced(barrierVersion, async (tx) => {
       const job = await tx.operationalJobExecution.findUnique({
         where: { id },
       });
@@ -494,8 +515,13 @@ export class OperationsService {
     });
   }
 
-  async failJob(id: string, input: FailJob, actor?: AuthUser) {
-    return this.prisma.$transaction(async (tx) => {
+  async failJob(
+    id: string,
+    input: FailJob,
+    actor?: AuthUser,
+    barrierVersion?: number,
+  ) {
+    return this.fenced(barrierVersion, async (tx) => {
       const job = await tx.operationalJobExecution.findUnique({
         where: { id },
       });

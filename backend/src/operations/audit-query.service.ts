@@ -8,6 +8,7 @@ import { PrismaService } from "../database/prisma.service";
 import type { Prisma } from "../generated/prisma/client";
 import type { AuditQuery } from "./audit.schemas";
 import { S3Storage } from "../storage/s3.storage";
+import { withWorkerWriteBarrier } from "../common/domain/worker-write-barrier";
 
 const privateFields = {
   id: true,
@@ -129,22 +130,26 @@ export class AuditQueryService {
   async createManifest(actor: AuthUser, periodKey: string) {
     if (getAccessScope(actor, Permission.AUDIT_EXPORT) !== AccessScope.GLOBAL)
       throw new ApiException("FORBIDDEN", 403);
-    const manifest = await this.buildManifest(periodKey);
-    await this.audit.append({
-      actorId: actor.id,
-      actorRole: actor.rol,
-      action: "MANIFEST_CREATE",
-      resource: "audit-manifest",
-      module: "AUDIT",
-      objectType: "AUDIT_MANIFEST",
-      objectId: periodKey,
-      result: "SUCCESS",
-      metadata: { count: manifest.eventCount },
-    });
-    return manifest;
+    // Manifest row and its audit event commit together.
+    return this.buildManifest(periodKey, undefined, (tx, manifest) =>
+      this.audit.append(
+        {
+          actorId: actor.id,
+          actorRole: actor.rol,
+          action: "MANIFEST_CREATE",
+          resource: "audit-manifest",
+          module: "AUDIT",
+          objectType: "AUDIT_MANIFEST",
+          objectId: periodKey,
+          result: "SUCCESS",
+          metadata: { count: manifest.eventCount },
+        },
+        tx,
+      ),
+    );
   }
 
-  async createSystemManifest(periodKey: string) {
+  async createSystemManifest(periodKey: string, barrierVersion?: number) {
     const existing = await this.prisma.auditManifest.findUnique({
       where: { periodKey },
     });
@@ -159,21 +164,32 @@ export class AuditQueryService {
         assurance: "integrity-check-not-legal-signature",
       };
     }
-    const manifest = await this.buildManifest(periodKey);
-    await this.audit.append({
-      actorType: "SYSTEM",
-      action: "MANIFEST_CREATE",
-      resource: "audit-manifest",
-      module: "AUDIT",
-      objectType: "AUDIT_MANIFEST",
-      objectId: periodKey,
-      result: "SUCCESS",
-      metadata: { count: manifest.eventCount },
-    });
-    return manifest;
+    // System path: same atomic pair, fenced to the epoch the worker claimed.
+    return this.buildManifest(periodKey, barrierVersion, (tx, manifest) =>
+      this.audit.append(
+        {
+          actorType: "SYSTEM",
+          action: "MANIFEST_CREATE",
+          resource: "audit-manifest",
+          module: "AUDIT",
+          objectType: "AUDIT_MANIFEST",
+          objectId: periodKey,
+          result: "SUCCESS",
+          metadata: { count: manifest.eventCount },
+        },
+        tx,
+      ),
+    );
   }
 
-  private async buildManifest(periodKey: string) {
+  private async buildManifest(
+    periodKey: string,
+    barrierVersion?: number,
+    after?: (
+      tx: Prisma.TransactionClient,
+      manifest: { eventCount: number },
+    ) => Promise<unknown>,
+  ) {
     if (periodKey >= new Date().toISOString().slice(0, 10))
       throw new ApiException("AUDIT_PERIOD_NOT_CLOSED", 409);
     const existing = await this.prisma.auditManifest.findUnique({
@@ -214,13 +230,21 @@ export class AuditQueryService {
         Buffer.from(JSON.stringify({ ...manifestPayload, manifestHash })),
         "application/json",
       );
-    const manifest = await this.prisma.auditManifest.create({
-      data: {
-        ...manifestPayload,
-        manifestHash,
-        storageRef: this.storage ? storageRef : null,
-      },
-    });
+    const write = async (tx: Prisma.TransactionClient) => {
+      const created = await tx.auditManifest.create({
+        data: {
+          ...manifestPayload,
+          manifestHash,
+          storageRef: this.storage ? storageRef : null,
+        },
+      });
+      await after?.(tx, created);
+      return created;
+    };
+    const manifest =
+      barrierVersion === undefined
+        ? await this.prisma.$transaction(write)
+        : await withWorkerWriteBarrier(this.prisma, write, barrierVersion);
     return { ...manifest, assurance: "integrity-check-not-legal-signature" };
   }
 
