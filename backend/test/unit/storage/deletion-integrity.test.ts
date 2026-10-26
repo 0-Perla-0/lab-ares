@@ -65,4 +65,53 @@ describe("deletion verification controls", () => {
     ).toBe(false);
     expect(storage.deleteVersion).not.toHaveBeenCalled();
   });
+  it("classifies an orphan external intent without importing or deleting anything", async () => {
+    const db: any = {
+      objectDeletionJob: {
+        count: vi.fn().mockResolvedValue(0),
+        findMany: vi.fn().mockResolvedValue([]),
+        create: vi.fn(),
+      },
+    };
+    const storage: any = {
+      listDeletionIntents: vi.fn().mockResolvedValue({
+        keys: ["deletion-intents/a.json", "deletion-intents/b.json"],
+      }),
+      deleteVersion: vi.fn(),
+    };
+    const assessment = await new ObjectDeletionService(
+      db,
+      storage,
+      new ConfigService() as any,
+    ).recoveryAssessment();
+    expect(assessment).toMatchObject({
+      ready: false,
+      unfinishedJobs: 0,
+      truncated: false,
+    });
+    expect(assessment.orphanIntents).toEqual([
+      { ref: "deletion-intents/a.json", reason: "NOT_IN_SQL" },
+      { ref: "deletion-intents/b.json", reason: "NOT_IN_SQL" },
+    ]);
+    expect(db.objectDeletionJob.create).not.toHaveBeenCalled();
+    expect(storage.deleteVersion).not.toHaveBeenCalled();
+  });
+  it("is ready only when SQL and the external store agree on an empty set", async () => {
+    const db: any = {
+      objectDeletionJob: {
+        count: vi.fn().mockResolvedValue(0),
+        findMany: vi.fn().mockResolvedValue([]),
+      },
+    };
+    const storage: any = {
+      listDeletionIntents: vi.fn().mockResolvedValue({ keys: [] }),
+    };
+    await expect(
+      new ObjectDeletionService(
+        db,
+        storage,
+        new ConfigService() as any,
+      ).recoveryAssessment(),
+    ).resolves.toMatchObject({ ready: true, orphanIntents: [] });
+  });
 });

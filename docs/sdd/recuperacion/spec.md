@@ -1,6 +1,6 @@
 # Recuperación coordinada
 
-ID: `recuperacion` · Estado: parcial · Revisión: 2026-10-15
+ID: `recuperacion` · Estado: parcial · Revisión: 2026-10-26
 
 ## Objetivo y alcance
 
@@ -20,12 +20,13 @@ API no ejecuta PITR/restore destructivo del proveedor; UI sólo prepara/consulta
 - [Recuperación](../../../backend/src/recovery/), [UI](../../../frontend/app/portal/admin/recuperacion/), [tests](../../../backend/test/unit/recovery/).
 - Históricamente hubo ensayo SQL aislado; no acredita restore conjunto/PITR ni el último incremento. [Memoria](../../../MEMORY.md).
 - [Reconciliador storage](../../../backend/src/storage/storage.reconciler.ts) rechaza planes con DELETE antes de aplicar; no eliminar bloqueo sin protocolo.
-- [Borrado durable](../borrado-objetos/spec.md) detecta intenciones externas ausentes del snapshot, pero no implementa importación/reconciliación automática completa.
+- [Borrado durable](../borrado-objetos/spec.md) detecta intenciones externas ausentes del snapshot. Desde el 26/10 `recoveryAssessment` las clasifica sin escribir (`NOT_IN_SQL`, `BODY_MISMATCH`, `TOO_LARGE`, `VERSIONS_REMAINING`, `MISSING_EXTERNAL_PROOF`) y la aprobación de readiness devuelve sólo los conteos por motivo, sin referencias.
+- Decisión (26/10) para la importación: una intención huérfana se importaría como job `UNCERTAIN` verificado contra su HMAC y reconciliado en sólo lectura antes de completar, dentro de la corrida de recuperación y con autoridad de restore. No se implementa sin ensayo aislado (T3) ni T4: importar es una escritura que decide qué historia se acepta.
 - Estrategia aprobada: PITR para RPO crítico, backup diario con retención inicial 30 días, objetos redundantes/versionados; ensayo antes de piloto y trimestral durante operación.
 
 ## Tareas y pendientes
 
 - [x] **T1 · código · AC-1/2/3/5:** Control/barrera/journal/objetivos implementados con bloqueos conservadores.
-- [ ] **T2 · código · AC-3/4:** Reconciliar/importar intenciones externas huérfanas y restauraciones a snapshots anteriores sin reapertura insegura.
+- [ ] **T2 · código · AC-3/4:** Diagnóstico de intenciones huérfanas hecho ([servicio](../../../backend/src/storage/object-deletion.service.ts), [pruebas](../../../backend/test/unit/storage/deletion-integrity.test.ts)); falta la importación/reconciliación y snapshots anteriores.
 - [ ] **T3 · validación · AC-2/3/4/5:** Ensayo coordinado nuevo DB+objetos+journal con freezes/leases/holds, fallos parciales y RPO/RTO medidos.
 - [ ] **T4 · externo · AC-4/5:** Proveedor, binlogs/PITR, backups/custodia, autoridad de restore/unfreeze y revisión institucional explícita.
