@@ -1439,7 +1439,7 @@ export class RetentionService {
         throw api("RETENTION_POLICY_ACTION_MISMATCH");
       return suppressOperationalEvidence(
         this.prisma,
-        this.objectStorage,
+        this.deletions,
         record.resourceType,
         record.resourceId,
         client === this.prisma
@@ -1963,14 +1963,17 @@ export class RetentionService {
           claim.version,
           Math.min(30000, Math.floor(this.leaseMs() / 2)),
         );
-      const pending = await finish();
-      if (pending) {
+      // An item may own several files (absence attachments): one durable job per
+      // file, bounded so a pathological record fails closed and retries later.
+      let pending = await finish();
+      for (let jobs = 0; pending; jobs++) {
+        if (jobs >= 20) throw api("RETENTION_RESOURCE_NOT_TERMINAL");
         await this.deletions.process(
           pending.deletionJobId,
           authorizeDeletion,
           claim.version,
         );
-        await finish();
+        pending = await finish();
       }
     } catch (error) {
       if (

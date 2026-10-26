@@ -15,7 +15,7 @@ Corte: **15 de octubre de 2026**. Mantener breve; el backlog vive en cada [featu
 
 - El árbol acumulado se guardó/publicó en `feature/docs/sdd-features` (`073e536`); las ramas históricas de fases compartían el mismo punto, no snapshots separados. La integración posterior en `develop` queda sólo local por instrucción expresa, sin push de esa rama.
 - Los módulos operativos ya existen: no volver a implementar ausencias/calendario/visitas/inventario/consolas a partir de planes antiguos.
-- El borrado durable sólo cubre ciertos recursos; adjuntos de ausencias y limpiezas de copias/huérfanos siguen bloqueados. [Contrato y tareas](docs/sdd/borrado-objetos/spec.md).
+- El borrado durable sólo cubre ciertos recursos; adjuntos de ausencias usan ya el protocolo (26/10, sólo con mocks); limpiezas de copias/huérfanos siguen bloqueadas. [Contrato y tareas](docs/sdd/borrado-objetos/spec.md).
 - Retención no tiene tratamientos institucionales universales; una enum o adaptador listado no autoriza supresión.
 - No borrar bases, volúmenes, buckets, evidencia ni decisiones para repetir pruebas. Un seed full-stack admite una ejecución completa; Newman va después del navegador.
 - Ninguna prueba local autoriza producción, PITR, unfreeze, activación de workers o políticas institucionales.

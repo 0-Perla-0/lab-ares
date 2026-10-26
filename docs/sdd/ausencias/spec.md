@@ -20,12 +20,12 @@ Depende de [calendario](../calendario/spec.md) e historia de [organización](../
 - [Ausencias](../../../backend/src/absences/), [UI](../../../frontend/app/portal/asistencia/ausencias/), [integración](../../../backend/test/integration/absences-calendar.integration.test.ts).
 - `ABSENCE_WORKER_ENABLED=false`; fecha inicial explícita o ayer, sin backfill automático indiscriminado.
 - Operación GLOBAL puede programar reevaluación idempotente de últimas 31 fechas cerradas; no reabre decisiones finales ni fabrica historia.
-- [Retención de evidencia](../../../backend/src/retention/operational-evidence.ts) bloquea adjuntos con `OBJECT_DELETION_PROTOCOL_REQUIRED`.
+- [Retención de evidencia](../../../backend/src/retention/operational-evidence.ts) delega adjuntos en el borrado durable (`ABSENCE_ATTACHMENT`); sin la transacción de retención falla `OBJECT_DELETION_PROTOCOL_REQUIRED`.
 - Dependencias: [borrado durable](../borrado-objetos/spec.md), [comunicaciones](../comunicaciones/spec.md).
 
 ## Tareas y pendientes
 
 - [x] **T1 · código · AC-1/2/3/4/5:** API/UI, checkpoint e issues históricos implementados.
-- [ ] **T2 · código · AC-4:** Adaptador por fases para supresión de adjuntos, compartidos/holds y replay redactado; no volver al DELETE directo.
+- [x] **T2 · código · AC-4:** Adaptador por fases para adjuntos, compartidos/holds y replay redactado ([borrado](../borrado-objetos/spec.md)); validado con mocks, falta integración real.
 - [ ] **T3 · validación · AC-1/2/5:** Aceptar calendario/deadlines, réplicas y revisión de issues sin duplicar decisiones.
 - [ ] **T4 · externo · AC-1/2/5:** Aprobar calendario, cobertura histórica y arranque del worker; historia anterior no se infiere.
