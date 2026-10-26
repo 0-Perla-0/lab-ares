@@ -29,5 +29,5 @@ No usar servicios públicos para analizar justificantes/expedientes ni exponer r
 - [x] **T1 · código · AC-1/2/3:** Pipeline y descargas autorizadas existentes.
 - [x] **T2 · código · AC-4:** Lifecycle por época y lease en [worker](../../../backend/src/storage/storage.worker.ts) y [análisis](../../../backend/src/storage/storage.service.ts); [pruebas](../../../backend/test/unit/storage/storage.regressions.test.ts) con mocks. El ABA con dos conexiones reales sigue en T5.
 - [ ] **T3 · código · AC-5:** Diseño (26/10): admisión con reserva en MariaDB (fila por usuario/global con contador y lease, liberada al terminar o expirar), no un Set por proceso; requiere migración y límites aprobados. Pendiente de implementar.
-- [ ] **T4 · código · AC-6:** Limpieza por fases de copias/rechazados/huérfanos sin romper referencias ni holds.
+- [x] **T4 · código · AC-6:** Limpieza por fases de copias y huérfanos sin romper referencias ni holds ([borrado](../borrado-objetos/spec.md)); candidatos de sólo lectura en `GET /api/retention/object-cleanup/candidates`.
 - [ ] **T5 · validación · AC-1/4/5:** Scanner caído/lento, disco lleno, subidas concurrentes y límites de proxy.

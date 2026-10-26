@@ -191,6 +191,27 @@ async function mutate<T>(
   return response.data;
 }
 
+export type CleanupCandidate = {
+  kind: "ORPHAN_OBJECT" | "QUARANTINE_COPY";
+  bucket: "quarantine" | "available";
+  key: string;
+};
+export type CleanupCandidates = {
+  orphans: CleanupCandidate[];
+  quarantineCopies: CleanupCandidate[];
+  semantics: string;
+};
+export type CleanupJob = {
+  id: string;
+  kind: CleanupCandidate["kind"];
+  bucket: CleanupCandidate["bucket"];
+  state: "PREPARED" | "DISPATCHED" | "UNCERTAIN" | "VERIFIED" | "COMPLETE";
+  attempts: number;
+  lastErrorCode?: string | null;
+  createdAt: string;
+  completedAt?: string | null;
+};
+
 export const retentionApi = {
   myRequests() {
     return apiRequest<ApiEnvelope<SuppressionRequest[]>>(
@@ -368,6 +389,33 @@ export const retentionApi = {
     return apiRequest<ApiEnvelope<PageResult<SuppressionRegistryEntry>>>(
       `/api/retention/suppression-registry${paged({ page, pageSize: 20, categoria })}`,
     ).then((x) => x.data);
+  },
+  cleanupJobs(page = 1) {
+    return apiRequest<ApiEnvelope<PageResult<CleanupJob>>>(
+      `/api/retention/object-cleanup${paged({ page, pageSize: 10 })}`,
+    ).then((x) => x.data);
+  },
+  cleanupCandidates(limit = 50) {
+    return apiRequest<ApiEnvelope<CleanupCandidates>>(
+      `/api/retention/object-cleanup/candidates${paged({ limit })}`,
+    ).then((x) => x.data);
+  },
+  cleanupObject(userId: number, input: CleanupCandidate) {
+    return mutate<{ id: string; state: string }>(
+      userId,
+      "retention-object-cleanup",
+      `${input.bucket}:${input.key}`,
+      "/api/retention/object-cleanup",
+      input,
+    );
+  },
+  reconcileCleanup(userId: number, id: string) {
+    return mutate<{ id: string; state: string }>(
+      userId,
+      "retention-object-cleanup-reconcile",
+      id,
+      `/api/retention/object-cleanup/${encodeURIComponent(id)}/reconcile`,
+    );
   },
   reapply(userId: number, limit = 100) {
     return mutate<{ processed: number }>(

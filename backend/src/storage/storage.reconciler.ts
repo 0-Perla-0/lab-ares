@@ -1,4 +1,9 @@
-import { Injectable, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
+import {
+  Injectable,
+  OnModuleDestroy,
+  OnModuleInit,
+  Optional,
+} from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 
 import type { Environment } from "../config/environment";
@@ -8,13 +13,17 @@ import { assertRecoveryBarrier, workersMayMutate } from "../recovery/barrier";
 import { journalHash } from "../recovery/journal-integrity";
 import { S3Storage } from "./s3.storage";
 import { ApiException } from "../common/errors/api.exception";
+import { ObjectDeletionService } from "./object-deletion.service";
 
 type Bucket = "quarantine" | "available";
 type ReconciliationAction =
   | { kind: "PROMOTE"; fileId: string; key: string }
   | { kind: "DELETE_FILE_OBJECT"; fileId: string; bucket: Bucket; key: string }
   | { kind: "MARK_MISSING"; fileId: string }
-  | { kind: "DELETE_ORPHAN"; bucket: Bucket; key: string };
+  | { kind: "DELETE_ORPHAN"; bucket: Bucket; key: string }
+  // Restoring an older snapshot never deletes; it only brings the SQL up to the
+  // deletions that already happened outside it.
+  | { kind: "IMPORT_DELETION_INTENT"; ref: string };
 
 interface ReconciliationPlan {
   actions: ReconciliationAction[];
@@ -32,6 +41,7 @@ export class StorageReconciler implements OnModuleInit, OnModuleDestroy {
     private readonly prisma: PrismaService,
     private readonly storage: S3Storage,
     private readonly config: ConfigService<Environment, true>,
+    @Optional() private readonly deletions?: ObjectDeletionService,
   ) {}
 
   onModuleInit() {
@@ -107,7 +117,7 @@ export class StorageReconciler implements OnModuleInit, OnModuleDestroy {
           ))
         )
           throw new Error("RECOVERY_BARRIER_LOST");
-        await this.apply(action);
+        await this.apply(action, recoveryRunId, barrierVersion);
         repaired += 1;
       }
       return {
@@ -120,6 +130,71 @@ export class StorageReconciler implements OnModuleInit, OnModuleDestroy {
     } finally {
       this.running = false;
     }
+  }
+
+  /**
+   * Read-only candidates for the governed cleanup: unreferenced old objects and
+   * redundant quarantine copies of promoted files. Nothing here deletes; the
+   * cleanup service revalidates every candidate under the barrier before sealing.
+   */
+  async cleanupCandidates(limit = 50) {
+    const take = Math.min(200, Math.max(1, limit));
+    const cutoff = new Date(
+      Date.now() - this.config.get("STORAGE_ORPHAN_MIN_AGE_MS"),
+    );
+    const [fileRefs, manifestRefs] = await Promise.all([
+      this.prisma.archivo.findMany({
+        select: { objectKey: true, quarantineKey: true },
+      }),
+      this.prisma.auditManifest.findMany({
+        where: { storageRef: { not: null } },
+        select: { storageRef: true },
+      }),
+    ]);
+    const referenced = new Set([
+      ...fileRefs.flatMap((file) => [file.objectKey, file.quarantineKey]),
+      ...manifestRefs.flatMap((row) =>
+        row.storageRef ? [row.storageRef] : [],
+      ),
+    ]);
+    const orphans: { bucket: Bucket; key: string }[] = [];
+    let scanned = 0;
+    for (const bucket of ["quarantine", "available"] as const) {
+      let cursor: string | undefined;
+      do {
+        const page = await this.storage.list(bucket, cursor, take);
+        for (const object of page.objects)
+          if (
+            orphans.length < take &&
+            object.lastModified &&
+            object.lastModified < cutoff &&
+            !referenced.has(object.key) &&
+            !object.key.startsWith("deletion-intents/") &&
+            !object.key.startsWith("audit-manifests/")
+          )
+            orphans.push({ bucket, key: object.key });
+        scanned += page.objects.length;
+        cursor = page.nextCursor;
+      } while (cursor && orphans.length < take && scanned < take * 10);
+    }
+    const copies: { bucket: Bucket; key: string }[] = [];
+    const promoted = await this.prisma.archivo.findMany({
+      where: { status: EstadoArchivo.DISPONIBLE },
+      orderBy: { updatedAt: "asc" },
+      take: take * 5,
+      select: { objectKey: true, quarantineKey: true },
+    });
+    for (const file of promoted) {
+      if (copies.length >= take) break;
+      if (file.objectKey !== file.quarantineKey) continue;
+      const [served, redundant] = await Promise.all([
+        this.storage.head("available", file.objectKey),
+        this.storage.head("quarantine", file.quarantineKey),
+      ]);
+      if (served && redundant)
+        copies.push({ bucket: "quarantine", key: file.quarantineKey });
+    }
+    return { orphans, quarantineCopies: copies };
   }
 
   private async buildPlan(limit: number): Promise<ReconciliationPlan> {
@@ -208,6 +283,9 @@ export class StorageReconciler implements OnModuleInit, OnModuleDestroy {
         cursor = page.nextCursor;
       } while (cursor && scanned < take * 10);
     }
+    if (this.deletions)
+      for (const ref of await this.deletions.unknownIntents(take))
+        actions.push({ kind: "IMPORT_DELETION_INTENT", ref });
     actions.sort((left, right) => {
       const l = JSON.stringify(left);
       const r = JSON.stringify(right);
@@ -216,8 +294,32 @@ export class StorageReconciler implements OnModuleInit, OnModuleDestroy {
     return { actions, inspected: files.length, scanned };
   }
 
-  private async apply(action: ReconciliationAction) {
+  private async apply(
+    action: ReconciliationAction,
+    recoveryRunId: string,
+    barrierVersion: number,
+  ) {
     switch (action.kind) {
+      case "IMPORT_DELETION_INTENT": {
+        if (!this.deletions)
+          throw new ApiException("OBJECT_DELETION_PROTOCOL_REQUIRED", 409);
+        const imported = await this.deletions.importExternalIntent(
+          action.ref,
+          recoveryRunId,
+          barrierVersion,
+        );
+        // Prove the sealed inventory is gone (read-only) and finalize in the run.
+        if (imported.outcome === "IMPORTED" && imported.id) {
+          const verify = await this.deletions.verifyAnyImported(
+            imported.id,
+            recoveryRunId,
+            barrierVersion,
+          );
+          if (verify === "UNCONFIRMED")
+            throw new ApiException("OBJECT_DELETION_IMPORT_UNCONFIRMED", 409);
+        }
+        return;
+      }
       case "PROMOTE":
         await this.storage.copy("quarantine", "available", action.key);
         await this.prisma.archivo.updateMany({
@@ -247,12 +349,16 @@ export class StorageReconciler implements OnModuleInit, OnModuleDestroy {
 
   private counts(actions: ReconciliationAction[]) {
     return Object.fromEntries(
-      ["PROMOTE", "DELETE_FILE_OBJECT", "MARK_MISSING", "DELETE_ORPHAN"].map(
-        (kind) => [
-          kind,
-          actions.filter((action) => action.kind === kind).length,
-        ],
-      ),
+      [
+        "PROMOTE",
+        "DELETE_FILE_OBJECT",
+        "MARK_MISSING",
+        "DELETE_ORPHAN",
+        "IMPORT_DELETION_INTENT",
+      ].map((kind) => [
+        kind,
+        actions.filter((action) => action.kind === kind).length,
+      ]),
     );
   }
 }

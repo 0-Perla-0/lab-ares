@@ -102,6 +102,23 @@ async function parseJson<T>(response: Response): Promise<T | undefined> {
 }
 
 const apiMessages: Record<string, string> = {
+  OBJECT_CLEANUP_DISABLED:
+    "La limpieza de objetos está deshabilitada hasta que se apruebe el tratamiento institucional.",
+  OBJECT_CLEANUP_OBJECT_REFERENCED:
+    "El objeto pertenece a un archivo vigente o en proceso; no se elimina.",
+  OBJECT_CLEANUP_TOO_RECENT:
+    "El objeto es demasiado reciente para considerarlo huérfano.",
+  OBJECT_CLEANUP_KEY_PROTECTED:
+    "Esa ruta pertenece a otro protocolo y no puede limpiarse aquí.",
+  OBJECT_CLEANUP_SERVED_COPY_MISSING:
+    "No se encontró la copia disponible; se conserva la copia de cuarentena.",
+  OBJECT_CLEANUP_PURPOSE_MISMATCH:
+    "El objeto ya no cumple las condiciones de la limpieza solicitada.",
+  OBJECT_CLEANUP_NOTHING_TO_DELETE: "El objeto ya no existe.",
+  OBJECT_CLEANUP_RESULT_UNKNOWN:
+    "No se pudo confirmar el borrado. Concilia la tarea antes de reintentar.",
+  RETENTION_SHARED_EVIDENCE_OR_HOLD:
+    "Hay una retención legal o una referencia compartida; no se elimina.",
   REAUTH_REQUIRED:
     "Confirma tu identidad y vuelve a enviar la operación. No se aplicó ningún cambio.",
   ACADEMIC_FORMALIZATION_REQUIRED:

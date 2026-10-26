@@ -7,7 +7,12 @@ export type Backend2MockOptions = {
 };
 
 export type Backend2MockState = {
-  requests: Array<{ method: string; path: string; body: unknown }>;
+  requests: Array<{
+    method: string;
+    path: string;
+    body: unknown;
+    headers?: Record<string, string>;
+  }>;
   filePolls: number;
   reportPolls: number;
 };
@@ -247,7 +252,7 @@ export async function installBackend2Api(
     const url = new URL(request.url());
     const path = url.pathname;
     const body = await requestBody(request);
-    state.requests.push({ method, path, body });
+    state.requests.push({ method, path, body, headers: request.headers() });
 
     if (path === "/api/auth/me") return json(route, envelope(user));
     if (path === "/api/auth/logout") return json(route, envelope({ ok: true }));
@@ -522,6 +527,25 @@ export async function installBackend2Api(
         }),
         201,
       );
+    if (path === "/api/retention/object-cleanup" && method === "GET")
+      return json(route, envelope(pageResult([])));
+    if (path === "/api/retention/object-cleanup/candidates")
+      return json(
+        route,
+        envelope({
+          orphans: [
+            {
+              kind: "ORPHAN_OBJECT",
+              bucket: "quarantine",
+              key: "synthetic/stray-object",
+            },
+          ],
+          quarantineCopies: [],
+          semantics: "read-only",
+        }),
+      );
+    if (path === "/api/retention/object-cleanup" && method === "POST")
+      return json(route, envelope({ id: "cleanup-1", state: "COMPLETE" }));
     if (path === "/api/retention/rules")
       return json(route, envelope(pageResult([])));
     if (path === "/api/retention/records")

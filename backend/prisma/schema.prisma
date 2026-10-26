@@ -2318,3 +2318,44 @@ model FeaturePolicy {
   changedById Int
   updatedAt DateTime @updatedAt @db.DateTime(3)
 }
+
+// Cleanup of private objects that no Archivo owns (orphans) or that a live file no
+// longer needs (quarantine copy after promotion). Same sealed-manifest protocol as
+// ObjectDeletionJob, keyed by bucket+key instead of a file row.
+model OrphanObjectDeletion {
+  id String @id @default(cuid()) @db.VarChar(30)
+  kind String @db.VarChar(30)
+  bucket String @db.VarChar(20)
+  objectKey String @db.VarChar(500)
+  activeKey String? @unique @db.VarChar(560)
+  archivoId String? @db.VarChar(30)
+  manifest Json
+  manifestHash String @unique @db.Char(64)
+  manifestRef String @unique @db.VarChar(191)
+  state String @default("PREPARED") @db.VarChar(20)
+  attempts Int @default(0)
+  leaseOwner String? @db.VarChar(80)
+  leaseUntil DateTime? @db.DateTime(3)
+  barrierVersion Int?
+  lastErrorCode String? @db.VarChar(100)
+  manifestPublishedAt DateTime? @db.DateTime(3)
+  irreversibleAt DateTime? @db.DateTime(3)
+  verifiedAt DateTime? @db.DateTime(3)
+  completedAt DateTime? @db.DateTime(3)
+  createdAt DateTime @default(now()) @db.DateTime(3)
+  updatedAt DateTime @updatedAt @db.DateTime(3)
+  @@index([state, leaseUntil])
+  @@index([bucket, objectKey])
+}
+
+// An external deletion intent whose subject does not exist in a restored snapshot
+// (the file was created after the restore point) is acknowledged, never imported.
+model ObjectDeletionAcknowledgement {
+  id String @id @default(cuid()) @db.VarChar(30)
+  manifestRef String @unique @db.VarChar(191)
+  manifestHash String @db.Char(64)
+  purpose String @db.VarChar(30)
+  reason String @db.VarChar(40)
+  recoveryRunId String? @db.VarChar(30)
+  createdAt DateTime @default(now()) @db.DateTime(3)
+}

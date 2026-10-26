@@ -2439,6 +2439,111 @@ const retentionPaths = {
       },
     },
   },
+  "/api/retention/object-deletions": {
+    get: {
+      tags: ["Retention & Suppression"],
+      security: cookieSecurity,
+      description:
+        "Lists durable object-deletion jobs (state and evidence timestamps only). VERIFIED is physical inventory evidence, not a domain receipt; no object keys or manifests are exposed.",
+      parameters: [
+        {
+          name: "page",
+          in: "query",
+          schema: { type: "integer", minimum: 1, default: 1 },
+        },
+        {
+          name: "pageSize",
+          in: "query",
+          schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+        },
+      ],
+      responses: { 200: { description: "Deletion jobs" }, ...errorResponses },
+    },
+  },
+  "/api/retention/object-deletions/{id}/reconcile": {
+    post: {
+      tags: ["Retention & Suppression"],
+      security: cookieSecurity,
+      description:
+        "GLOBAL executor only. Read-only S3 inspection of the sealed inventory; never emits a DELETE.",
+      parameters: [retentionIdParameter, retentionIdempotencyParameter],
+      responses: {
+        200: { description: "Reconciliation state" },
+        ...errorResponses,
+      },
+    },
+  },
+  "/api/retention/object-cleanup": {
+    get: {
+      tags: ["Retention & Suppression"],
+      security: cookieSecurity,
+      description:
+        "Lists orphan and quarantine-copy cleanup jobs. Keys and manifests are never exposed.",
+      parameters: [
+        {
+          name: "page",
+          in: "query",
+          schema: { type: "integer", minimum: 1, default: 1 },
+        },
+        {
+          name: "pageSize",
+          in: "query",
+          schema: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+        },
+      ],
+      responses: { 200: { description: "Cleanup jobs" }, ...errorResponses },
+    },
+    post: {
+      tags: ["Retention & Suppression"],
+      security: cookieSecurity,
+      description:
+        "GLOBAL executor only and disabled unless OBJECT_CLEANUP_ENABLED. Seals the exact versions, revalidates references, holds, age and the served copy under the write barrier, deletes only those versions and records the result. A retried key never deletes twice.",
+      parameters: [retentionIdempotencyParameter],
+      requestBody: jsonBody({
+        type: "object",
+        additionalProperties: false,
+        required: ["kind", "bucket", "key"],
+        properties: {
+          kind: { type: "string", enum: ["ORPHAN_OBJECT", "QUARANTINE_COPY"] },
+          bucket: { type: "string", enum: ["quarantine", "available"] },
+          key: { type: "string", minLength: 1, maxLength: 500 },
+        },
+      }),
+      responses: {
+        200: { description: "Cleanup completed" },
+        ...errorResponses,
+      },
+    },
+  },
+  "/api/retention/object-cleanup/candidates": {
+    get: {
+      tags: ["Retention & Suppression"],
+      security: cookieSecurity,
+      description:
+        "Read-only proposal of unreferenced old objects and redundant quarantine copies. Nothing is deleted by listing.",
+      parameters: [
+        {
+          name: "limit",
+          in: "query",
+          schema: { type: "integer", minimum: 1, maximum: 200, default: 50 },
+        },
+      ],
+      responses: { 200: { description: "Candidates" }, ...errorResponses },
+    },
+  },
+  "/api/retention/object-cleanup/{id}/reconcile": {
+    post: {
+      tags: ["Retention & Suppression"],
+      security: cookieSecurity,
+      description:
+        "GLOBAL executor only. Read-only inspection that seals a cleanup whose reply was lost.",
+      parameters: [retentionIdParameter, retentionIdempotencyParameter],
+      responses: {
+        200: { description: "Reconciliation state" },
+        ...errorResponses,
+      },
+    },
+  },
   "/api/retention/requests/me": {
     get: {
       tags: ["Retention & Suppression"],

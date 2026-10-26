@@ -138,6 +138,27 @@ export class S3Storage implements ObjectStorage {
       throw error;
     }
   }
+  /** Null when the object is absent; unknown age is reported as null by callers. */
+  async lastModified(bucket: StorageBucket, key: string) {
+    try {
+      const head = await this.client.send(
+        new HeadObjectCommand({ Bucket: this.buckets[bucket], Key: key }),
+      );
+      return head.LastModified ?? null;
+    } catch (error) {
+      const e = error as {
+        name?: string;
+        $metadata?: { httpStatusCode?: number };
+      };
+      if (
+        e.name === "NotFound" ||
+        e.name === "NoSuchKey" ||
+        e.$metadata?.httpStatusCode === 404
+      )
+        return null;
+      throw error;
+    }
+  }
   async deletionVersions(
     bucket: StorageBucket,
     key: string,

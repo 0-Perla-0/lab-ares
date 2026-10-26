@@ -308,6 +308,8 @@ const environmentSchema = z
     SMTP_TLS: environmentBoolean.default(false),
     SMTP_TIMEOUT_MS: z.coerce.number().int().min(1000).default(10000),
     STORAGE_ORPHAN_MIN_AGE_MS: z.coerce.number().int().min(0).default(3600000),
+    // Orphan/quarantine-copy cleanup is irreversible; off until the treatment is approved.
+    OBJECT_CLEANUP_ENABLED: environmentBoolean.default(false),
   })
   .superRefine(
     (

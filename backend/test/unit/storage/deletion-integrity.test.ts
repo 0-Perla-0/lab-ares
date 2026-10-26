@@ -4,6 +4,15 @@ import { parseDeletionKeyring } from "../../../src/storage/deletion-keyring";
 import { ObjectDeletionService } from "../../../src/storage/object-deletion.service";
 import { runtimeGrants } from "../../../src/scripts/provision-runtime-db";
 
+// Object-level jobs and acknowledgements join the same readiness decision.
+const emptyObjectTables = () => ({
+  orphanObjectDeletion: {
+    count: vi.fn().mockResolvedValue(0),
+    findMany: vi.fn().mockResolvedValue([]),
+  },
+  objectDeletionAcknowledgement: { findMany: vi.fn().mockResolvedValue([]) },
+});
+
 describe("deletion verification controls", () => {
   it("does not grant runtime deletion of durable object intentions", () => {
     expect(
@@ -12,6 +21,17 @@ describe("deletion verification controls", () => {
       ]),
     ).toEqual([
       "GRANT SELECT, INSERT, UPDATE ON `ares_test`.`ObjectDeletionJob` TO 'ares_runtime_test'@'%'",
+    ]);
+  });
+  it("keeps cleanup intents non-deletable and acknowledgements append-only", () => {
+    expect(
+      runtimeGrants("ares_test", "ares_runtime_test", "%", [
+        "OrphanObjectDeletion",
+        "ObjectDeletionAcknowledgement",
+      ]),
+    ).toEqual([
+      "GRANT SELECT, INSERT, UPDATE ON `ares_test`.`OrphanObjectDeletion` TO 'ares_runtime_test'@'%'",
+      "GRANT SELECT, INSERT ON `ares_test`.`ObjectDeletionAcknowledgement` TO 'ares_runtime_test'@'%'",
     ]);
   });
   it("accepts only versioned verification secrets, not short or malformed rings", () => {
@@ -31,6 +51,7 @@ describe("deletion verification controls", () => {
   });
   it("does not approve recovery when a deletion is unfinished", async () => {
     const db: any = {
+        ...emptyObjectTables(),
         objectDeletionJob: { count: vi.fn().mockResolvedValue(1) },
       },
       storage: any = { listDeletionIntents: vi.fn() };
@@ -45,6 +66,7 @@ describe("deletion verification controls", () => {
   });
   it("detects an external intent missing from the restored SQL snapshot", async () => {
     const db: any = {
+      ...emptyObjectTables(),
       objectDeletionJob: {
         count: vi.fn().mockResolvedValue(0),
         findMany: vi.fn().mockResolvedValue([]),
@@ -67,6 +89,7 @@ describe("deletion verification controls", () => {
   });
   it("classifies an orphan external intent without importing or deleting anything", async () => {
     const db: any = {
+      ...emptyObjectTables(),
       objectDeletionJob: {
         count: vi.fn().mockResolvedValue(0),
         findMany: vi.fn().mockResolvedValue([]),
@@ -98,6 +121,7 @@ describe("deletion verification controls", () => {
   });
   it("is ready only when SQL and the external store agree on an empty set", async () => {
     const db: any = {
+      ...emptyObjectTables(),
       objectDeletionJob: {
         count: vi.fn().mockResolvedValue(0),
         findMany: vi.fn().mockResolvedValue([]),
