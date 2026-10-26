@@ -56,7 +56,13 @@ describe("Backend 2 real contracts", () => {
     const findUnique = vi
       .fn()
       .mockResolvedValue({ ...row, state: "PROCESSING" });
-    const tx: any = { outboxEvent: { findFirst, updateMany, findUnique } };
+    const tx: any = {
+      $queryRaw: vi.fn().mockResolvedValue([]),
+      recoveryWriteBarrier: {
+        findUnique: vi.fn().mockResolvedValue({ active: false, version: 1 }),
+      },
+      outboxEvent: { findFirst, updateMany, findUnique },
+    };
     const prisma: any = { $transaction: (fn: any) => fn(tx) };
     const service = new OutboxService(prisma, {
       get: (k: string) =>
@@ -76,6 +82,10 @@ describe("Backend 2 real contracts", () => {
     let claimed = false;
     const row = { id: "e1", state: "PENDING", attempts: 0 };
     const tx: any = {
+      $queryRaw: vi.fn().mockResolvedValue([]),
+      recoveryWriteBarrier: {
+        findUnique: vi.fn().mockResolvedValue({ active: false, version: 1 }),
+      },
       outboxEvent: {
         findFirst: vi.fn().mockResolvedValue(row),
         updateMany: vi.fn().mockImplementation(async () => {
@@ -99,6 +109,10 @@ describe("Backend 2 real contracts", () => {
       .mockResolvedValue({ id: "e", state: "PROCESSING", attempts: 1 });
     const updateMany = vi.fn().mockResolvedValue({ count: 1 });
     const tx: any = {
+      $queryRaw: vi.fn().mockResolvedValue([]),
+      recoveryWriteBarrier: {
+        findUnique: vi.fn().mockResolvedValue({ active: false, version: 1 }),
+      },
       outboxEvent: {
         findFirst,
         updateMany,

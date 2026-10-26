@@ -5,6 +5,8 @@ import type { Environment } from "../config/environment";
 import { OutboxService } from "./outbox.service";
 import { EmailService } from "./email.service";
 import { workersMayMutate } from "../recovery/barrier";
+import { withWorkerWriteBarrier } from "../common/domain/worker-write-barrier";
+import { ApiException } from "../common/errors/api.exception";
 import { observeWorker } from "../common/domain/worker-heartbeat";
 import { notificationLink } from "../common/domain/operational-notification";
 
@@ -41,7 +43,18 @@ export class OutboxDispatcherService implements OnModuleInit, OnModuleDestroy {
     const owner = `${process.pid}-${Math.random().toString(36).slice(2)}`;
     try {
       if (!(await workersMayMutate(this.prisma))) return;
-      const event = await this.outbox.claim(owner);
+      let event;
+      try {
+        event = await this.outbox.claim(owner);
+      } catch (error) {
+        // A freeze between the check and the claim simply skips this cycle.
+        if (
+          error instanceof ApiException &&
+          error.code === "RECOVERY_WRITE_BARRIER_ACTIVE"
+        )
+          return;
+        throw error;
+      }
       if (!event) return;
       const messageId = `<ares-${event.id}@ares.local>`;
       try {
@@ -49,25 +62,33 @@ export class OutboxDispatcherService implements OnModuleInit, OnModuleDestroy {
           where: { outboxEventId: event.id },
         });
         if (existing?.status === "SENT") {
-          await this.outbox.markSent(event.id, owner);
+          await this.fenced(event, async (tx) => {
+            await this.outbox.markSent(event.id, owner, tx);
+          });
           return;
         }
-        await this.prisma.emailDelivery.upsert({
-          where: { outboxEventId: event.id },
-          create: {
-            outboxEventId: event.id,
-            status: "SENDING",
-            attempts: event.attempts,
-            messageId,
-            leaseOwner: owner,
-            leaseUntil: new Date(Date.now() + 60000),
-          },
-          update: {
-            status: "SENDING",
-            attempts: event.attempts,
-            leaseOwner: owner,
-            leaseUntil: new Date(Date.now() + 60000),
-          },
+        // Preparing the attempt needs a live outbox lease in the claimed epoch;
+        // a stale worker must not overwrite the receipt of the current owner.
+        await this.fenced(event, async (tx) => {
+          if (!(await this.outbox.holdsLease(event.id, owner, tx)))
+            throw new ApiException("OUTBOX_LEASE_LOST", 409);
+          await tx.emailDelivery.upsert({
+            where: { outboxEventId: event.id },
+            create: {
+              outboxEventId: event.id,
+              status: "SENDING",
+              attempts: event.attempts,
+              messageId,
+              leaseOwner: owner,
+              leaseUntil: new Date(Date.now() + 60000),
+            },
+            update: {
+              status: "SENDING",
+              attempts: event.attempts,
+              leaseOwner: owner,
+              leaseUntil: new Date(Date.now() + 60000),
+            },
+          });
         });
         const payload =
           event.type === "OPERATIONAL_NOTIFICATION"
@@ -154,28 +175,42 @@ export class OutboxDispatcherService implements OnModuleInit, OnModuleDestroy {
         const handler = handlers[event.type];
         if (!handler) throw new Error("UNKNOWN_EVENT");
         await handler(payload);
-        await this.prisma.emailDelivery.updateMany({
-          where: {
-            outboxEventId: event.id,
-            status: "SENDING",
-            leaseOwner: owner,
-          },
-          data: {
-            status: "SENT",
-            sentAt: new Date(),
-            leaseOwner: null,
-            leaseUntil: null,
-          },
+        // SMTP cannot be rolled back: record the receipt and the outbox state
+        // together, owner-fenced, so a lease that expired but was never reclaimed
+        // still records the delivery instead of provoking a duplicate.
+        await this.fenced(event, async (tx) => {
+          await tx.emailDelivery.updateMany({
+            where: {
+              outboxEventId: event.id,
+              status: "SENDING",
+              leaseOwner: owner,
+            },
+            data: {
+              status: "SENT",
+              sentAt: new Date(),
+              leaseOwner: null,
+              leaseUntil: null,
+            },
+          });
+          await this.outbox.markSent(event.id, owner, tx);
         });
-        await this.outbox.markSent(event.id, owner);
       } catch (error) {
+        // Frozen or superseded: leave the event for the next lease; the stable
+        // Message-ID lets a later attempt be reconciled by the receiver.
+        if (
+          error instanceof ApiException &&
+          ["RECOVERY_WRITE_BARRIER_ACTIVE", "OUTBOX_LEASE_LOST"].includes(
+            error.code,
+          )
+        )
+          return;
         const safe =
           error instanceof Error &&
           ["UNKNOWN_EVENT", "MISSING_RECIPIENT"].includes(error.message)
             ? error.message
             : "DELIVERY_FAILED";
-        await this.prisma.emailDelivery
-          .updateMany({
+        await this.fenced(event, async (tx) => {
+          await tx.emailDelivery.updateMany({
             where: { outboxEventId: event.id, leaseOwner: owner },
             data: {
               status: "FAILED",
@@ -183,18 +218,32 @@ export class OutboxDispatcherService implements OnModuleInit, OnModuleDestroy {
               leaseOwner: null,
               leaseUntil: null,
             },
-          })
-          .catch(() => undefined);
-        await this.outbox.markFailure(
-          event.id,
-          owner,
-          safe,
-          safe === "UNKNOWN_EVENT" || safe === "MISSING_RECIPIENT" ? 1 : 5,
-        );
+          });
+          await this.outbox.markFailure(
+            event.id,
+            owner,
+            safe,
+            safe === "UNKNOWN_EVENT" || safe === "MISSING_RECIPIENT" ? 1 : 5,
+            tx,
+          );
+        }).catch((fenceError) => {
+          if (!(
+            fenceError instanceof ApiException &&
+            fenceError.code === "RECOVERY_WRITE_BARRIER_ACTIVE"
+          ))
+            throw fenceError;
+        });
       }
     } finally {
       this.running = false;
     }
+  }
+  /** Every durable transition commits in the epoch where the event was claimed. */
+  private fenced<T>(
+    event: { barrierVersion?: number },
+    effect: (tx: any) => Promise<T>,
+  ) {
+    return withWorkerWriteBarrier(this.prisma, effect, event.barrierVersion);
   }
   private async sendUser(id: any, type: string, messageId: string) {
     const user = await this.prisma.usuario.findUnique({
