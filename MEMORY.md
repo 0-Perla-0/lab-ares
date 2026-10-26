@@ -1,6 +1,6 @@
 # Memoria de continuidad
 
-Corte: **15 de octubre de 2026**. Mantener breve; el backlog vive en cada [feature SDD](docs/index.md).
+Corte: **26 de octubre de 2026**. Mantener breve; el backlog vive en cada [feature SDD](docs/index.md).
 
 ## Decisiones estables
 
@@ -22,7 +22,7 @@ Corte: **15 de octubre de 2026**. Mantener breve; el backlog vive en cada [featu
 
 ## Evidencia y límites
 
-- Evidencia heredada del 13/10, **no reproducida por la migración documental**: 35 migraciones e integración 100 aprobadas y 3 opt-in omitidas.
+- Evidencia heredada del 13/10, **no reproducida por la migración documental**: 35 migraciones e integración 100 aprobadas y 3 opt-in omitidas. El 26/10 se reprodujo en un stack aislado: integración 103/3 omitidas y opt-in de SMTP, retención y MinIO aprobados ([entrega](docs/sdd/entrega/spec.md)).
 - Los 18 casos dirigidos de borrado incluyen 17 ya contados en integración; no sumar dos veces.
 - El navegador/SMTP/restore de cortes previos no certifican el último cambio de borrado. CI remota y liberación no constan ejecutadas.
 - Artefactos locales previos: `C:\Users\jaret\AppData\Local\Temp\opencode\ares-deletion-upgrade-20261013`; no son evidencia portable de CI.

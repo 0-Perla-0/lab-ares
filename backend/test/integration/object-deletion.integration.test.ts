@@ -19,6 +19,7 @@ import { RetentionService } from "../../src/retention/retention.service";
 import { NotificationsService } from "../../src/notifications/notifications.service";
 import { withWorkerWriteBarrier } from "../../src/common/domain/worker-write-barrier";
 import { ApiException } from "../../src/common/errors/api.exception";
+import { suppressOperationalEvidence } from "../../src/retention/operational-evidence";
 import { operationFingerprint } from "../../src/common/domain/canonical-operation";
 import type { ObjectVersion } from "../../src/storage/storage.types";
 
@@ -775,4 +776,173 @@ describe("durable object deletion on MariaDB (versioned transport simulated unle
       s3.destroy();
     },
   );
+});
+
+describe("absence attachments through the durable protocol (MariaDB, simulated transport)", () => {
+  let subject: any;
+  beforeAll(async () => {
+    const suffix = randomUUID().slice(0, 8);
+    subject = await db.usuario.create({
+      data: {
+        codigo: `absence-subject-${suffix}`,
+        email: `absence-subject-${suffix}@example.test`,
+        rol: "PRESTADOR",
+        estado: "ACTIVA",
+        passwordHash: "synthetic-non-login",
+      },
+    });
+  });
+  let day = 0;
+  async function absenceFixture(
+    options: {
+      estado?: "JUSTIFICADA" | "PENDIENTE_JUSTIFICACION";
+      shareWith?: any;
+    } = {},
+  ) {
+    const h = memoryStorage();
+    const id = randomUUID().replaceAll("-", "").slice(0, 30);
+    const objectKey = `synthetic/absence/${id}.pdf`;
+    const file = await db.archivo.create({
+      data: {
+        id,
+        propietarioId: subject.id,
+        objectKey,
+        quarantineKey: `synthetic/q/${id}`,
+        originalName: "Synthetic private justification",
+        detectedMime: "application/pdf",
+        sizeBytes: 3,
+        status: "DISPONIBLE",
+      },
+    });
+    h.objects.set(`available:${objectKey}`, [
+      { id: "v1", etag: '"synthetic-etag"', deleteMarker: false },
+    ]);
+    const make = async (estado: string) => {
+      day += 1;
+      return db.ausencia.create({
+        data: {
+          userId: subject.id,
+          sedeId: 1,
+          areaId: 1,
+          turnoId: 1,
+          fecha: new Date(Date.UTC(2031, 0, day)),
+          estado: estado as any,
+          plazoLimiteAt: new Date(Date.now() - 86_400_000),
+          apelacionLimiteAt: new Date(Date.now() - 3_600_000),
+          motivoResolucion: "private resolution narrative",
+        },
+      });
+    };
+    const absence = await make(options.estado ?? "JUSTIFICADA");
+    await db.justificacionAusencia.create({
+      data: {
+        ausenciaId: absence.id,
+        motivo: "private medical narrative",
+        archivoId: file.id,
+        solicitadoPor: subject.id,
+      },
+    });
+    if (options.shareWith) {
+      const other = await make("JUSTIFICADA");
+      await db.justificacionAusencia.create({
+        data: {
+          ausenciaId: other.id,
+          motivo: "second narrative",
+          archivoId: file.id,
+          solicitadoPor: subject.id,
+        },
+      });
+    }
+    const deletion = new ObjectDeletionService(
+      db,
+      h.storage,
+      config as any,
+      audit,
+    );
+    return { ...h, file, absence, deletion };
+  }
+  const suppress = (f: any) =>
+    withWorkerWriteBarrier(db, (tx) =>
+      suppressOperationalEvidence(
+        db,
+        f.deletion,
+        "AbsenceEvidence",
+        f.absence.id,
+        tx,
+      ),
+    );
+
+  it("keeps the text until the attachment is verified gone, then redacts and completes", async () => {
+    const f = await absenceFixture();
+    const pending: any = await suppress(f);
+    expect(pending?.deletionJobId).toBeTruthy();
+    expect(f.storage.deleteVersion).not.toHaveBeenCalled();
+    expect(
+      (await db.archivo.findUniqueOrThrow({ where: { id: f.file.id } })).status,
+    ).toBe("ELIMINACION_PENDIENTE");
+    expect(
+      (await db.ausencia.findUniqueOrThrow({ where: { id: f.absence.id } }))
+        .motivoResolucion,
+    ).toBe("private resolution narrative");
+    // Unfinished job: still pending, nothing redacted, no second intent.
+    expect(((await suppress(f)) as any)?.deletionJobId).toBe(
+      pending.deletionJobId,
+    );
+    await f.deletion.process(pending.deletionJobId);
+    expect(f.storage.deleteVersion).toHaveBeenCalledTimes(1);
+    expect(f.objects.get(`available:${f.file.objectKey}`)).toEqual([]);
+    expect(await suppress(f)).toBeUndefined();
+    const archivo = await db.archivo.findUniqueOrThrow({
+      where: { id: f.file.id },
+    });
+    expect(archivo).toMatchObject({
+      status: "ELIMINADO",
+      originalName: "[SUPRIMIDO]",
+    });
+    expect(
+      (await db.ausencia.findUniqueOrThrow({ where: { id: f.absence.id } }))
+        .motivoResolucion,
+    ).toBe("[SUPRIMIDO]");
+    expect(
+      (
+        await db.justificacionAusencia.findFirstOrThrow({
+          where: { ausenciaId: f.absence.id },
+        })
+      ).motivo,
+    ).toBe("[SUPRIMIDO]");
+    const job = await db.objectDeletionJob.findUniqueOrThrow({
+      where: { fileId: f.file.id },
+    });
+    expect(job).toMatchObject({
+      purpose: "ABSENCE_ATTACHMENT",
+      resourceId: f.absence.id,
+      state: "COMPLETE",
+    });
+    // Replaying after completion is a no-op, not a second effect.
+    expect(await suppress(f)).toBeUndefined();
+    expect(f.storage.deleteVersion).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses an attachment shared by another absence and starts nothing", async () => {
+    const f = await absenceFixture({ shareWith: true });
+    await expect(suppress(f)).rejects.toMatchObject({
+      code: "RETENTION_SHARED_EVIDENCE_OR_HOLD",
+    });
+    expect(
+      await db.objectDeletionJob.count({ where: { fileId: f.file.id } }),
+    ).toBe(0);
+    expect(
+      (await db.archivo.findUniqueOrThrow({ where: { id: f.file.id } })).status,
+    ).toBe("DISPONIBLE");
+  });
+
+  it("refuses a non-terminal absence", async () => {
+    const f = await absenceFixture({ estado: "PENDIENTE_JUSTIFICACION" });
+    await expect(suppress(f)).rejects.toMatchObject({
+      code: "RETENTION_RESOURCE_NOT_TERMINAL",
+    });
+    expect(
+      await db.objectDeletionJob.count({ where: { fileId: f.file.id } }),
+    ).toBe(0);
+  });
 });
