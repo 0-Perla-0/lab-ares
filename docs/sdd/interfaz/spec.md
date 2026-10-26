@@ -22,6 +22,7 @@ Excluye marca institucional, contenido y políticas: no inventar identidad visua
 - Decisión (26/10): el naranja funcional se adapta de la referencia `cap-design.txt`, que lo trata como decorativo; el relleno se oscurece a `#c2410c` por contraste. El azul tinta/índigo se retira de botones y navegación; el texto pasa a `#202020`.
 - Fuente: pila del sistema (`Inter`, `Segoe UI`, `system-ui`); no se descarga ninguna fuente externa en build. Cargar una fuente alojada requiere decisión aparte.
 - [Tokens](../../../frontend/app/globals.css), [primitivos](../../../frontend/components/ui/primitives.tsx), [shell del portal](../../../frontend/components/portal/portal-shell.tsx).
+- 26/10: tras enlazar páginas institucionales en la barra pública, axe y desborde se repitieron en Chromium (320/768/1280 px, claro y oscuro) sin fallos; los enlaces extra sólo aparecen desde 1024 px y el resto vive en el footer.
 - Entrega y accesibilidad manual: [entrega](../entrega/spec.md) AC-3. Regresiones de modales: [modal-layout](../../../frontend/e2e/modal-layout.spec.ts).
 - Fases: U0 tokens/modo oscuro; U1 primitivos; U2 shell y navegación; U3 sitio público y acceso; U4 portal por feature; U5 verificación visual y manual.
 

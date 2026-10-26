@@ -33,5 +33,5 @@ Eliminar versiones S3 con intención durable y evidencia reconciliable. Hoy cubr
 - [x] **T2 · código · AC-4/5:** Adaptador de adjuntos de ausencia con holds compartidos, reserva y finalización por dominio; probado con mocks, falta integración real (T5).
 - [ ] **T3 · código · AC-1/2/5:** Intenciones para copias/huérfanos, incluidas preparaciones sin metadata tras respuesta SQL perdida.
 - [ ] **T4 · código · AC-6:** Diagnóstico de huérfanas hecho (`recoveryAssessment`); falta importar/reconciliar tras restaurar un snapshot anterior, ver [recuperación](../recuperacion/spec.md).
-- [ ] **T5 · validación · AC-2/4/5:** Fallos parciales, capacidad, concurrencia de todos los emisores y restore conjunto en buckets sintéticos nuevos.
+- [ ] **T5 · validación · AC-2/4/5:** Adjuntos de ausencia ya probados en MariaDB y MinIO versionado del 26/10 ([integración](../../../backend/test/integration/object-deletion.integration.test.ts)); faltan fallos parciales, capacidad, concurrencia de todos los emisores y restore conjunto.
 - [ ] **T6 · externo · AC-3/4:** Aprobar tratamiento/IAM/custodia/rotación/capacidad; sin supresión productiva autorizada por esta spec.

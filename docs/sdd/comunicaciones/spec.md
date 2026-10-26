@@ -27,5 +27,5 @@ Correo operativo genérico con enlace; no escritos, binarios, rutas privadas ni 
 - [x] **T1 · código · AC-1/2/4:** Avisos tipados de múltiples dominios, outbox privado y entrega genérica existentes.
 - [x] **T2 · código · AC-3:** Lifecycle de outbox/EmailDelivery por época y lease ([dispatcher](../../../backend/src/auth/outbox-dispatcher.service.ts), [pruebas](../../../backend/test/unit/auth/operational-delivery.test.ts)); validado con mocks, dos dispatchers reales en T4.
 - [ ] **T3 · código · AC-2:** Inventariar productores restantes y cobertura de avisos de seguridad/vencimiento/resolución, con schemas estrictos.
-- [ ] **T4 · validación · AC-1/3/4:** SMTP lento/rechazado/respuesta perdida y dos dispatchers contra base/SMTP sintéticos.
+- [ ] **T4 · validación · AC-1/3/4:** Dispatcher con barrera/lease verificado el 26/10 contra MariaDB y Mailpit reales (rechazo, reintento y aviso genérico); faltan SMTP lento/respuesta perdida y dos dispatchers simultáneos.
 - [ ] **T5 · externo · AC-2:** Aprobar destinatarios y canales institucionales sin inventar autoridades ni correos.
