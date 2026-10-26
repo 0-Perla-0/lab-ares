@@ -1,6 +1,6 @@
 # Archivos privados y cuarentena
 
-ID: `archivos` · Estado: parcial · Revisión: 2026-10-15
+ID: `archivos` · Estado: parcial · Revisión: 2026-10-26
 
 ## Objetivo y alcance
 
@@ -20,14 +20,14 @@ No usar servicios públicos para analizar justificantes/expedientes ni exponer r
 
 - [Storage](../../../backend/src/storage/), [worker](../../../backend/src/storage/storage.worker.ts), [presupuesto local](../../../backend/src/storage/upload-budget.ts).
 - [Tests](../../../backend/test/unit/storage/), [scanner real](../../../frontend/fullstack/operational.spec.ts), [upload controller](../../../backend/src/storage/files.controller.ts).
-- Brecha comprobada: worker hace `workersMayMutate` antes de escrituras root de recuperación/claim/exhaustion; no captura época como reportes/retención.
+- Desde el 26/10 el worker fija la época en su primera escritura (recuperar leases vencidos) y exige la misma en el reclamo, el resultado del escaneo y el agotamiento; una época movida termina el ciclo sin registrar un falso `ERROR` del scanner y deja el lease expirar.
 - `UploadBudget` usa un Set local por proceso; no impone cuota global. Escaneo/promoción conservan copias; reconciliador rechaza DELETE general.
 - Dependencias: [borrado](../borrado-objetos/spec.md), [operación](../operacion/spec.md).
 
 ## Tareas y pendientes
 
 - [x] **T1 · código · AC-1/2/3:** Pipeline y descargas autorizadas existentes.
-- [ ] **T2 · código · AC-4:** Uniformar lifecycle/claim/renovación/publicación/error por época y lease; probar freeze/unfreeze ABA con dos conexiones.
-- [ ] **T3 · código · AC-5:** Diseñar cuotas distribuidas y coordinación de capacidad sin confundir límite local con garantía global.
+- [x] **T2 · código · AC-4:** Lifecycle por época y lease en [worker](../../../backend/src/storage/storage.worker.ts) y [análisis](../../../backend/src/storage/storage.service.ts); [pruebas](../../../backend/test/unit/storage/storage.regressions.test.ts) con mocks. El ABA con dos conexiones reales sigue en T5.
+- [ ] **T3 · código · AC-5:** Diseño (26/10): admisión con reserva en MariaDB (fila por usuario/global con contador y lease, liberada al terminar o expirar), no un Set por proceso; requiere migración y límites aprobados. Pendiente de implementar.
 - [ ] **T4 · código · AC-6:** Limpieza por fases de copias/rechazados/huérfanos sin romper referencias ni holds.
 - [ ] **T5 · validación · AC-1/4/5:** Scanner caído/lento, disco lleno, subidas concurrentes y límites de proxy.

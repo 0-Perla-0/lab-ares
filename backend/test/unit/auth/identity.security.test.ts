@@ -93,8 +93,12 @@ describe("identity security boundaries", () => {
   });
 
   it("runs cleanup transaction with expiry and revocation predicates", async () => {
-    const prisma = {
-      $transaction: vi.fn().mockResolvedValue([]),
+    const prisma: any = {
+      $transaction: vi.fn((fn: any) => fn(prisma)),
+      $queryRaw: vi.fn().mockResolvedValue([]),
+      recoveryWriteBarrier: {
+        findUnique: vi.fn().mockResolvedValue({ active: false, version: 1 }),
+      },
       invitation: { updateMany: vi.fn() },
       recoveryToken: { deleteMany: vi.fn() },
       session: { deleteMany: vi.fn() },
@@ -110,9 +114,31 @@ describe("identity security boundaries", () => {
     expect(prisma.session.deleteMany).toHaveBeenCalled();
   });
 
+  it("deletes nothing while the recovery barrier is frozen", async () => {
+    const prisma: any = {
+      $transaction: vi.fn((fn: any) => fn(prisma)),
+      $queryRaw: vi.fn().mockResolvedValue([]),
+      recoveryWriteBarrier: {
+        findUnique: vi.fn().mockResolvedValue({ active: true, version: 2 }),
+      },
+      invitation: { updateMany: vi.fn() },
+      recoveryToken: { deleteMany: vi.fn() },
+      session: { deleteMany: vi.fn() },
+    };
+    const service = new IdentityCleanupService(prisma);
+    await expect(service.run()).resolves.toBeUndefined();
+    expect(prisma.session.deleteMany).not.toHaveBeenCalled();
+    expect(prisma.recoveryToken.deleteMany).not.toHaveBeenCalled();
+    expect(prisma.invitation.updateMany).not.toHaveBeenCalled();
+  });
+
   it("cleans up again after a prior run completes", async () => {
-    const prisma = {
-      $transaction: vi.fn().mockResolvedValue([]),
+    const prisma: any = {
+      $transaction: vi.fn((fn: any) => fn(prisma)),
+      $queryRaw: vi.fn().mockResolvedValue([]),
+      recoveryWriteBarrier: {
+        findUnique: vi.fn().mockResolvedValue({ active: false, version: 1 }),
+      },
       invitation: { updateMany: vi.fn() },
       recoveryToken: { deleteMany: vi.fn() },
       session: { deleteMany: vi.fn() },
@@ -124,8 +150,12 @@ describe("identity security boundaries", () => {
   });
 
   it("archives only invitations outside the retention window", async () => {
-    const prisma = {
-      $transaction: vi.fn().mockResolvedValue([]),
+    const prisma: any = {
+      $transaction: vi.fn((fn: any) => fn(prisma)),
+      $queryRaw: vi.fn().mockResolvedValue([]),
+      recoveryWriteBarrier: {
+        findUnique: vi.fn().mockResolvedValue({ active: false, version: 1 }),
+      },
       invitation: { updateMany: vi.fn() },
       recoveryToken: { deleteMany: vi.fn() },
       session: { deleteMany: vi.fn() },
@@ -140,8 +170,12 @@ describe("identity security boundaries", () => {
   });
 
   it("keeps invitation cleanup non-destructive even when no retention is configured", async () => {
-    const prisma = {
-      $transaction: vi.fn().mockResolvedValue([]),
+    const prisma: any = {
+      $transaction: vi.fn((fn: any) => fn(prisma)),
+      $queryRaw: vi.fn().mockResolvedValue([]),
+      recoveryWriteBarrier: {
+        findUnique: vi.fn().mockResolvedValue({ active: false, version: 1 }),
+      },
       invitation: { updateMany: vi.fn() },
       recoveryToken: { deleteMany: vi.fn() },
       session: { deleteMany: vi.fn() },
