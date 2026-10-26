@@ -2,7 +2,7 @@
 
 Revisión estática: **15/10/2026**; actualizada el **26/10/2026** (contenido público, borrado de adjuntos, outbox, scanner, recuperación), contrastada con módulos, rutas, servicios, Prisma y pruebas del árbol de trabajo.
 Especificaciones SDD de features verticales; no asignaciones por persona o capa.
-[Cómo trabajar](sdd/README.md) · [Memoria](../MEMORY.md).
+[Cómo trabajar](sdd/README.md) · [Memoria](../MEMORY.md) · [Aprobaciones externas](aprobaciones-externas.md).
 
 ## Inventario
 
@@ -42,11 +42,11 @@ Especificaciones SDD de features verticales; no asignaciones por persona o capa.
 
 ## Orden recomendado
 
-1. Borrado de objetos y retención: resolver bloqueos explícitos sin reintroducir DELETE bajo rollback SQL.
-2. Archivos/comunicaciones/escrituras/operación: cerrar la matriz de época, lease, reintento, autorización y flags por efecto.
-3. Reportes: definir historia faltante antes de implementar backfills; medir capacidad de archivos/exportaciones.
-4. Recuperación: ensayo coordinado aislado y reconciliación de intenciones externas antes de reapertura.
-5. Entrega: aceptación por feature, accesibilidad humana, carga y CI; después aprobación externa de piloto/promoción.
+El código de las features está cerrado (26/10); lo que falta es validación y autoridad externa.
+
+1. Validación a cargo del equipo: ensayo multirréplica, fallos reales de red/SMTP/disco, restauración conjunta DB+objetos+journal, carga y accesibilidad manual. Cada spec lista sus tareas `validación`.
+2. Aprobaciones externas: [lista de verificación](aprobaciones-externas.md). Sin ellas las funciones destructivas o institucionales siguen apagadas.
+3. Entrega: CI remota, aceptación por anillo y promoción autorizada.
 
 No reimplementar recorridos existentes. Tratamientos, destinatarios, calendario, secretos, proveedor y liberación requieren autoridad externa; no inventarlos.
 No hay porcentaje global de terminado: código, evidencia local y autorización institucional son estados diferentes.
