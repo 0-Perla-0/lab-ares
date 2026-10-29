@@ -334,6 +334,34 @@ textarea:disabled {
   animation: fade-up 350ms ease-out both;
 }
 
+@keyframes skeleton-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+/* Silueta de carga: tinte translúcido visible sobre cualquier superficie; con movimiento reducido queda estática.
+   En la capa components para que las utilidades `rounded-*` la sobrescriban. */
+@layer components {
+  .skeleton {
+    border-radius: var(--radius-input);
+    background: color-mix(in srgb, var(--color-ink) 10%, transparent);
+    animation: skeleton-pulse 1.6s ease-in-out infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .skeleton {
+    border: 1px solid CanvasText;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;

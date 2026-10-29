@@ -581,6 +581,12 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
                   <p className="truncate text-sm font-bold text-[var(--color-ink)]">
                     {user.codigo}
                   </p>
+                  <p
+                    className="truncate text-xs font-medium text-[var(--color-muted)]"
+                    title={user.email}
+                  >
+                    {user.email}
+                  </p>
                   <p className="truncate text-xs font-medium text-[var(--color-muted)]">
                     {roleLabels[user.rol]}
                   </p>
@@ -643,7 +649,8 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
       )}
 
       <div className="min-w-0">
-        <header className="safe-area-top sticky top-0 z-30 flex min-h-17 items-center justify-between border-b border-[var(--color-border)] bg-[var(--color-canvas)]/95 px-4 backdrop-blur-xl sm:px-7 lg:justify-end">
+        {/* Desde 1024 px la barra lateral ya muestra menú e identidad. */}
+        <header className="safe-area-top sticky top-0 z-30 flex min-h-17 items-center justify-between border-b border-[var(--color-border)] bg-[var(--color-canvas)]/95 px-4 backdrop-blur-xl sm:px-7 lg:hidden">
           <button
             ref={menuButtonRef}
             type="button"

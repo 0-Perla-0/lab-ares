@@ -7,7 +7,12 @@ import {
   useDomainAction,
   useDomainData,
 } from "@/components/portal/domain-ui";
-import { Field, Panel, inputClassName } from "@/components/ui/primitives";
+import {
+  Field,
+  LoadingLines,
+  Panel,
+  inputClassName,
+} from "@/components/ui/primitives";
 import type { Formalization } from "@/lib/backend2/documents";
 
 export function ExpedientFormalization({ userId }: { userId: number }) {
@@ -31,7 +36,7 @@ export function ExpedientFormalization({ userId }: { userId: number }) {
       title="Formalización del expediente"
       description="Exige adscripción académica confirmada para la fecha de inicio. Conserva una constancia inmutable; no autoriza documentos ni abona horas automáticamente."
     >
-      {loading && <p role="status">Consultando formalizaciones…</p>}
+      {loading && <LoadingLines label="Consultando formalizaciones…" />}
       {error && (
         <p role="alert">
           {error}{" "}

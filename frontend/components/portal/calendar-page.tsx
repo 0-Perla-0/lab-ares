@@ -24,6 +24,7 @@ import {
   Modal,
   PageHeader,
   Panel,
+  Skeleton,
   inputClassName,
   textareaClassName,
 } from "@/components/ui/primitives";
@@ -317,7 +318,10 @@ export function CalendarPage() {
           {error}
         </p>
       )}
-      <p role="status">{notice || (loading ? "Cargando calendario…" : "")}</p>
+      <p role="status">
+        {notice ||
+          (loading && <span className="sr-only">Cargando calendario…</span>)}
+      </p>
       {view === "week" && (
         <Field label="Día de la semana a consultar">
           <input
@@ -336,6 +340,13 @@ export function CalendarPage() {
         className="grid grid-cols-1 gap-2 sm:grid-cols-4 lg:grid-cols-7"
       >
         {visibleDays.map((day) => {
+          if (loading)
+            return (
+              <Skeleton
+                key={day}
+                className="h-24 rounded-[var(--radius-card)]"
+              />
+            );
           const effective = effectiveCalendarEvent(data.items, day, user);
           const work = effective
             ? ["HORARIO_ESPECIAL", "ASISTENCIA_EXTRAORDINARIA"].includes(

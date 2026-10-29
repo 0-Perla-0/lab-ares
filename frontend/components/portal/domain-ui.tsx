@@ -2,7 +2,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, apiRequest } from "@/lib/api";
 import { socialError, socialMutation } from "@/lib/service-social";
-import { Field, inputClassName } from "@/components/ui/primitives";
+import {
+  Field,
+  LoadingLines,
+  inputClassName,
+} from "@/components/ui/primitives";
 import { pendingIdempotencyKey } from "@/lib/attendance";
 export const actionClass =
   "focus-ring min-h-11 rounded-full border px-4 py-2 disabled:opacity-50";
@@ -218,7 +222,7 @@ export function ReadFeedback({
 }) {
   return (
     <>
-      {loading && <p role="status">Cargando…</p>}
+      {loading && <LoadingLines />}
       {error && (
         <div role="alert">
           <p>{error}</p>

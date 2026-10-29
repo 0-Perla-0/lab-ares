@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { ArrowRight, Building2, Clock3, UsersRound } from "lucide-react";
+import { Building2, Clock3, UsersRound } from "lucide-react";
 
 import { PublicFooter } from "@/components/public/footer";
 import { PublicHeader } from "@/components/public/header";
@@ -67,25 +66,6 @@ export default function HomePage() {
                 Laboratorio de Inventores dedique menos tiempo a coordinar y más
                 tiempo a crear.
               </p>
-              <div className="mt-9 flex flex-wrap items-center gap-3">
-                <Link
-                  href="/login"
-                  className="focus-ring group inline-flex min-h-11 items-center gap-2 rounded-full bg-[var(--color-primary)] px-6 text-sm font-bold text-[var(--color-on-primary)] shadow-[var(--shadow-button)] transition hover:bg-[var(--color-primary-hover)]"
-                >
-                  Acceder a Ares
-                  <ArrowRight
-                    size={17}
-                    aria-hidden="true"
-                    className="transition group-hover:translate-x-1 motion-reduce:transition-none"
-                  />
-                </Link>
-                <Link
-                  href="/#plataforma"
-                  className="focus-ring inline-flex min-h-11 items-center rounded-full border border-[var(--color-border)] px-6 text-sm font-medium transition hover:bg-[var(--color-surface-inset)]"
-                >
-                  Conocer la plataforma
-                </Link>
-              </div>
             </div>
 
             <div className="relative mx-auto w-full max-w-md lg:max-w-none">

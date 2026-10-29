@@ -16,6 +16,8 @@ Excluye marca institucional, contenido y políticas: no inventar identidad visua
 - **AC-4:** Superficies `#fcfcfc` (no blanco puro) con bordes `#e0e0e0`; texto `#202020`, apoyo `#646464` (≥4.5:1). Modo oscuro con valores propios, no invertidos, y contraste verificado por separado.
 - **AC-5:** Se conservan foco visible ≥3:1, objetivos ≥44 px, `prefers-reduced-motion`, `forced-colors`, portal/scroll/tamaños de modales y semántica ARIA existentes. Estado nunca sólo por color.
 - **AC-6:** Sin horizontal scroll desde 320 px; los cambios no alteran textos accesibles ni roles usados por las pruebas de navegador.
+- **AC-7:** Cargas de pantalla, sección o lista usan skeleton con la silueta del contenido (`role="status"`, texto sólo para lector, sin animación con `prefers-reduced-motion`); el spinner queda para acciones puntuales (botón que guarda, sube o envía).
+- **AC-8:** Sin acciones ni datos repetidos en una misma vista: cada destino tiene un único enlace por región (barra, cuerpo, pie) y la identidad de sesión se muestra una sola vez por viewport.
 
 ## Diseño y evidencia
 
@@ -23,6 +25,7 @@ Excluye marca institucional, contenido y políticas: no inventar identidad visua
 - Fuente: pila del sistema (`Inter`, `Segoe UI`, `system-ui`); no se descarga ninguna fuente externa en build. Cargar una fuente alojada requiere decisión aparte.
 - [Tokens](../../../frontend/app/globals.css), [primitivos](../../../frontend/components/ui/primitives.tsx), [shell del portal](../../../frontend/components/portal/portal-shell.tsx).
 - 26/10: tras enlazar páginas institucionales en la barra pública, axe y desborde se repitieron en Chromium (320/768/1280 px, claro y oscuro) sin fallos; los enlaces extra sólo aparecen desde 1024 px y el resto vive en el footer.
+- 29/10: skeletons en [primitivos](../../../frontend/components/ui/primitives.tsx) (`Skeleton`, `LoadingTable`, `LoadingLines`) y silueta del portal en [auth-provider](../../../frontend/components/auth/auth-provider.tsx); la cabecera del portal sólo existe bajo 1024 px porque la barra lateral ya muestra identidad, y el panel principal retira la tarjeta "Cuenta activa" que repetía correo y código.
 - Entrega y accesibilidad manual: [entrega](../entrega/spec.md) AC-3. Regresiones de modales: [modal-layout](../../../frontend/e2e/modal-layout.spec.ts).
 - Fases: U0 tokens/modo oscuro; U1 primitivos; U2 shell y navegación; U3 sitio público y acceso; U4 portal por feature; U5 verificación visual y manual.
 
@@ -34,3 +37,4 @@ Excluye marca institucional, contenido y políticas: no inventar identidad visua
 - [x] **T4 · código · AC-3/6:** U3 (inicio, acceso, recuperación, invitación) y U4 (portal y consolas por feature) migrados a tokens sin hex; codemod por clases, revisión visual sólo de dashboard, usuarios e inicio con APIs interceptadas.
 - [ ] **T5 · validación · AC-4/5/6:** Axe WCAG 2.2 AA y sin desborde a 320/768/1280 px en claro y oscuro ([theme-a11y](../../../frontend/e2e/theme-a11y.spec.ts), Chromium, APIs interceptadas); falta revisión manual (teclado, foco, zoom 200 %, lector) y otros navegadores.
 - [ ] **T6 · externo · AC-1:** Aprobar identidad visual y fuente institucional si existe una guía oficial.
+- [x] **T7 · código · AC-7/8:** Skeleton en cargas de pantalla y retiro de enlaces, CTAs e identidad duplicados (sitio público y portal). Gates 29/10: `quality` (con `DATABASE_URL` sintética, sin integración), e2e Chromium interceptado de contenido público, theme-a11y, navegación, ausencias/calendario, asistencia, modales y documentos; revisión visual del menú a 320 px y skeleton claro/oscuro. Sin revisión manual de lector ni otros navegadores (T5).
