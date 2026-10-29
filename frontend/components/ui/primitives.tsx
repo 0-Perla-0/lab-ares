@@ -510,21 +510,68 @@ export function ErrorBanner({ message }: { message: string }) {
   );
 }
 
-export function LoadingTable() {
+// Las cargas de pantalla y listas usan silueta; el spinner queda para acciones de botón.
+export function Skeleton({ className = "" }: { className?: string }) {
+  return <span aria-hidden="true" className={`skeleton block ${className}`} />;
+}
+
+export function LoadingTable({
+  rows = 4,
+  label = "Cargando información…",
+}: {
+  rows?: number;
+  label?: string;
+}) {
   return (
     <div
       role="status"
       aria-live="polite"
       aria-busy="true"
-      className="grid min-h-56 place-items-center rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)]"
+      className="overflow-hidden rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)]"
     >
-      <div className="text-center text-[var(--color-muted)]">
-        <LoaderCircle
-          size={25}
-          className="mx-auto animate-spin text-[var(--color-primary)]"
-        />
-        <p className="mt-3 text-sm font-bold">Cargando información…</p>
+      <span className="sr-only">{label}</span>
+      <div className="flex items-center gap-4 border-b border-[var(--color-border)] px-5 py-4">
+        <Skeleton className="h-3 w-1/4" />
+        <Skeleton className="ml-auto h-3 w-16" />
       </div>
+      {Array.from({ length: rows }, (_, index) => (
+        <div
+          key={index}
+          className="flex items-center gap-4 border-b border-[var(--color-border)] px-5 py-4 last:border-b-0"
+        >
+          <Skeleton className="h-10 w-10 shrink-0 rounded-full" />
+          <div className="min-w-0 flex-1 space-y-2">
+            <Skeleton className={`h-3 ${index % 2 ? "w-2/5" : "w-1/2"}`} />
+            <Skeleton className="h-3 w-1/3" />
+          </div>
+          <Skeleton className="hidden h-7 w-20 rounded-full sm:block" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function LoadingLines({
+  lines = 3,
+  label = "Cargando información…",
+}: {
+  lines?: number;
+  label?: string;
+}) {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+      className="space-y-3"
+    >
+      <span className="sr-only">{label}</span>
+      {Array.from({ length: lines }, (_, index) => (
+        <Skeleton
+          key={index}
+          className={`h-4 ${index === lines - 1 ? "w-2/3" : "w-full"}`}
+        />
+      ))}
     </div>
   );
 }

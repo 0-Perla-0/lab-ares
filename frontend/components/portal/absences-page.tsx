@@ -19,6 +19,7 @@ import {
   Field,
   ForbiddenState,
   FormActions,
+  LoadingTable,
   Modal,
   PageHeader,
   Panel,
@@ -236,7 +237,10 @@ export function AbsencesPage() {
           {error}
         </p>
       )}
-      <p role="status">{notice || (loading ? "Cargando ausencias…" : "")}</p>
+      <p role="status">{notice}</p>
+      {loading && !rows.length && (
+        <LoadingTable rows={3} label="Cargando ausencias…" />
+      )}
       {!loading && !rows.length && <p>No hay ausencias en esta bandeja.</p>}
       <div aria-busy={loading} className="space-y-4">
         {rows.map((row) => (

@@ -5,7 +5,7 @@ import Link from "next/link";
 
 import { PublicFooter } from "@/components/public/footer";
 import { PublicHeader } from "@/components/public/header";
-import { LoadError, LoadingTable } from "@/components/ui/primitives";
+import { LoadError, Skeleton } from "@/components/ui/primitives";
 import { ApiError, getApiErrorMessage } from "@/lib/api";
 import {
   publicContentApi,
@@ -54,7 +54,7 @@ export function PublicContentPage({
       <main className="min-h-[70vh] bg-[var(--color-surface-inset)] px-5 py-14 sm:px-8 sm:py-20">
         <div className="mx-auto max-w-4xl">
           {loading && !page ? (
-            <LoadingTable />
+            <ArticleSkeleton />
           ) : unpublished ? (
             <section role="status" className="space-y-4">
               <h1 className="text-3xl font-bold tracking-[-0.04em]">
@@ -98,6 +98,25 @@ export function PublicContentPage({
       </main>
       <PublicFooter />
     </>
+  );
+}
+
+function ArticleSkeleton() {
+  return (
+    <div role="status" aria-live="polite" aria-busy="true">
+      <span className="sr-only">Cargando información…</span>
+      <Skeleton className="h-3 w-44" />
+      <Skeleton className="mt-4 h-12 w-3/4 sm:h-16" />
+      <Skeleton className="mt-5 h-3 w-48" />
+      <div className="mt-10 space-y-5">
+        {Array.from({ length: 4 }, (_, index) => (
+          <Skeleton
+            key={index}
+            className="h-16 w-full rounded-[var(--radius-card)]"
+          />
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -205,11 +224,9 @@ function PublicAssetImage({
           className="h-auto w-full rounded-[var(--radius-card)] object-cover"
         />
       ) : (
-        <div
-          role="status"
-          className="grid min-h-48 place-items-center text-sm font-bold text-[var(--color-muted)]"
-        >
-          Cargando imagen…
+        <div role="status">
+          <span className="sr-only">Cargando imagen…</span>
+          <Skeleton className="min-h-48 w-full rounded-[var(--radius-card)]" />
         </div>
       )}
       {block.contenido.pie && (

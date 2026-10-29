@@ -2,8 +2,9 @@
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { LoaderCircle, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 
+import { LoadingTable, Skeleton } from "@/components/ui/primitives";
 import { ApiError, apiRequest, getApiErrorMessage } from "@/lib/api";
 import type { ApiEnvelope, AuthUser } from "@/lib/types";
 import { ReauthenticationDialog } from "./reauthentication-dialog";
@@ -59,21 +60,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [user],
   );
 
-  if (loading) {
-    return (
-      <main className="grid min-h-screen place-items-center bg-[var(--color-surface-inset)]">
-        <div className="text-center">
-          <LoaderCircle
-            className="mx-auto animate-spin text-[var(--color-accent-text)]"
-            size={30}
-          />
-          <p className="mt-4 text-sm font-bold text-[var(--color-muted)]">
-            Preparando tu espacio…
-          </p>
-        </div>
-      </main>
-    );
-  }
+  if (loading) return <PortalSkeleton />;
 
   if (error || !value) {
     return (
@@ -108,4 +95,32 @@ export function useAuth() {
   const value = useContext(AuthContext);
   if (!value) throw new Error("useAuth must be used inside AuthProvider");
   return value;
+}
+
+// Silueta del portal (barra lateral, cabecera y contenido) mientras se valida la sesión.
+function PortalSkeleton() {
+  return (
+    <div className="portal-background min-h-screen lg:grid lg:grid-cols-[17rem_1fr]">
+      <aside className="hidden h-screen flex-col gap-3 border-r border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-5 lg:flex">
+        <Skeleton className="mb-4 h-12 w-40" />
+        {Array.from({ length: 6 }, (_, index) => (
+          <Skeleton key={index} className="h-10 w-full rounded-full" />
+        ))}
+        <Skeleton className="mt-auto h-24 w-full rounded-[var(--radius-card)]" />
+      </aside>
+      <div className="min-w-0">
+        <div className="flex min-h-17 items-center justify-between border-b border-[var(--color-border)] bg-[var(--color-canvas)] px-4 sm:px-7 lg:hidden">
+          <Skeleton className="h-11 w-11 rounded-full" />
+          <Skeleton className="h-11 w-11 rounded-full" />
+        </div>
+        <main className="mx-auto w-full max-w-[92rem] space-y-6 px-4 py-7 sm:px-7 sm:py-9 lg:px-10">
+          <div className="space-y-3">
+            <Skeleton className="h-3 w-28" />
+            <Skeleton className="h-9 w-64 max-w-full" />
+          </div>
+          <LoadingTable label="Preparando tu espacio…" />
+        </main>
+      </div>
+    </div>
+  );
 }

@@ -157,7 +157,7 @@ export function DashboardPage() {
         ))}
       </section>
 
-      <section className="mt-6 grid gap-6 xl:grid-cols-[1.3fr_0.7fr]">
+      <section className="mt-6">
         <div className="rounded-[var(--radius-card-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-6 sm:p-8">
           <div className="flex items-center gap-3">
             <span className="grid h-11 w-11 place-items-center rounded-full bg-[var(--color-primary)] text-[var(--color-on-primary)]">
@@ -192,21 +192,6 @@ export function DashboardPage() {
               </div>
             ))}
           </div>
-        </div>
-
-        <div className="rounded-[var(--radius-card-lg)] border border-[var(--color-border)] bg-[var(--color-accent-soft)] p-6 text-[var(--color-ink)] sm:p-8">
-          <p className="text-xs font-bold uppercase tracking-[var(--tracking-eyebrow)] text-[var(--color-ink)]">
-            Cuenta activa
-          </p>
-          <h2 className="mt-3 text-2xl font-bold tracking-[-0.04em]">
-            Tu acceso está listo.
-          </h2>
-          <p className="mt-3 break-all text-sm font-semibold leading-6 text-[var(--color-ink)]">
-            {user.email}
-          </p>
-          <p className="mt-6 text-xs font-bold text-[var(--color-ink)]">
-            Código {user.codigo}
-          </p>
         </div>
       </section>
     </div>

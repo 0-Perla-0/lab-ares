@@ -434,9 +434,9 @@ function Review({
     <section className="mt-8">
       <h2 className="text-xl font-bold">Sesiones abiertas en tu ámbito</h2>
       {loading ? (
-        <p role="status" className="mt-4 text-sm">
-          Cargando sesiones…
-        </p>
+        <div className="mt-4">
+          <LoadingTable rows={3} label="Cargando sesiones…" />
+        </div>
       ) : error ? (
         <p
           role="alert"
