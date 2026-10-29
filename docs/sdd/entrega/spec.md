@@ -1,6 +1,6 @@
 # Entrega y aceptación
 
-ID: `entrega` · Estado: parcial · Revisión: 2026-10-26
+ID: `entrega` · Estado: parcial · Revisión: 2026-10-29
 
 ## Objetivo y alcance
 
@@ -16,6 +16,7 @@ Build/test local verde no autoriza staging, piloto, producción ni supresión/re
 - **AC-5:** CI del mismo commit, candidato inmutable y promoción del mismo digest; secretos/entornos aislados, runtime/migrador separados, sin reconstruir runtime durante aceptación.
 - **AC-6:** Anillos: staging → piloto SS una sede/área (10–25, ≥20 días hábiles) → expansión/expediente → Kairos → módulos complementarios por flag. Parar por duplicidad/exposición/barrera/auditoría inconciliable.
 - **AC-7:** Cambiar regla sensible requiere aceptación funcional/operativa y autoridad institucional de datos/permisos/horas cuando aplique. Silencio no aprueba; rollback preserva historia, no restaura DB destructivamente por defecto.
+- **AC-8:** Desde la raíz, `npm run dev` prepara Prisma y arranca backend/frontend juntos; conserva los comandos separados y detiene ambos al interrumpir o fallar un proceso. El arranque no migra bases, crea cuentas ni habilita workers. Los hosts de desarrollo adicionales se autorizan explícitamente por entorno, sin comodines globales.
 
 ## Diseño y evidencia
 
@@ -30,6 +31,8 @@ Build/test local verde no autoriza staging, piloto, producción ni supresión/re
 - Dependencias (26/10): `next` 16.4.3, `zod` 4.6.7, `nodemailer` 10.2.1, `body-parser` 2.4.0, `fast-uri` 3.1.9 y `multer` 2.5.0 forzado por `overrides` (platform-express 11 lo fija en 2.4.0). `npm audit --omit=dev` queda en 0 avisos; `npm run quality` aprobado con 1072 pruebas de backend y 72 de frontend; retirar el override cuando Nest publique una versión corregida.
 - `npm run quality` incluye formato, docs, lint a11y, Prisma, unitarias, tipos/builds; integración/navegador son gates separados.
 - Prisma validate/generate exige `DATABASE_URL` aunque no conecte: para quality sin DB usar URL sintética de ensayo sólo en el proceso; no crear `.env` productiva, migrar ni fingir integración real.
+- Arranque local: supervisión concurrente de los scripts existentes; `predev` genera Prisma y rechaza la configuración de ejemplo antes de arrancar servicios. La preparación inicial de MariaDB y sus credenciales permanece explícita; no ejecuta migraciones ni bootstrap en cada arranque.
+- Validación de AC-8 (29/10): `npm run quality` aprobado (6 documentales, 1072 backend, 72 frontend, tipos y builds). En Windows se comprobó arranque conjunto, parada con Ctrl+C y cierre del frontend al terminar el comando backend; ambos puertos quedaron libres. Con MariaDB/MinIO locales nuevos, readiness 200, login 200 y contenido público sin spinner por localhost/IP; el CMS vacío devuelve 404 y estado no publicado. Es una comprobación de arranque real, no la suite full-stack ni aceptación institucional.
 - Full-stack: configurar `ARES_FULLSTACK_URL`, `ARES_MAILPIT_URL`, `ARES_FULLSTACK_DB_URL` de stack local nuevo; `npm run test:e2e:fullstack`. Overlay requiere Compose ≥2.24.4 y puertos libres, bind loopback.
 - Workflow candidato entregado, sin evidencia de ejecución/publicación remota. Manifiesto `productionAuthorized=false` no aprueba release.
 - Dependencias fijadas/overrides en lockfile resolvieron advisories reportados al corte anterior; repetir `npm audit --omit=dev`. No certificar imágenes base/proveedor con ese dato histórico.
@@ -41,3 +44,5 @@ Build/test local verde no autoriza staging, piloto, producción ni supresión/re
 - [ ] **T3 · validación · AC-1/5:** Carga/cuotas/multirréplica, instalación fresh/upgrade/grants/deriva y restore coordinado del último código.
 - [ ] **T4 · externo · AC-5/6/7:** Ejecutar CI/publicación remota, configurar proveedor/TLS/secrets/proxy/registry y aprobar staging/piloto/promoción/rollback.
 - [ ] **T5 · externo · AC-6/7:** Asignar autoridad funcional, operativa, técnica, de datos y de liberación; soporte/capacitación y decisión explícita por anillo, sin reparto por desarrollador.
+- [x] **T6 · código · AC-8:** Añadir arranque conjunto y hosts locales configurables y actualizar la instalación inicial.
+- [x] **T7 · validación · AC-8:** Comprobar arranque/parada real en Windows más quality. La base usada para la comprobación debe ser local nueva y permanecer separada de bases existentes.
